@@ -3,7 +3,6 @@ options:
   bundleIdPrefix: com.twstock
   deploymentTarget:
     iOS: "16.0"
-  xcodeVersion: "15.4"
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -20,13 +19,16 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: App
+        excludes:
+          - "Info.plist"
       - path: Shared
+        excludes:
+          - "*.entitlements"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.twstock.tracker
-        INFOPLIST_KEY_CFBundleDisplayName: "台股績效"
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        INFOPLIST_FILE: App/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
         CODE_SIGN_ENTITLEMENTS: Shared/TaiwanStockTracker.entitlements
     dependencies:
       - target: TaiwanStockWidgetExtension
@@ -37,13 +39,16 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: Widget
+        excludes:
+          - "Info.plist"
       - path: Shared
+        excludes:
+          - "*.entitlements"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.twstock.tracker.widget
-        INFOPLIST_KEY_CFBundleDisplayName: "台股監控小工具"
-        INFOPLIST_KEY_NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        INFOPLIST_FILE: Widget/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
         CODE_SIGN_ENTITLEMENTS: Shared/TaiwanStockWidgetExtension.entitlements
     frameworks:
       - framework: WidgetKit.framework
