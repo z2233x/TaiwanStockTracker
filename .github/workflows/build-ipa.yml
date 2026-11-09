@@ -36,10 +36,26 @@ jobs:
 
       - name: Package IPA
         run: |
+          APP_PATH="build/TaiwanStockTracker.xcarchive/Products/Applications/TaiwanStockTracker.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: $APP_PATH not found!"
+            find build -name "*.app"
+            exit 1
+          fi
+
+          echo "Found compiled app bundle:"
+          ls -la "$APP_PATH"
+
           mkdir -p build/Payload
-          cp -r build/TaiwanStockTracker.xcarchive/Products/Applications/TaiwanStockTracker.app build/Payload/
+          cp -R "$APP_PATH" build/Payload/
+
           cd build
-          zip -r TaiwanStockTracker.ipa Payload
+          zip -qry TaiwanStockTracker.ipa Payload
+          echo "Generated IPA size:"
+          ls -lh TaiwanStockTracker.ipa
+
+          echo "IPA Manifest:"
+          unzip -l TaiwanStockTracker.ipa
           cd ..
 
       - name: Upload IPA
