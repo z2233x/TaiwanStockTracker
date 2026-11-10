@@ -328,9 +328,9 @@ struct DashboardView: View {
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(16)
                     
-                    // 4. ETF 投資佔比 (環形圓餅圖 Donut Chart)
+                    // 4. 投資佔比 (環形圓餅圖 Donut Chart)
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("ETF 投資佔比")
+                        Text("投資佔比")
                             .font(.headline.bold())
                         
                         // Donut Chart 圖形
@@ -339,9 +339,9 @@ struct DashboardView: View {
                                 .frame(width: 200, height: 200)
                             
                             VStack(spacing: 4) {
-                                Text("ETF")
+                                Image(systemName: "chart.pie.fill")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(Color(hex: "#007AFF"))
                                 Text("投資佔比")
                                     .font(.subheadline.bold())
                             }
