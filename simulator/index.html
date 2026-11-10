@@ -338,6 +338,14 @@
       🔍 瀏覽全台股資料庫 (2,409 檔)
     </button>
 
+    <button class="sim-btn primary" onclick="openBrokerageModal()">
+      🏦 券商銀行對接與匯入
+    </button>
+
+    <button class="sim-btn" onclick="openRankModal()">
+      🏅 存股晉升榮譽榜 (等級天梯)
+    </button>
+
     <button class="sim-btn" onclick="refreshQuotesSim()">
       🔄 模擬盤中即時報價更新
     </button>
@@ -389,8 +397,8 @@
           <span>股息日曆</span>
         </div>
         <div class="tab-item" onclick="switchTab(1)" id="tab1">
-          <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-          <span>我的追蹤</span>
+          <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+          <span>持有現股</span>
         </div>
         <div class="tab-item active" onclick="switchTab(2)" id="tab2">
           <svg viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2 0v8.99H22c-.47-4.74-4.24-8.52-9-8.99zm0 11.01V22c4.76-.47 8.53-4.25 9-8.99H13z"/></svg>
@@ -422,13 +430,35 @@
 <script>
   // 資料庫 (LocalStorage 持久化)
   const defaultHoldings = [
-    { id: '1', symbol: '0056', name: '元大高股息', frequency: '季配', shares: 3000, averageCost: 37.84, currentPrice: 37.05, totalDividends: 1070, count: 1 },
-    { id: '2', symbol: '00929', name: '復華台灣科技優息', frequency: '月配', shares: 4000, averageCost: 19.85, currentPrice: 19.90, totalDividends: 1590, count: 4 },
-    { id: '3', symbol: '00919', name: '群益台灣精選高息', frequency: '季配', shares: 2000, averageCost: 23.50, currentPrice: 24.10, totalDividends: 720, count: 1 },
-    { id: '4', symbol: '00936', name: '台新永續高息中小', frequency: '月配', shares: 2000, averageCost: 16.20, currentPrice: 16.50, totalDividends: 380, count: 2 },
-    { id: '5', symbol: '00915', name: '凱基優選高股息30', frequency: '季配', shares: 1500, averageCost: 26.80, currentPrice: 27.20, totalDividends: 450, count: 1 },
-    { id: '6', symbol: '00717', name: '富邦美國特別股', frequency: '季配', shares: 1000, averageCost: 15.60, currentPrice: 15.80, totalDividends: 160, count: 1 }
+    { id: '1', symbol: '0056', name: '元大高股息', frequency: '季配', shares: 3000, averageCost: 37.84, currentPrice: 37.05, totalDividends: 1070, count: 1, brokerage: '元大證券' },
+    { id: '2', symbol: '00929', name: '復華台灣科技優息', frequency: '月配', shares: 4000, averageCost: 19.85, currentPrice: 19.90, totalDividends: 1590, count: 4, brokerage: '國泰綜合證券' },
+    { id: '3', symbol: '00919', name: '群益台灣精選高息', frequency: '季配', shares: 2000, averageCost: 23.50, currentPrice: 24.10, totalDividends: 720, count: 1, brokerage: '永豐金證券' },
+    { id: '4', symbol: '00936', name: '台新永續高息中小', frequency: '月配', shares: 2000, averageCost: 16.20, currentPrice: 16.50, totalDividends: 380, count: 2, brokerage: '台新證券' },
+    { id: '5', symbol: '00915', name: '凱基優選高股息30', frequency: '季配', shares: 1500, averageCost: 26.80, currentPrice: 27.20, totalDividends: 450, count: 1, brokerage: '凱基證券' },
+    { id: '6', symbol: '00717', name: '富邦美國特別股', frequency: '季配', shares: 1000, averageCost: 15.60, currentPrice: 15.80, totalDividends: 160, count: 1, brokerage: '富邦證券' }
   ];
+
+  // 遊戲化存股晉升等級系統 (共 7 個段位)
+  const investorRanks = [
+    { level: 1, title: '存股見習生', badge: '🥉', color: '#CD7F32', min: 0, max: 100000 },
+    { level: 2, title: '存股築基者', badge: '🥈', color: '#8E8E93', min: 100000, max: 500000 },
+    { level: 3, title: '被動現金流行家', badge: '🥇', color: '#FFD700', min: 500000, max: 1000000 },
+    { level: 4, title: '百萬存股達人', badge: '💎', color: '#007AFF', min: 1000000, max: 3000000 },
+    { level: 5, title: '穩健資本家', badge: '👑', color: '#AF52DE', min: 3000000, max: 5000000 },
+    { level: 6, title: '財富自由領航員', badge: '🏆', color: '#FF9500', min: 5000000, max: 10000000 },
+    { level: 7, title: '傳奇存股巨擘', badge: '⭐', color: '#FF2D55', min: 10000000, max: Infinity }
+  ];
+
+  function getCurrentRank(amount) {
+    for (let i = investorRanks.length - 1; i >= 0; i--) {
+      if (amount >= investorRanks[i].min) return investorRanks[i];
+    }
+    return investorRanks[0];
+  }
+
+  function getNextRank(rank) {
+    return investorRanks.find(r => r.level === rank.level + 1) || null;
+  }
 
   const defaultEvents = [
     { id: '1', symbol: '00939', name: '統一台灣高息', frequency: '月配', type: '除息日', date: '2026-11-10', days: 0, cash: 0.063 },
@@ -509,6 +539,8 @@
     const freqCount = { '月配': 0, '雙月配': 0, '季配': 0, '半年配': 0, '年配': 0 };
     holdings.forEach(h => { if (freqCount[h.frequency] !== undefined) freqCount[h.frequency]++; });
 
+    const currentRank = getCurrentRank(totalMarketValue);
+
     return `
       <div class="nav-bar">
         <button class="nav-btn" onclick="refreshQuotesSim()">🔄 更新報價</button>
@@ -519,7 +551,12 @@
       <!-- 藍色漸層資產主卡片 -->
       <div class="asset-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 13px; opacity: 0.85;">總價值</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 13px; opacity: 0.85;">總價值</span>
+            <span style="background: rgba(255,255,255,0.22); border-radius: 12px; padding: 2px 8px; font-size: 10px; font-weight: 700; cursor: pointer;" onclick="openRankModal()">
+              ${currentRank.badge} Lv.${currentRank.level} ${currentRank.title} ›
+            </span>
+          </div>
           <span style="cursor: pointer;" onclick="togglePrivacy()">${isPrivacyMasked ? '🙈' : '👁️'}</span>
         </div>
         <div style="font-size: 32px; font-weight: 800; margin-bottom: 12px; letter-spacing: -0.5px;">
@@ -643,17 +680,20 @@
     return `<svg width="160" height="160" viewBox="0 0 160 160">${paths}</svg>`;
   }
 
-  // ==================== 模組 2: 我的追蹤 (持有ETF) ====================
+  // ==================== 模組 2: 持有現股 + 股息明細 ====================
   function renderHoldingsTab() {
     return `
       <div class="nav-bar">
         <button class="nav-btn" onclick="refreshQuotesSim()">🔄</button>
-        <h1>持有ETF</h1>
-        <button class="nav-btn" onclick="openAddHoldingSheet()">➕</button>
+        <h1>持有現股</h1>
+        <div style="display: flex; gap: 8px;">
+          <button class="nav-btn" title="券商對接中心" onclick="openBrokerageModal()">🏦</button>
+          <button class="nav-btn" title="新增/加碼" onclick="openAddHoldingSheet()">➕</button>
+        </div>
       </div>
 
       <div style="padding: 0 16px 8px 16px;">
-        <input class="form-input" placeholder="🔍 搜尋代號或名稱 (例: 0056, 00878)" oninput="filterHoldings(this.value)">
+        <input class="form-input" placeholder="🔍 搜尋代號、名稱或券商 (例: 0056, 台積電, 元大)" oninput="filterHoldings(this.value)">
       </div>
 
       <div id="holdingsList">
@@ -668,12 +708,14 @@
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
+      const brokerageTag = h.brokerage || '元大證券';
       return `
         <div class="card" style="margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 6px;">
               <span style="font-size: 16px; font-weight: 800;">${h.symbol}</span>
               <span class="badge ${h.frequency === '月配' ? 'badge-monthly' : 'badge-quarterly'}">${h.frequency}</span>
+              <span style="font-size: 10px; background: #E5E5EA; color: #555; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${brokerageTag}</span>
             </div>
             <span style="cursor: pointer; color: #8E8E93; font-size: 12px;" onclick="toggleExpand('${h.symbol}')">
               ${isExpanded ? '▲ 收合' : '▼ 展開'}
@@ -764,8 +806,22 @@
     `;
   }
 
-  // ==================== 模組 4: 日記管理 ====================
+  // ==================== 模組 4: 日記管理 (遊戲化等級系統) ====================
   function renderJournalTab() {
+    const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
+    const rank = getCurrentRank(totalMarketValue);
+    const next = getNextRank(rank);
+
+    let progressPct = 100;
+    let gapText = '🎉 已達到最高傳奇殿堂！';
+    if (next && isFinite(rank.max)) {
+      const curInTier = Math.max(0, totalMarketValue - rank.min);
+      const tierRange = rank.max - rank.min;
+      progressPct = Math.min(100, Math.round((curInTier / tierRange) * 100));
+      const gap = Math.max(0, rank.max - totalMarketValue);
+      gapText = `距晉升【${next.badge} ${next.title}】還需 $${Math.round(gap).toLocaleString()}`;
+    }
+
     return `
       <div class="nav-bar">
         <div></div>
@@ -773,15 +829,35 @@
         <button class="nav-btn" onclick="openAddJournalSheet()">➕</button>
       </div>
 
-      <div style="padding: 12px 16px; background: #FFF; margin: 0 16px 10px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 36px; height: 36px; background: var(--ios-blue); border-radius: 50%; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700;">客</div>
-          <div>
-            <div style="font-weight: 700; font-size: 13px;">存股助手</div>
-            <div style="font-size: 10px; color: #8E8E93;">ID: 8886291 · 永久有效</div>
+      <!-- 遊戲化存股等級晉升卡片 (點擊查看天梯榮譽殿堂) -->
+      <div style="padding: 14px 16px; background: #FFF; margin: 0 16px 12px 16px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer;" onclick="openRankModal()">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 44px; height: 44px; background: linear-gradient(135deg, ${rank.color}, #5AC8FA); border-radius: 50%; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 3px 8px rgba(0,0,0,0.15);">
+              ${rank.badge}
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 800; font-size: 15px; color: #1C1C1E;">${rank.title}</span>
+                <span style="font-size: 10px; font-weight: 700; background: ${rank.color}22; color: ${rank.color}; padding: 2px 6px; border-radius: 10px;">Lv.${rank.level}</span>
+                <span style="font-size: 12px; color: #8E8E93;">›</span>
+              </div>
+              <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">存股市值 $${Math.round(totalMarketValue).toLocaleString()}</div>
+            </div>
+          </div>
+          <button class="sim-btn" style="padding: 5px 9px; font-size: 11px;" onclick="event.stopPropagation(); exportJSON()">💾 備份</button>
+        </div>
+
+        <!-- 升級經驗條 -->
+        <div style="margin-top: 4px;">
+          <div style="background: #E5E5EA; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
+            <div style="background: ${rank.color}; height: 100%; width: ${progressPct}%; border-radius: 3px; transition: width 0.3s;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px;">
+            <span style="color: #8E8E93;">${gapText}</span>
+            <b style="color: ${rank.color};">${progressPct}%</b>
           </div>
         </div>
-        <button class="sim-btn" style="padding: 6px 10px; font-size: 11px;" onclick="exportJSON()">💾 備份 JSON</button>
       </div>
 
       <div style="padding: 0 16px;">
@@ -967,6 +1043,19 @@
         </select>
       </div>
       <div class="form-group">
+        <label>往來證券商</label>
+        <select class="form-input" id="newBrokerage">
+          <option selected>元大證券</option>
+          <option>國泰綜合證券</option>
+          <option>富邦證券</option>
+          <option>永豐金證券 (大戶投)</option>
+          <option>玉山證券</option>
+          <option>台新證券 (Richart)</option>
+          <option>群益金鼎證券</option>
+          <option>凱基證券</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>買入股數 (1,000股 = 1張)</label>
         <input class="form-input" id="newShares" type="number" value="1000">
       </div>
@@ -1043,6 +1132,266 @@
     document.getElementById('modalStocksList').innerHTML = renderModalStockItems(list);
   }
 
+  // ==================== 存股等級成就天梯 Modal ====================
+  function openRankModal() {
+    const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
+    const curRank = getCurrentRank(totalMarketValue);
+    const nextRank = getNextRank(curRank);
+
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h3 style="font-size: 16px;">🏅 存股晉升榮譽殿堂</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+
+      <!-- 當前等級大卡 -->
+      <div style="text-align: center; background: #F2F2F7; padding: 18px; border-radius: 16px; margin-bottom: 16px;">
+        <div style="font-size: 52px; margin-bottom: 4px;">${curRank.badge}</div>
+        <div style="font-size: 18px; font-weight: 800; color: #1C1C1E;">${curRank.title}</div>
+        <div style="font-size: 12px; color: #8E8E93; margin-top: 2px;">
+          Lv.${curRank.level} · 存股市值 <b>$${Math.round(totalMarketValue).toLocaleString()}</b>
+        </div>
+      </div>
+
+      <!-- 7 大階級天梯清單 -->
+      <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">存股階級天梯 (全7階)</div>
+      <div style="max-height: 380px; overflow-y: auto;">
+        ${investorRanks.map(r => {
+          const isUnlocked = totalMarketValue >= r.min;
+          const isCurrent = curRank.level === r.level;
+          return `
+            <div style="padding: 12px; margin-bottom: 8px; border-radius: 12px; border: 1.5px solid ${isCurrent ? r.color : '#E5E5EA'}; background: ${isCurrent ? r.color + '10' : '#FFF'}; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="font-size: 24px;">${r.badge}</div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-weight: 800; font-size: 14px; color: ${isUnlocked ? '#000' : '#8E8E93'};">Lv.${r.level} ${r.title}</span>
+                    ${isCurrent ? `<span style="font-size: 9px; font-weight: 700; background: ${r.color}; color: #FFF; padding: 1px 6px; border-radius: 8px;">當前段位</span>` : ''}
+                  </div>
+                  <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">
+                    門檻: ${r.max === Infinity ? `$${r.min.toLocaleString()} 以上` : `$${r.min.toLocaleString()} ~ $${r.max.toLocaleString()}`}
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 18px;">
+                ${isUnlocked ? '✅' : '🔒'}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `);
+  }
+
+  // ==================== 券商銀行對接中心 Modal ====================
+  function openBrokerageModal(activeTab = 1) {
+    const supportedBrokerages = [
+      { name: '元大證券', icon: '🔵', connected: true },
+      { name: '國泰綜合證券', icon: '🟢', connected: true },
+      { name: '富邦證券', icon: '🔵', connected: true },
+      { name: '永豐金證券 (大戶投)', icon: '🟠', connected: true },
+      { name: '玉山證券', icon: '🟢', connected: false },
+      { name: '台新證券 (Richart)', icon: '🔴', connected: false },
+      { name: '群益金鼎證券', icon: '🟣', connected: false },
+      { name: '凱基證券', icon: '🟣', connected: false }
+    ];
+
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="font-size: 16px;">🏦 券商銀行對接中心</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+
+      <div class="seg-control" style="margin: 0 0 12px 0;">
+        <button class="seg-btn ${activeTab === 1 ? 'active' : ''}" onclick="openBrokerageModal(1)">對帳單文字/CSV匯入</button>
+        <button class="seg-btn ${activeTab === 0 ? 'active' : ''}" onclick="openBrokerageModal(0)">已支援券商</button>
+        <button class="seg-btn ${activeTab === 2 ? 'active' : ''}" onclick="openBrokerageModal(2)">永豐 API 直連</button>
+      </div>
+
+      ${activeTab === 1 ? `
+        <div>
+          <div class="form-group">
+            <label>選擇來源券商</label>
+            <select class="form-input" id="importBrokerageSelect">
+              ${supportedBrokerages.map(b => `<option>${b.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label>貼上庫存或對帳單文字</label>
+              <span style="font-size: 11px; color: var(--ios-blue); cursor: pointer; font-weight: 700;" onclick="loadSampleBrokerageText()">載入測試範例</span>
+            </div>
+            <textarea class="form-input" id="brokerageRawText" rows="6" style="font-family: monospace; font-size: 12px;" placeholder="支援格式 (逗號/空格/Tab均可)：&#10;2330 台積電 1000 1050&#10;0056 元大高股息 3000 37.84&#10;00878 5000 22.80"></textarea>
+          </div>
+
+          <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;" onclick="parseAndImportBrokerageText()">
+            ⚡ 智慧解析並同步至「持有現股」
+          </button>
+
+          <div style="margin-top: 12px; background: #F2F2F7; padding: 10px; border-radius: 10px; font-size: 11px; color: #666; line-height: 1.5;">
+            🔒 <b>安全保障說明</b>：遵循台灣金管會資安法規，不搜集密碼，所有對帳單解析均在您裝置端離線處理。
+          </div>
+        </div>
+      ` : (activeTab === 0 ? `
+        <div style="max-height: 420px; overflow-y: auto;">
+          <div style="font-size: 12px; color: #8E8E93; margin-bottom: 8px;">支援各大券商庫存匯入與資產追蹤：</div>
+          ${supportedBrokerages.map(b => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #EEE;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 20px;">${b.icon}</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 13px;">${b.name}</div>
+                  <div style="font-size: 10px; color: ${b.connected ? '#34C759' : '#8E8E93'};">
+                    ${b.connected ? '● 已連線對接' : '○ 支援對帳單/手動匯入'}
+                  </div>
+                </div>
+              </div>
+              <button class="sim-btn" style="padding: 4px 8px; font-size: 11px;" onclick="openBrokerageModal(1)">匯入持股</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div>
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">永豐金證券 Shioaji API 即時連線</div>
+          <div style="font-size: 11px; color: #8E8E93; margin-bottom: 12px;">永豐金是目前台灣唯一開放個人量化交易與庫存查詢 API 的券商。</div>
+          <div class="form-group"><label>API Key</label><input class="form-input" placeholder="輸入永豐 API Key" value="API_KEY_DEMO_2026"></div>
+          <div class="form-group"><label>Secret Key</label><input class="form-input" type="password" placeholder="輸入 Secret Key" value="********"></div>
+          <div class="form-group"><label>CA 憑證路徑 (選填)</label><input class="form-input" placeholder="Sinopac.pfx"></div>
+          <button class="sim-btn" style="width: 100%; justify-content: center; padding: 12px; background: var(--ios-orange); color: #FFF; font-weight: 700;" onclick="simulateShioajiSync()">
+            🔗 驗證金鑰並即時同步永豐持股
+          </button>
+        </div>
+      `)}
+    `);
+  }
+
+  function loadSampleBrokerageText() {
+    const el = document.getElementById('brokerageRawText');
+    if (el) {
+      el.value = `2330 台積電 1000 1050\n0056 元大高股息 3000 37.84\n00878 國泰永續高股息 5000 22.80\n2454 聯發科 500 1300\n0050 元大台灣50 2000 195.0`;
+    }
+  }
+
+  function parseAndImportBrokerageText() {
+    const raw = (document.getElementById('brokerageRawText') ? document.getElementById('brokerageRawText').value : '').trim();
+    const brokerage = document.getElementById('importBrokerageSelect') ? document.getElementById('importBrokerageSelect').value : '元大證券';
+    if (!raw) {
+      alert('請先貼上券商對帳單文字或點擊「載入測試範例」！');
+      return;
+    }
+
+    const lines = raw.split('\n');
+    let importedCount = 0;
+
+    lines.forEach(l => {
+      const line = l.trim();
+      if (!line || line.startsWith('#') || line.includes('股票代號')) return;
+      const parts = line.replace(/,/g, ' ').replace(/\t/g, ' ').split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return;
+
+      const sym = parts[0].toUpperCase();
+      let name = sym;
+      let shares = 1000;
+      let price = 10.0;
+
+      // 比對台股資料庫取得標準名稱與頻率
+      const match = typeof allTaiwanStocks !== 'undefined' ? allTaiwanStocks.find(s => s.symbol === sym) : null;
+      if (match) {
+        name = match.name;
+        price = match.referencePrice || 10.0;
+      }
+
+      if (parts.length >= 4) {
+        name = parts[1];
+        shares = parseInt(parts[2]) || 1000;
+        price = parseFloat(parts[3]) || price;
+      } else if (parts.length === 3) {
+        shares = parseInt(parts[1]) || 1000;
+        price = parseFloat(parts[2]) || price;
+      } else if (parts.length === 2) {
+        shares = parseInt(parts[1]) || 1000;
+      }
+
+      // 寫入/更新持股
+      const existing = holdings.find(h => h.symbol === sym);
+      if (existing) {
+        existing.shares = shares;
+        existing.averageCost = price;
+        existing.currentPrice = price;
+        existing.brokerage = brokerage;
+      } else {
+        holdings.push({
+          id: Date.now().toString() + Math.random(),
+          symbol: sym,
+          name: name,
+          frequency: match ? match.frequency : '季配',
+          shares: shares,
+          averageCost: price,
+          currentPrice: price,
+          totalDividends: 0,
+          count: 0,
+          brokerage: brokerage
+        });
+      }
+
+      // 寫入買進日記
+      journals.unshift({
+        id: Date.now().toString() + Math.random(),
+        symbol: sym,
+        name: name,
+        type: '買',
+        date: new Date().toISOString().substring(0, 10),
+        price: price,
+        shares: shares,
+        note: `券商對接匯入 (${brokerage})`
+      });
+
+      importedCount++;
+    });
+
+    saveState();
+    closeSheet();
+    renderApp();
+    triggerNotification('🏦 券商持股同步完成', `已自「${brokerage}」成功匯入 ${importedCount} 筆現股！`);
+  }
+
+  function simulateShioajiSync() {
+    closeSheet();
+    triggerNotification('⚡ Shioaji API 連線中', '正在安全連線永豐金證券伺服器...');
+    setTimeout(() => {
+      // 模擬匯入永豐金持股
+      const shioajiItems = [
+        { symbol: '2330', name: '台積電', shares: 1000, price: 1050, freq: '季配' },
+        { symbol: '0050', name: '元大台灣50', shares: 2000, price: 195, freq: '半年配' }
+      ];
+      shioajiItems.forEach(item => {
+        const exist = holdings.find(h => h.symbol === item.symbol);
+        if (exist) {
+          exist.shares = item.shares;
+          exist.currentPrice = item.price;
+          exist.brokerage = '永豐金證券 (大戶投)';
+        } else {
+          holdings.push({
+            id: Date.now().toString() + Math.random(),
+            symbol: item.symbol,
+            name: item.name,
+            frequency: item.freq,
+            shares: item.shares,
+            averageCost: item.price,
+            currentPrice: item.price,
+            totalDividends: 0,
+            count: 0,
+            brokerage: '永豐金證券 (大戶投)'
+          });
+        }
+      });
+      saveState();
+      renderApp();
+      triggerNotification('✅ Shioaji 同步成功', '已自永豐金證券帳戶即時同步 2 筆持股！');
+    }, 1200);
+  }
+
   function renderModalStockItems(items) {
     return items.map(s => `
       <div style="padding: 10px 12px; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeSheet(); openAddHoldingSheet('${s.symbol}')">
@@ -1067,6 +1416,7 @@
     const sym = document.getElementById('newSymbol').value.trim();
     const name = document.getElementById('newName').value.trim() || sym;
     const freq = document.getElementById('newFreq').value;
+    const brokerage = document.getElementById('newBrokerage') ? document.getElementById('newBrokerage').value : '元大證券';
     const shares = parseInt(document.getElementById('newShares').value) || 0;
     const price = parseFloat(document.getElementById('newPrice').value) || 0;
 
@@ -1084,6 +1434,7 @@
       existing.averageCost = +((oldCost + addCost) / totalS).toFixed(2);
       existing.shares = totalS;
       existing.currentPrice = price;
+      existing.brokerage = brokerage;
     } else {
       holdings.push({
         id: Date.now().toString(),
@@ -1094,7 +1445,8 @@
         averageCost: price,
         currentPrice: price,
         totalDividends: 0,
-        count: 0
+        count: 0,
+        brokerage: brokerage
       });
     }
 

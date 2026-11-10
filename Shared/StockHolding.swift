@@ -70,6 +70,7 @@ public struct StockHolding: Identifiable, Codable, Equatable {
     public var brokerFeeDiscount: Double   // 手續費折讓 (預設 0.6 代表 6 折)
     public var totalDividendsReceived: Double // 累計已領股息
     public var dividendCount: Int          // 累計領息次數
+    public var brokerage: String           // 所屬券商 (如 元大證券、國泰證券)
     public var updatedAt: Date
     
     public init(
@@ -85,6 +86,7 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         brokerFeeDiscount: Double = 0.6,
         totalDividendsReceived: Double = 0.0,
         dividendCount: Int = 0,
+        brokerage: String = "元大證券",
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -99,7 +101,31 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         self.brokerFeeDiscount = brokerFeeDiscount
         self.totalDividendsReceived = totalDividendsReceived
         self.dividendCount = dividendCount
+        self.brokerage = brokerage
         self.updatedAt = updatedAt
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, symbol, name, frequency, shares, averageCost, currentPrice, previousClose
+        case stockType, brokerFeeDiscount, totalDividendsReceived, dividendCount, brokerage, updatedAt
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.symbol = try container.decode(String.self, forKey: .symbol)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.frequency = try container.decodeIfPresent(FrequencyType.self, forKey: .frequency) ?? .quarterly
+        self.shares = try container.decodeIfPresent(Int.self, forKey: .shares) ?? 0
+        self.averageCost = try container.decodeIfPresent(Double.self, forKey: .averageCost) ?? 0.0
+        self.currentPrice = try container.decodeIfPresent(Double.self, forKey: .currentPrice) ?? 0.0
+        self.previousClose = try container.decodeIfPresent(Double.self, forKey: .previousClose) ?? self.currentPrice
+        self.stockType = try container.decodeIfPresent(StockType.self, forKey: .stockType) ?? .etf
+        self.brokerFeeDiscount = try container.decodeIfPresent(Double.self, forKey: .brokerFeeDiscount) ?? 0.6
+        self.totalDividendsReceived = try container.decodeIfPresent(Double.self, forKey: .totalDividendsReceived) ?? 0.0
+        self.dividendCount = try container.decodeIfPresent(Int.self, forKey: .dividendCount) ?? 0
+        self.brokerage = try container.decodeIfPresent(String.self, forKey: .brokerage) ?? "元大證券"
+        self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
     
     // 定期定額加碼存股試算：加權更新均價與股數

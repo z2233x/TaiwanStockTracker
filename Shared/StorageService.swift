@@ -140,6 +140,27 @@ public final class StorageService {
         saveHoldings(current)
     }
     
+    // 批次匯入/同步券商持股
+    @discardableResult
+    public func batchImportHoldings(_ imported: [StockHolding]) -> Int {
+        var current = loadHoldings()
+        var count = 0
+        for item in imported {
+            if let idx = current.firstIndex(where: { $0.symbol == item.symbol }) {
+                current[idx].shares = item.shares
+                current[idx].averageCost = item.averageCost > 0 ? item.averageCost : current[idx].averageCost
+                current[idx].currentPrice = item.currentPrice > 0 ? item.currentPrice : current[idx].currentPrice
+                current[idx].brokerage = item.brokerage
+                current[idx].updatedAt = Date()
+            } else {
+                current.append(item)
+            }
+            count += 1
+        }
+        saveHoldings(current)
+        return count
+    }
+    
     // MARK: - 即時報價更新 (Yahoo Finance 批次查詢)
     public func refreshAllStockQuotes() async -> (successCount: Int, failedCount: Int) {
         var current = loadHoldings()
