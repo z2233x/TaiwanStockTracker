@@ -180,6 +180,9 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         return (unrealizedProfit / totalCostWithFee) * 100.0
     }
     
+    // 未實現報酬率別名
+    public var unrealizedProfitRate: Double { returnRate }
+    
     // 今日損益與漲跌幅
     public var todayProfitAmount: Double {
         guard shares > 0 && previousClose > 0 else { return 0.0 }
