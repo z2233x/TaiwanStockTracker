@@ -1,6 +1,47 @@
 import SwiftUI
 import UserNotifications
 
+// MARK: - 官方 App 圖示與頭像視圖
+struct AppIconAvatarView: View {
+    var size: CGFloat = 48
+    var badge: String = ""
+    
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let uiImage = UIImage(named: "app_logo") ?? UIImage(named: "AppLogo") {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+            } else {
+                Circle()
+                    .fill(LinearGradient(colors: [Color(hex: "#007AFF"), Color(hex: "#5AC8FA")], startPoint: .top, endPoint: .bottom))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: size * 0.45, weight: .bold))
+                            .foregroundColor(.white)
+                    )
+                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+            }
+            
+            if !badge.isEmpty {
+                Text(badge)
+                    .font(.system(size: size * 0.34))
+                    .frame(width: size * 0.44, height: size * 0.44)
+                    .background(Color(.systemBackground))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 0.8))
+                    .offset(x: 3, y: 3)
+            }
+        }
+    }
+}
+
 // MARK: - 主應用程式五分頁 (對應截圖底部導航列)
 struct ContentView: View {
     @State private var selectedTab: Int = 2 // 預設停在「投資總覽」
@@ -159,12 +200,13 @@ struct DashboardView: View {
                                         .foregroundColor(.secondary)
                                     Text(isPrivacyMasked ? "*****" : "$\(Int(totalDividends).formatted())")
                                         .font(.headline.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
+                                        .foregroundColor(Color(hex: "#1D58BD"))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
+                                .padding(12)
                                 .background(Color.white)
-                                .cornerRadius(10)
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("領息次數")
@@ -172,12 +214,13 @@ struct DashboardView: View {
                                         .foregroundColor(.secondary)
                                     Text(isPrivacyMasked ? "***" : "\(totalDividendCount) 次")
                                         .font(.headline.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
+                                        .foregroundColor(Color(hex: "#1D58BD"))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
+                                .padding(12)
                                 .background(Color.white)
-                                .cornerRadius(10)
+                                .cornerRadius(12)
+                                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
                             }
                             
                             if !lastRefreshedTime.isEmpty {
@@ -189,16 +232,16 @@ struct DashboardView: View {
                                 .foregroundColor(.white.opacity(0.8))
                             }
                         }
-                        .padding(18)
+                        .padding(20)
                         .background(
                             LinearGradient(
-                                colors: [Color(hex: "#2F80ED"), Color(hex: "#56CCF2")],
+                                colors: [Color(hex: "#1D58BD"), Color(hex: "#2F80ED"), Color(hex: "#4DA8DA")],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .cornerRadius(20)
-                        .shadow(color: Color(hex: "#2F80ED").opacity(0.3), radius: 10, y: 5)
+                        .cornerRadius(22)
+                        .shadow(color: Color(hex: "#1D58BD").opacity(0.28), radius: 12, x: 0, y: 6)
                     }
                     
                     // 2. 存股被動收入目標計算機 (進階功能)
@@ -535,13 +578,7 @@ struct JournalManagementView: View {
                         Button {
                             isShowingRankSheet = true
                         } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(LinearGradient(colors: [Color(hex: currentRank.colorHex), Color(hex: "#5AC8FA")], startPoint: .top, endPoint: .bottom))
-                                    .frame(width: 48, height: 48)
-                                Text(currentRank.badge)
-                                    .font(.title2)
-                            }
+                            AppIconAvatarView(size: 48, badge: currentRank.badge)
                         }
                         
                         VStack(alignment: .leading, spacing: 3) {
@@ -979,9 +1016,20 @@ struct HoldingsListView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("總損益")
                                     .font(.caption).foregroundColor(.secondary)
-                                Text("\(item.unrealizedProfit >= 0 ? "+" : "")$\(Int(item.unrealizedProfit).formatted())")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                HStack(spacing: 6) {
+                                    Text("\(item.unrealizedProfit >= 0 ? "+" : "")$\(Int(item.unrealizedProfit).formatted())")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                    
+                                    let rate = item.unrealizedProfitRate
+                                    Text(String(format: "%@%.2f%%", rate >= 0 ? "+" : "", rate))
+                                        .font(.system(size: 11, weight: .bold))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background((rate >= 0 ? Color.red : Color.green).opacity(0.12))
+                                        .foregroundColor(rate >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                        .cornerRadius(6)
+                                }
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {

@@ -5,7 +5,9 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_TW</string>
     <key>CFBundleDisplayName</key>
-    <string>台股績效</string>
+    <string>台股存股助手</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleExecutable</key>
     <string>TaiwanStockTracker</string>
     <key>CFBundleIdentifier</key>
