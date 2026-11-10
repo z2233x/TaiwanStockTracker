@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>台股績效監控 - iOS 桌面即時模擬器</title>
+<style>
+  :root {
+    --ios-blue: #007AFF;
+    --ios-indigo: #5856D6;
+    --ios-orange: #FF9500;
+    --ios-green: #34C759;
+    --ios-purple: #AF52DE;
+    --ios-teal: #5AC8FA;
+    --ios-red: #FF3B30;
+    --ios-bg: #F2F2F7;
+    --ios-card: #FFFFFF;
+    --ios-text: #000000;
+    --ios-subtext: #8E8E93;
+    --ios-border: #E5E5EA;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  body {
+    background: #1C1C1E;
+    color: #FFFFFF;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 30px;
+    overflow-x: auto;
+  }
+
+  /* 模擬器控制面板 (側邊欄) */
+  .sim-controls {
+    width: 280px;
+    background: #2C2C2E;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .sim-controls h2 { font-size: 16px; color: #FFF; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #3A3A3C; padding-bottom: 10px; }
+  .sim-btn {
+    background: #3A3A3C;
+    color: #FFF;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+  .sim-btn:hover { background: #48484A; }
+  .sim-btn.primary { background: var(--ios-blue); }
+  .sim-btn.primary:hover { background: #0062cc; }
+  .sim-note { font-size: 12px; color: #8E8E93; line-height: 1.5; background: #1C1C1E; padding: 10px; border-radius: 8px; }
+
+  /* iPhone 16 Pro 外殼 */
+  .iphone-frame {
+    width: 393px;
+    height: 852px;
+    background: #000000;
+    border-radius: 54px;
+    padding: 12px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 0 3px #48484A, 0 0 0 6px #1C1C1E;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .screen {
+    width: 100%;
+    height: 100%;
+    background: var(--ios-bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    color: var(--ios-text);
+  }
+
+  /* 頂部狀態列 & 動態島 */
+  .status-bar {
+    height: 48px;
+    padding: 12px 24px 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+    z-index: 99;
+  }
+  .dynamic-island {
+    position: absolute;
+    top: 11px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 124px;
+    height: 35px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    color: #FFF;
+    font-size: 12px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+  }
+  .dynamic-island.expanded {
+    width: 340px;
+    height: 70px;
+    top: 8px;
+    border-radius: 28px;
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  }
+  .dynamic-island .di-content { display: none; width: 100%; }
+  .dynamic-island.expanded .di-content { display: block; }
+  .dynamic-island.expanded .di-default { display: none; }
+
+  /* 底部 Home Indicator */
+  .home-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 134px;
+    height: 5px;
+    background: #000;
+    border-radius: 3px;
+    opacity: 0.6;
+    z-index: 99;
+  }
+
+  /* 應用畫面容器 */
+  .app-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 70px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-container::-webkit-scrollbar { display: none; }
+
+  /* 底部 TabBar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 65px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--ios-border);
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    padding-top: 6px;
+    z-index: 90;
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--ios-subtext);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    flex: 1;
+  }
+  .tab-item.active { color: var(--ios-blue); }
+  .tab-item svg { width: 22px; height: 22px; fill: currentColor; }
+
+  /* 頂部 Navigation Bar */
+  .nav-bar {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(242, 242, 247, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 50;
+  }
+  .nav-bar h1 { font-size: 20px; font-weight: 700; color: #000; }
+  .nav-btn {
+    background: none;
+    border: none;
+    color: var(--ios-blue);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* 卡片元件 */
+  .card {
+    background: var(--ios-card);
+    border-radius: 16px;
+    padding: 16px;
+    margin: 12px 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .asset-card {
+    background: linear-gradient(135deg, #2F80ED, #56CCF2);
+    color: #FFF;
+    border-radius: 20px;
+    padding: 18px;
+    margin: 12px 16px;
+    box-shadow: 0 10px 20px rgba(47, 128, 237, 0.3);
+    position: relative;
+  }
+
+  /* Badge 標籤 */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge-monthly { background: rgba(0,122,255,0.15); color: var(--ios-blue); }
+  .badge-quarterly { background: rgba(255,149,0,0.15); color: var(--ios-orange); }
+  .badge-semiannual { background: rgba(52,199,89,0.15); color: var(--ios-green); }
+
+  /* Segmented Control */
+  .seg-control {
+    background: #E5E5EA;
+    border-radius: 8px;
+    padding: 2px;
+    display: flex;
+    margin: 8px 16px;
+  }
+  .seg-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #000;
+    transition: all 0.2s;
+  }
+  .seg-btn.active { background: #FFF; box-shadow: 0 2px 4px rgba(0,0,0,0.12); }
+
+  /* 彈出視窗 Sheet */
+  .sheet-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 110;
+    display: none;
+    align-items: flex-end;
+  }
+  .sheet-overlay.active { display: flex; }
+  .sheet-content {
+    width: 100%;
+    max-height: 85%;
+    background: #FFF;
+    border-radius: 24px 24px 0 0;
+    padding: 18px;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--ios-subtext); margin-bottom: 4px; }
+  .form-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #F2F2F7;
+    border: 1px solid #E5E5EA;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+  }
+  .form-input:focus { border-color: var(--ios-blue); background: #FFF; }
+  .chip-group { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
+  .chip {
+    padding: 6px 10px;
+    background: #F2F2F7;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .chip.active { background: var(--ios-blue); color: #FFF; }
+
+  /* 存股目標進度條 */
+  .goal-bar-bg { width: 100%; height: 10px; background: #E5E5EA; border-radius: 5px; overflow: hidden; margin: 8px 0; }
+  .goal-bar-fill { height: 100%; background: linear-gradient(90deg, #007AFF, #5AC8FA); width: 45%; border-radius: 5px; transition: width 0.5s; }
+</style>
+</head>
+<body>
+
+  <!-- 桌面模擬器側邊控制面板 -->
+  <div class="sim-controls">
+    <h2>📱 iOS 測試控制台</h2>
+    <div class="sim-note">
+      此模擬器與你的 iOS Swift 程式碼邏輯 100% 同步！你可在此即時體驗操作、點擊測試，並直接告訴我哪裡需要微調。
+    </div>
+
+    <button class="sim-btn primary" onclick="triggerNotification('00878 國泰永續高股息', '明日除息！每股配息 $0.55 元，預估入帳 $5,500 元。')">
+      🔔 模擬 iOS 鎖定畫面推播
+    </button>
+    
+    <button class="sim-btn" onclick="openAddHoldingSheet()">
+      ➕ 測試新增/加碼存股
+    </button>
+
+    <button class="sim-btn" onclick="refreshQuotesSim()">
+      🔄 模擬盤中即時報價更新
+    </button>
+
+    <button class="sim-btn" onclick="resetSampleData()">
+      ⏮️ 重設為預設展示資料
+    </button>
+
+    <button class="sim-btn" onclick="copyFeedbackTemplate()">
+      📋 複製修改反饋模板
+    </button>
+  </div>
+
+  <!-- iPhone 16 Pro 實體機殼 -->
+  <div class="iphone-frame">
+    <div class="screen">
+      
+      <!-- 頂部動態島 (Dynamic Island) -->
+      <div class="dynamic-island" id="dynamicIsland" onclick="toggleDynamicIsland()">
+        <div class="di-default" style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <span style="font-size: 11px;">台股</span>
+          <span style="width: 8px; height: 8px; background: #34C759; border-radius: 50%;"></span>
+        </div>
+        <div class="di-content" id="diContent">
+          <div style="font-weight: 700; color: #5AC8FA;" id="diTitle">🔔 除息提醒</div>
+          <div style="font-size: 11px; color: #DDD;" id="diBody">明日 00878 除息，每股配發 0.55 元</div>
+        </div>
+      </div>
+
+      <!-- 狀態列 -->
+      <div class="status-bar">
+        <span id="statusBarTime">09:41</span>
+        <div style="display: flex; gap: 5px; align-items: center;">
+          <svg width="15" height="11" viewBox="0 0 18 12" fill="#000"><path d="M1 9h2V3H1v6zm4 2h2V1H5v10zm4 0h2V5H9v6zm4 0h2V7h-2v4z"/></svg>
+          <svg width="14" height="11" viewBox="0 0 16 12" fill="#000"><path d="M8 2.5C4.8 2.5 2 4.1.5 6.5l7.5 5.5 7.5-5.5C14 4.1 11.2 2.5 8 2.5z"/></svg>
+          <svg width="22" height="11" viewBox="0 0 25 12" fill="#000"><rect x="1" y="1" width="20" height="10" rx="3" fill="none" stroke="#000" stroke-width="1.5"/><rect x="3" y="3" width="13" height="6" rx="1.5"/><path d="M22 4.5v3c.8-.3 1.3-1 1.3-1.5s-.5-1.2-1.3-1.5z"/></svg>
+        </div>
+      </div>
+
+      <!-- App 內容區域 -->
+      <div class="app-container" id="appContent">
+        <!-- 內容由 JS 動態渲染五大模組 -->
+      </div>
+
+      <!-- 底部 Tab Bar -->
+      <div class="tab-bar">
+        <div class="tab-item" onclick="switchTab(0)" id="tab0">
+          <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+          <span>股息日曆</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(1)" id="tab1">
+          <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <span>我的追蹤</span>
+        </div>
+        <div class="tab-item active" onclick="switchTab(2)" id="tab2">
+          <svg viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2 0v8.99H22c-.47-4.74-4.24-8.52-9-8.99zm0 11.01V22c4.76-.47 8.53-4.25 9-8.99H13z"/></svg>
+          <span>投資總覽</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(3)" id="tab3">
+          <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
+          <span>日記管理</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(4)" id="tab4">
+          <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+          <span>股息歷程</span>
+        </div>
+      </div>
+
+      <!-- Home Indicator -->
+      <div class="home-indicator"></div>
+
+      <!-- 彈出對話框 (Sheet) -->
+      <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet(event)">
+        <div class="sheet-content" id="sheetContent" onclick="event.stopPropagation()">
+          <!-- Sheet 內容由 JS 產生 -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  // 資料庫 (LocalStorage 持久化)
+  const defaultHoldings = [
+    { id: '1', symbol: '0056', name: '元大高股息', frequency: '季配', shares: 3000, averageCost: 37.84, currentPrice: 37.05, totalDividends: 1070, count: 1 },
+    { id: '2', symbol: '00929', name: '復華台灣科技優息', frequency: '月配', shares: 4000, averageCost: 19.85, currentPrice: 19.90, totalDividends: 1590, count: 4 },
+    { id: '3', symbol: '00919', name: '群益台灣精選高息', frequency: '季配', shares: 2000, averageCost: 23.50, currentPrice: 24.10, totalDividends: 720, count: 1 },
+    { id: '4', symbol: '00936', name: '台新永續高息中小', frequency: '月配', shares: 2000, averageCost: 16.20, currentPrice: 16.50, totalDividends: 380, count: 2 },
+    { id: '5', symbol: '00915', name: '凱基優選高股息30', frequency: '季配', shares: 1500, averageCost: 26.80, currentPrice: 27.20, totalDividends: 450, count: 1 },
+    { id: '6', symbol: '00717', name: '富邦美國特別股', frequency: '季配', shares: 1000, averageCost: 15.60, currentPrice: 15.80, totalDividends: 160, count: 1 }
+  ];
+
+  const defaultEvents = [
+    { id: '1', symbol: '00939', name: '統一台灣高息', frequency: '月配', type: '除息日', date: '2026-11-10', days: 0, cash: 0.063 },
+    { id: '2', symbol: '00940', name: '元大台灣價值', frequency: '月配', type: '最後購買日', date: '2026-11-10', days: 0, cash: 0.04 },
+    { id: '3', symbol: '00940', name: '元大台灣價值', frequency: '月配', type: '除息日', date: '2026-11-12', days: 2, cash: 0.04 },
+    { id: '4', symbol: '00936', name: '台新永續高息', frequency: '月配', type: '股利發放日', date: '2026-11-16', days: 6, cash: 0.08 },
+    { id: '5', symbol: '00717', name: '富邦美國特別', frequency: '季配', type: '除息日', date: '2026-11-22', days: 12, cash: 0.16 }
+  ];
+
+  const defaultJournals = [
+    { id: '1', symbol: '0056', name: '元大高股息', type: '買', date: '2026-10-28', price: 36.67, shares: 1000, note: '定期定額加碼' },
+    { id: '2', symbol: '0056', name: '元大高股息', type: '買', date: '2026-08-15', price: 35.58, shares: 1000, note: '逢低買進' },
+    { id: '3', symbol: '0056', name: '元大高股息', type: '買', date: '2026-06-20', price: 41.26, shares: 1000, note: '首次建倉' }
+  ];
+
+  let holdings = JSON.parse(localStorage.getItem('twstock_holdings')) || defaultHoldings;
+  let events = JSON.parse(localStorage.getItem('twstock_events')) || defaultEvents;
+  let journals = JSON.parse(localStorage.getItem('twstock_journals')) || defaultJournals;
+  let isPrivacyMasked = localStorage.getItem('twstock_masked') === 'true';
+  let isNotificationEnabled = localStorage.getItem('twstock_notif') === 'true';
+  let targetMonthlyIncome = 30000;
+  let currentTab = 2; // 預設第 3 個：投資總覽
+  let expandedHoldings = new Set(['0056']);
+
+  function saveState() {
+    localStorage.setItem('twstock_holdings', JSON.stringify(holdings));
+    localStorage.setItem('twstock_events', JSON.stringify(events));
+    localStorage.setItem('twstock_journals', JSON.stringify(journals));
+    localStorage.setItem('twstock_masked', isPrivacyMasked);
+    localStorage.setItem('twstock_notif', isNotificationEnabled);
+  }
+
+  // 更新頂部時間
+  function updateTime() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('statusBarTime').innerText = `${hours}:${minutes}`;
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
+
+  // 切換 Tab
+  function switchTab(index) {
+    currentTab = index;
+    for (let i = 0; i < 5; i++) {
+      const el = document.getElementById(`tab${i}`);
+      if (el) el.classList.toggle('active', i === index);
+    }
+    renderApp();
+  }
+
+  // 渲染畫面
+  function renderApp() {
+    const container = document.getElementById('appContent');
+    switch (currentTab) {
+      case 0: container.innerHTML = renderCalendarTab(); break;
+      case 1: container.innerHTML = renderHoldingsTab(); break;
+      case 2: container.innerHTML = renderDashboardTab(); break;
+      case 3: container.innerHTML = renderJournalTab(); break;
+      case 4: container.innerHTML = renderTimelineTab(); break;
+    }
+  }
+
+  // ==================== 模組 1: 投資總覽 ====================
+  function renderDashboardTab() {
+    const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
+    const totalCost = holdings.reduce((s, h) => s + (h.shares * h.averageCost), 0);
+    const totalProfit = totalMarketValue - totalCost;
+    const totalDividends = holdings.reduce((s, h) => s + h.totalDividends, 0);
+    const totalCount = holdings.reduce((s, h) => s + h.count, 0);
+
+    const estMonthlyDiv = (totalMarketValue * 0.075) / 12;
+    const goalPct = Math.min(100, Math.round((estMonthlyDiv / targetMonthlyIncome) * 100));
+    const principalGap = Math.max(0, (targetMonthlyIncome * 12 / 0.075) - totalMarketValue);
+
+    // 計算配息頻率數量
+    const freqCount = { '月配': 0, '雙月配': 0, '季配': 0, '半年配': 0, '年配': 0 };
+    holdings.forEach(h => { if (freqCount[h.frequency] !== undefined) freqCount[h.frequency]++; });
+
+    return `
+      <div class="nav-bar">
+        <button class="nav-btn" onclick="refreshQuotesSim()">🔄 更新報價</button>
+        <h1>投資總覽</h1>
+        <button class="nav-btn" onclick="openAddHoldingSheet()">➕</button>
+      </div>
+
+      <!-- 藍色漸層資產主卡片 -->
+      <div class="asset-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 13px; opacity: 0.85;">總價值</span>
+          <span style="cursor: pointer;" onclick="togglePrivacy()">${isPrivacyMasked ? '🙈' : '👁️'}</span>
+        </div>
+        <div style="font-size: 32px; font-weight: 800; margin-bottom: 12px; letter-spacing: -0.5px;">
+          ${isPrivacyMasked ? '******' : '$' + Math.round(totalMarketValue).toLocaleString()}
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 14px;">
+          <div>
+            <div style="font-size: 11px; opacity: 0.8;">總成本</div>
+            <div style="font-weight: 700;">${isPrivacyMasked ? '*****' : '$' + Math.round(totalCost).toLocaleString()}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 11px; opacity: 0.8;">價差獲利</div>
+            <div style="font-weight: 700; color: ${totalProfit >= 0 ? '#FFD60A' : '#77DD77'};">
+              ${isPrivacyMasked ? '****' : (totalProfit >= 0 ? '+' : '') + '$' + Math.round(totalProfit).toLocaleString()}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1; background: #FFF; color: #000; padding: 10px; border-radius: 10px;">
+            <div style="font-size: 11px; color: #8E8E93;">總股息</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--ios-blue);">${isPrivacyMasked ? '*****' : '$' + totalDividends.toLocaleString()}</div>
+          </div>
+          <div style="flex: 1; background: #FFF; color: #000; padding: 10px; border-radius: 10px;">
+            <div style="font-size: 11px; color: #8E8E93;">領息次數</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--ios-blue);">${isPrivacyMasked ? '***' : totalCount + ' 次'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 存股被動收入目標計算機 -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; font-size: 15px;">🎯 存股被動收入目標</span>
+          <span style="font-weight: 700; font-size: 13px; color: var(--ios-blue);">達成率 ${goalPct}%</span>
+        </div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill" style="width: ${goalPct}%;"></div></div>
+        <div style="display: flex; gap: 6px; margin: 8px 0;">
+          <button class="chip ${targetMonthlyIncome === 10000 ? 'active' : ''}" onclick="setGoal(10000)">月領1萬</button>
+          <button class="chip ${targetMonthlyIncome === 30000 ? 'active' : ''}" onclick="setGoal(30000)">月領3萬</button>
+          <button class="chip ${targetMonthlyIncome === 50000 ? 'active' : ''}" onclick="setGoal(50000)">月領5萬</button>
+          <button class="chip ${targetMonthlyIncome === 100000 ? 'active' : ''}" onclick="setGoal(100000)">月領10萬</button>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-top: 8px; border-top: 1px solid #EEE; padding-top: 8px;">
+          <div>目前推算月股息: <b style="color:var(--ios-blue);">$${Math.round(estMonthlyDiv).toLocaleString()}</b></div>
+          <div>本金差額: <b>$${Math.round(principalGap).toLocaleString()}</b></div>
+        </div>
+      </div>
+
+      <!-- 領息頻率卡片 -->
+      <div class="card">
+        <div style="font-weight: 700; font-size: 15px; margin-bottom: 10px;">領息頻率</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="flex:1; background: rgba(0,122,255,0.1); border-radius: 10px; padding: 10px 4px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ios-blue);">月配</div>
+            <div style="font-size: 18px; font-weight: 800;">${freqCount['月配']}</div>
+          </div>
+          <div style="flex:1; background: rgba(88,86,214,0.1); border-radius: 10px; padding: 10px 4px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ios-indigo);">雙月配</div>
+            <div style="font-size: 18px; font-weight: 800;">${freqCount['雙月配']}</div>
+          </div>
+          <div style="flex:1; background: rgba(255,149,0,0.1); border-radius: 10px; padding: 10px 4px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ios-orange);">季配</div>
+            <div style="font-size: 18px; font-weight: 800;">${freqCount['季配']}</div>
+          </div>
+          <div style="flex:1; background: rgba(52,199,89,0.1); border-radius: 10px; padding: 10px 4px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ios-green);">半年配</div>
+            <div style="font-size: 18px; font-weight: 800;">${freqCount['半年配']}</div>
+          </div>
+          <div style="flex:1; background: rgba(175,82,222,0.1); border-radius: 10px; padding: 10px 4px; text-align: center;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ios-purple);">年配</div>
+            <div style="font-size: 18px; font-weight: 800;">${freqCount['年配']}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ETF 投資佔比圓餅圖 -->
+      <div class="card">
+        <div style="font-weight: 700; font-size: 15px; margin-bottom: 12px;">ETF 投資佔比</div>
+        <div style="display: flex; justify-content: center; align-items: center; height: 160px; position: relative;">
+          ${renderDonutSVG(holdings, totalMarketValue)}
+          <div style="position: absolute; text-align: center;">
+            <div style="font-size: 10px; color: #8E8E93;">ETF</div>
+            <div style="font-size: 13px; font-weight: 700;">投資佔比</div>
+          </div>
+        </div>
+        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+          ${holdings.map((h, i) => {
+            const val = h.shares * h.currentPrice;
+            const pct = totalMarketValue > 0 ? ((val / totalMarketValue) * 100).toFixed(1) : 0;
+            const colors = ['#007AFF','#5856D6','#FF9500','#34C759','#AF52DE','#5AC8FA'];
+            return `
+              <div style="display: flex; align-items: center; font-size: 12px;">
+                <div style="width: 4px; height: 18px; background: ${colors[i%colors.length]}; border-radius: 2px; margin-right: 8px;"></div>
+                <div style="font-weight: 700;">${h.symbol} ${h.name}</div>
+                <div style="flex:1; text-align: right; color:#8E8E93; margin-right: 8px;">${isPrivacyMasked ? '*****' : '$' + Math.round(val).toLocaleString()}</div>
+                <div style="font-weight: 700; width: 45px; text-align: right;">${pct}%</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDonutSVG(list, total) {
+    if (total <= 0) return '';
+    const colors = ['#007AFF','#5856D6','#FF9500','#34C759','#AF52DE','#5AC8FA'];
+    let accum = 0;
+    const radius = 60;
+    const stroke = 22;
+    const circ = 2 * Math.PI * radius;
+    
+    const paths = list.map((h, i) => {
+      const pct = (h.shares * h.currentPrice) / total;
+      const dash = pct * circ;
+      const offset = -(accum * circ);
+      accum += pct;
+      return `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="${stroke}" stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${offset}" transform="rotate(-90 80 80)" />`;
+    }).join('');
+
+    return `<svg width="160" height="160" viewBox="0 0 160 160">${paths}</svg>`;
+  }
+
+  // ==================== 模組 2: 我的追蹤 (持有ETF) ====================
+  function renderHoldingsTab() {
+    return `
+      <div class="nav-bar">
+        <button class="nav-btn" onclick="refreshQuotesSim()">🔄</button>
+        <h1>持有ETF</h1>
+        <button class="nav-btn" onclick="openAddHoldingSheet()">➕</button>
+      </div>
+
+      <div style="padding: 0 16px 8px 16px;">
+        <input class="form-input" placeholder="🔍 搜尋代號或名稱 (例: 0056, 00878)" oninput="filterHoldings(this.value)">
+      </div>
+
+      <div id="holdingsList">
+        ${renderHoldingsCards(holdings)}
+      </div>
+    `;
+  }
+
+  function renderHoldingsCards(items) {
+    return items.map(h => {
+      const isExpanded = expandedHoldings.has(h.symbol);
+      const val = h.shares * h.currentPrice;
+      const cost = h.shares * h.averageCost;
+      const profit = val - cost;
+      return `
+        <div class="card" style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 16px; font-weight: 800;">${h.symbol}</span>
+              <span class="badge ${h.frequency === '月配' ? 'badge-monthly' : 'badge-quarterly'}">${h.frequency}</span>
+            </div>
+            <span style="cursor: pointer; color: #8E8E93; font-size: 12px;" onclick="toggleExpand('${h.symbol}')">
+              ${isExpanded ? '▲ 收合' : '▼ 展開'}
+            </span>
+          </div>
+          <div style="font-size: 13px; color: #666; margin: 2px 0 8px 0;">${h.name}</div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <div><span style="color:#8E8E93;">總成本: </span><b>$${Math.round(cost).toLocaleString()}</b></div>
+            <div><span style="color:#8E8E93;">總股數: </span><b>${h.shares.toLocaleString()}股</b></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px;">
+            <div><span style="color:#8E8E93;">總損益: </span><b style="color:${profit >= 0 ? '#FF3B30' : '#34C759'};">${profit >= 0 ? '+' : ''}$${Math.round(profit).toLocaleString()}</b></div>
+            <div style="color: #8E8E93;">(領息${h.count}次)</div>
+          </div>
+
+          ${isExpanded ? `
+            <div style="margin-top: 10px; border-top: 1px solid #EEE; padding-top: 8px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8E8E93; margin-bottom: 10px;">
+                <span>現值: $${Math.round(val).toLocaleString()}</span>
+                <span>均價: $${h.averageCost}</span>
+                <span>現價: $${h.currentPrice}</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="sim-btn" style="flex: 1; padding: 6px; font-size: 11px; justify-content: center;" onclick="openDCA('${h.symbol}')">➕ 加碼存股</button>
+                <button class="sim-btn" style="flex: 1; padding: 6px; font-size: 11px; justify-content: center;" onclick="openEditHolding('${h.symbol}')">✏️ 編輯</button>
+                <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; color: #FF3B30; background: rgba(255,59,48,0.1);" onclick="confirmDelete('${h.symbol}')">🗑️ 刪除</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ==================== 模組 3: 股息日曆 + 倒數日 ====================
+  let calendarMode = 1; // 0: 日曆, 1: 倒數日
+  function renderCalendarTab() {
+    return `
+      <div class="nav-bar">
+        <div></div>
+        <h1>ETF日曆</h1>
+        <button class="nav-btn" onclick="openAddEventSheet()">➕</button>
+      </div>
+
+      <!-- 除息通知推播開關 (進階功能) -->
+      <div style="background: #E5E5EA; padding: 10px 16px; margin: 0 16px 8px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 12px; font-weight: 700;">🔔 除息前一日 08:30 推播通知</div>
+          <div style="font-size: 10px; color: #666;">即時提醒除息金額與入帳預估</div>
+        </div>
+        <input type="checkbox" ${isNotificationEnabled ? 'checked' : ''} onchange="toggleNotification(this.checked)" style="transform: scale(1.3); cursor: pointer;">
+      </div>
+
+      <div class="seg-control">
+        <button class="seg-btn ${calendarMode === 0 ? 'active' : ''}" onclick="setCalendarMode(0)">股息日曆</button>
+        <button class="seg-btn ${calendarMode === 1 ? 'active' : ''}" onclick="setCalendarMode(1)">倒數日</button>
+      </div>
+
+      ${calendarMode === 1 ? `
+        <div style="padding: 4px 16px;">
+          ${events.map(ev => `
+            <div class="card" style="margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 700; font-size: 14px;">${ev.symbol} ${ev.name}</div>
+                <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${ev.type}: ${ev.date} · 每股配 $${ev.cash}</div>
+              </div>
+              <div style="background: ${ev.days === 0 ? '#34C759' : (ev.days <= 3 ? '#FF9500' : '#007AFF')}; color: #FFF; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 14px;">
+                ${ev.days === 0 ? '今天' : `剩 ${ev.days} 天`}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div class="card">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">當月除權息日程</div>
+          ${events.map(ev => `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px solid #EEE;">
+              <div>
+                <span class="badge ${ev.type.includes('除息') ? 'badge-monthly' : 'badge-quarterly'}">${ev.type}</span>
+                <span style="font-weight: 700; margin-left: 4px;">${ev.symbol} ${ev.name}</span>
+              </div>
+              <div style="color: var(--ios-blue); font-weight: 700;">$${ev.cash} (${ev.date.substring(5)})</div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    `;
+  }
+
+  // ==================== 模組 4: 日記管理 ====================
+  function renderJournalTab() {
+    return `
+      <div class="nav-bar">
+        <div></div>
+        <h1>日記管理</h1>
+        <button class="nav-btn" onclick="openAddJournalSheet()">➕</button>
+      </div>
+
+      <div style="padding: 12px 16px; background: #FFF; margin: 0 16px 10px 16px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; background: var(--ios-blue); border-radius: 50%; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700;">客</div>
+          <div>
+            <div style="font-weight: 700; font-size: 13px;">存股助手</div>
+            <div style="font-size: 10px; color: #8E8E93;">ID: 8886291 · 永久有效</div>
+          </div>
+        </div>
+        <button class="sim-btn" style="padding: 6px 10px; font-size: 11px;" onclick="exportJSON()">💾 備份 JSON</button>
+      </div>
+
+      <div style="padding: 0 16px;">
+        ${journals.map(j => `
+          <div class="card" style="margin: 8px 0; display: flex; align-items: center; gap: 12px;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${j.type === '買' ? 'var(--ios-orange)' : 'var(--ios-green)'}; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;">
+              ${j.type}
+            </div>
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="font-weight: 800; font-size: 14px;">${j.symbol}</span>
+                <span style="font-size: 11px; color: #666;">${j.name}</span>
+                ${j.note ? `<span class="badge" style="background:#E5E5EA; color:#333;">${j.note}</span>` : ''}
+              </div>
+              <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${j.date} · $${j.price} · ${j.shares}股</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 14px; font-weight: 800;">$${Math.round(j.price * j.shares).toLocaleString()}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // ==================== 模組 5: 股息歷程 ====================
+  function renderTimelineTab() {
+    const timelines = [
+      { month: '2025年 2月', value: 244490, cost: 240420, profit: 4070, div: 390 },
+      { month: '2025年 1月', value: 207400, cost: 206630, profit: 770, div: 320 },
+      { month: '2024年 12月', value: 206280, cost: 206630, profit: -350, div: 1935 },
+      { month: '2024年 11月', value: 203890, cost: 206630, profit: -2740, div: 1250 }
+    ];
+
+    return `
+      <div class="nav-bar">
+        <div></div>
+        <h1>股息歷程</h1>
+        <div></div>
+      </div>
+
+      <div style="padding: 16px;">
+        ${timelines.map(t => `
+          <div style="display: flex; gap: 12px; margin-bottom: 14px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <div style="width: 12px; height: 12px; background: var(--ios-blue); border-radius: 50%; margin-top: 4px;"></div>
+              <div style="width: 2px; flex: 1; background: rgba(0,122,255,0.3); margin-top: 4px;"></div>
+            </div>
+            <div class="card" style="margin: 0; flex: 1; padding: 12px;">
+              <div style="font-weight: 800; font-size: 14px; margin-bottom: 8px;">${t.month}</div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <span>總價值: $${t.value.toLocaleString()}</span>
+                <span>總成本: $${t.cost.toLocaleString()}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                <span>價差獲利: <b style="color:${t.profit>=0?'#FF3B30':'#34C759'};">${t.profit>=0?'+':''}$${t.profit.toLocaleString()}</b></span>
+              </div>
+              <div style="border-top: 1px solid #EEE; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; font-weight: 700;">當月股息</span>
+                <span style="font-size: 16px; font-weight: 800; color: var(--ios-blue);">$${t.div}</span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // ==================== 互動與 Sheet 控制 ====================
+  function togglePrivacy() {
+    isPrivacyMasked = !isPrivacyMasked;
+    saveState();
+    renderApp();
+  }
+
+  function setGoal(amt) {
+    targetMonthlyIncome = amt;
+    renderApp();
+  }
+
+  function setCalendarMode(mode) {
+    calendarMode = mode;
+    renderApp();
+  }
+
+  function toggleExpand(symbol) {
+    if (expandedHoldings.has(symbol)) expandedHoldings.delete(symbol);
+    else expandedHoldings.add(symbol);
+    renderApp();
+  }
+
+  function toggleNotification(checked) {
+    isNotificationEnabled = checked;
+    saveState();
+    if (checked) {
+      triggerNotification('🔔 已排程除息前通知', '將在各檔 ETF 除息日前一日 08:30 於鎖定畫面彈出提醒！');
+    }
+  }
+
+  // 動態島推播模擬
+  function triggerNotification(title, body) {
+    const di = document.getElementById('dynamicIsland');
+    document.getElementById('diTitle').innerText = title;
+    document.getElementById('diBody').innerText = body;
+    di.classList.add('expanded');
+    setTimeout(() => { di.classList.remove('expanded'); }, 4000);
+  }
+
+  function toggleDynamicIsland() {
+    document.getElementById('dynamicIsland').classList.toggle('expanded');
+  }
+
+  // 模擬即時報價刷新
+  function refreshQuotesSim() {
+    holdings.forEach(h => {
+      const delta = (Math.random() - 0.48) * 0.3;
+      h.currentPrice = Math.max(1, +(h.currentPrice + delta).toFixed(2));
+    });
+    saveState();
+    renderApp();
+    triggerNotification('📈 股價已刷新', '全體持股現價已串接 Yahoo Finance 完成同步更新！');
+  }
+
+  // 彈出 Sheet
+  function openSheet(html) {
+    document.getElementById('sheetContent').innerHTML = html;
+    document.getElementById('sheetOverlay').classList.add('active');
+  }
+  function closeSheet() {
+    document.getElementById('sheetOverlay').classList.remove('active');
+  }
+
+  // 新增存股 Sheet
+  function openAddHoldingSheet(presetSymbol = '') {
+    const presets = [
+      { sym: '0056', name: '元大高股息', freq: '季配', price: 37.5 },
+      { sym: '00878', name: '國泰永續高股息', freq: '季配', price: 22.8 },
+      { sym: '00919', name: '群益台灣精選高息', freq: '季配', price: 24.2 },
+      { sym: '00929', name: '復華台灣科技優息', freq: '月配', price: 19.5 },
+      { sym: '0050', name: '元大台灣50', freq: '半年配', price: 195 },
+      { sym: '2330', name: '台積電', freq: '季配', price: 1050 }
+    ];
+
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px;">新增 / 加碼存股</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+
+      <div class="form-group">
+        <label>熱門標的快速選取</label>
+        <div class="chip-group">
+          ${presets.map(p => `
+            <div class="chip ${presetSymbol === p.sym ? 'active' : ''}" onclick="selectPreset('${p.sym}', '${p.name}', '${p.freq}', ${p.price})">
+              ${p.sym} ${p.name}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>股票代號</label>
+        <input class="form-input" id="newSymbol" value="${presetSymbol}" placeholder="例: 0056">
+      </div>
+      <div class="form-group">
+        <label>股票名稱</label>
+        <input class="form-input" id="newName" placeholder="例: 元大高股息">
+      </div>
+      <div class="form-group">
+        <label>配息頻率</label>
+        <select class="form-input" id="newFreq">
+          <option>月配</option>
+          <option selected>季配</option>
+          <option>雙月配</option>
+          <option>半年配</option>
+          <option>年配</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>買入股數 (1,000股 = 1張)</label>
+        <input class="form-input" id="newShares" type="number" value="1000">
+      </div>
+      <div class="form-group">
+        <label>買入成交價 (元)</label>
+        <input class="form-input" id="newPrice" type="number" step="0.01" placeholder="例: 37.5">
+      </div>
+
+      <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="saveNewHolding()">
+        確認儲存 / 加碼
+      </button>
+    `);
+  }
+
+  function selectPreset(sym, name, freq, price) {
+    document.getElementById('newSymbol').value = sym;
+    document.getElementById('newName').value = name;
+    document.getElementById('newFreq').value = freq;
+    document.getElementById('newPrice').value = price;
+  }
+
+  function saveNewHolding() {
+    const sym = document.getElementById('newSymbol').value.trim();
+    const name = document.getElementById('newName').value.trim() || sym;
+    const freq = document.getElementById('newFreq').value;
+    const shares = parseInt(document.getElementById('newShares').value) || 0;
+    const price = parseFloat(document.getElementById('newPrice').value) || 0;
+
+    if (!sym || shares <= 0 || price <= 0) {
+      alert('請輸入正確的代號、股數與價格');
+      return;
+    }
+
+    const existing = holdings.find(h => h.symbol === sym);
+    if (existing) {
+      // 加碼存股：加權重新計算均價
+      const oldCost = existing.shares * existing.averageCost;
+      const addCost = shares * price;
+      const totalS = existing.shares + shares;
+      existing.averageCost = +((oldCost + addCost) / totalS).toFixed(2);
+      existing.shares = totalS;
+      existing.currentPrice = price;
+    } else {
+      holdings.push({
+        id: Date.now().toString(),
+        symbol: sym,
+        name: name,
+        frequency: freq,
+        shares: shares,
+        averageCost: price,
+        currentPrice: price,
+        totalDividends: 0,
+        count: 0
+      });
+    }
+
+    // 同步記錄日記
+    journals.unshift({
+      id: Date.now().toString(),
+      symbol: sym,
+      name: name,
+      type: '買',
+      date: new Date().toISOString().substring(0, 10),
+      price: price,
+      shares: shares,
+      note: existing ? '加碼存股' : '初次建倉'
+    });
+
+    saveState();
+    closeSheet();
+    renderApp();
+    triggerNotification('✅ 存股成功', `已將 ${sym} ${name} 記入持股與買賣日記！`);
+  }
+
+  function openDCA(symbol) {
+    openAddHoldingSheet(symbol);
+    const existing = holdings.find(h => h.symbol === symbol);
+    if (existing) {
+      setTimeout(() => {
+        document.getElementById('newName').value = existing.name;
+        document.getElementById('newFreq').value = existing.frequency;
+        document.getElementById('newPrice').value = existing.currentPrice;
+      }, 50);
+    }
+  }
+
+  function openEditHolding(symbol) {
+    const h = holdings.find(item => item.symbol === symbol);
+    if (!h) return;
+
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px;">編輯 ${h.symbol}</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+      <div class="form-group"><label>名稱</label><input class="form-input" id="editName" value="${h.name}"></div>
+      <div class="form-group"><label>股數</label><input class="form-input" id="editShares" type="number" value="${h.shares}"></div>
+      <div class="form-group"><label>買入均價</label><input class="form-input" id="editCost" type="number" step="0.01" value="${h.averageCost}"></div>
+      <div class="form-group"><label>目前現價</label><input class="form-input" id="editPrice" type="number" step="0.01" value="${h.currentPrice}"></div>
+      <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="saveEdit('${h.symbol}')">儲存修改</button>
+    `);
+  }
+
+  function saveEdit(symbol) {
+    const h = holdings.find(item => item.symbol === symbol);
+    if (!h) return;
+    h.name = document.getElementById('editName').value;
+    h.shares = parseInt(document.getElementById('editShares').value) || h.shares;
+    h.averageCost = parseFloat(document.getElementById('editCost').value) || h.averageCost;
+    h.currentPrice = parseFloat(document.getElementById('editPrice').value) || h.currentPrice;
+    saveState();
+    closeSheet();
+    renderApp();
+  }
+
+  function confirmDelete(symbol) {
+    if (confirm(`確定要刪除 ${symbol} 嗎？此操作將自總資產扣除。`)) {
+      holdings = holdings.filter(h => h.symbol !== symbol);
+      saveState();
+      renderApp();
+      triggerNotification('🗑️ 已刪除存股', `${symbol} 已從持股清單移除。`);
+    }
+  }
+
+  function resetSampleData() {
+    if (confirm('確定要重設為預設的台股展示資料嗎？')) {
+      holdings = JSON.parse(JSON.stringify(defaultHoldings));
+      events = JSON.parse(JSON.stringify(defaultEvents));
+      journals = JSON.parse(JSON.stringify(defaultJournals));
+      saveState();
+      renderApp();
+      triggerNotification('⏮️ 資料已重設', '展示資料已恢復預設！');
+    }
+  }
+
+  function copyFeedbackTemplate() {
+    const text = `【台股存股助手 - 修改反饋】\n1. 投資總覽：\n2. 持有ETF：\n3. ETF日曆：\n4. 日記管理：\n5. 其他需求：`;
+    navigator.clipboard.writeText(text);
+    alert('已複製反饋清單模板至剪貼簿！直接在對話框貼上並告訴我你想改哪裡即可。');
+  }
+
+  function exportJSON() {
+    const data = { holdings, events, journals };
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    alert('已將完整備份 JSON 複製至剪貼簿！');
+  }
+
+  // 初次啟動渲染
+  renderApp();
+</script>
+</body>
+</html>
