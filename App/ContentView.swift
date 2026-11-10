@@ -1635,6 +1635,11 @@ struct StockEventRowView: View {
     }
 }
 
+struct CalendarDaySlot: Identifiable {
+    let id: Int
+    let date: Date?
+}
+
 // 互動式月曆顯示視圖 (包含月曆網格、色彩圓點標記、點選連動)
 struct TaiwanStockCalendarMonthView: View {
     let events: [DividendEvent]
@@ -1661,6 +1666,10 @@ struct TaiwanStockCalendarMonthView: View {
             }
         }
         return list
+    }
+    
+    var daySlots: [CalendarDaySlot] {
+        daysInMonth.enumerated().map { CalendarDaySlot(id: $0.offset, date: $0.element) }
     }
     
     var eventsOnSelectedDate: [DividendEvent] {
@@ -1715,7 +1724,7 @@ struct TaiwanStockCalendarMonthView: View {
             
             // 星期表頭 (日 一 二 三 四 五 六)
             HStack {
-                ForEach(0..<7) { idx in
+                ForEach(0..<7, id: \.self) { idx in
                     Text(weekDays[idx])
                         .font(.caption.bold())
                         .foregroundColor(idx == 0 || idx == 6 ? Color(hex: "#FF9500") : .secondary)
@@ -1727,8 +1736,8 @@ struct TaiwanStockCalendarMonthView: View {
             // 月曆 7 欄 Grid
             let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
             LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(0..<daysInMonth.count, id: \.self) { idx in
-                    if let date = daysInMonth[idx] {
+                ForEach(daySlots) { slot in
+                    if let date = slot.date {
                         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
                         let isToday = calendar.isDateInToday(date)
                         let dayEvents = events.filter { calendar.isDate($0.targetDate, inSameDayAs: date) }
@@ -1737,18 +1746,22 @@ struct TaiwanStockCalendarMonthView: View {
                             selectedDate = date
                         } label: {
                             VStack(spacing: 2) {
-                                Text("\(calendar.component(.day, from: date))")
-                                    .font(.system(size: 13, weight: isSelected || isToday ? .bold : .medium))
-                                    .foregroundColor(isSelected ? .white : (isToday ? Color(hex: "#007AFF") : .primary))
-                                    .frame(width: 28, height: 28)
-                                    .background(
-                                        isSelected ? Circle().fill(Color(hex: "#007AFF")) :
-                                        (isToday ? Circle().stroke(Color(hex: "#007AFF"), lineWidth: 1.5) : nil)
-                                    )
+                                ZStack {
+                                    if isSelected {
+                                        Circle().fill(Color(hex: "#007AFF"))
+                                    } else if isToday {
+                                        Circle().stroke(Color(hex: "#007AFF"), lineWidth: 1.5)
+                                    }
+                                    
+                                    Text("\(calendar.component(.day, from: date))")
+                                        .font(.system(size: 13, weight: isSelected || isToday ? .bold : .medium))
+                                        .foregroundColor(isSelected ? .white : (isToday ? Color(hex: "#007AFF") : .primary))
+                                }
+                                .frame(width: 28, height: 28)
                                 
                                 // 事件彩點標記 (最多 3 顆彩點)
                                 HStack(spacing: 2) {
-                                    ForEach(dayEvents.prefix(3)) { ev in
+                                    ForEach(Array(dayEvents.prefix(3))) { ev in
                                         Circle()
                                             .fill(Color(hex: ev.eventType.badgeColorHex))
                                             .frame(width: 4, height: 4)
