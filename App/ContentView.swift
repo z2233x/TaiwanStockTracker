@@ -926,6 +926,171 @@ struct DividendTimelineView: View {
 // MARK: 模組 4: 持有現股 + 股息明細 (對應截圖 4)
 // MARK: ==========================================
 
+struct StockHoldingRowView: View {
+    let item: StockHolding
+    let isExpanded: Bool
+    let onToggleExpand: () -> Void
+    let onEdit: () -> Void
+    let onShowDetail: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                // 標的代號 + 頻率Badge + 券商Badge
+                HStack(spacing: 6) {
+                    Text(item.symbol)
+                        .font(.headline.bold())
+                    
+                    Text(item.frequency.rawValue)
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: item.frequency.badgeColorHex).opacity(0.15))
+                        .foregroundColor(Color(hex: item.frequency.badgeColorHex))
+                        .cornerRadius(4)
+                    
+                    if !item.brokerage.isEmpty {
+                        Text(item.brokerage)
+                            .font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color(.systemGray5))
+                            .foregroundColor(.secondary)
+                            .cornerRadius(4)
+                    }
+                }
+                
+                Spacer()
+                
+                // 展開收合箭頭
+                Button(action: onToggleExpand) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Text(item.name)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("總成本")
+                        .font(.caption).foregroundColor(.secondary)
+                    Text("$\(Int(item.totalCostWithFee).formatted())")
+                        .font(.subheadline.bold())
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("總股數")
+                        .font(.caption).foregroundColor(.secondary)
+                    Text("\(item.shares.formatted())股")
+                        .font(.subheadline.bold())
+                }
+            }
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("總損益")
+                        .font(.caption).foregroundColor(.secondary)
+                    HStack(spacing: 6) {
+                        Text("\(item.unrealizedProfit >= 0 ? "+" : "")$\(Int(item.unrealizedProfit).formatted())")
+                            .font(.subheadline.bold())
+                            .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                        
+                        Text(profitRateText)
+                            .font(.system(size: 11, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(profitBadgeBg)
+                            .foregroundColor(profitTextColor)
+                            .cornerRadius(6)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("已領息")
+                        .font(.caption).foregroundColor(.secondary)
+                    Text("(領息\(item.dividendCount)次)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // 展開內容：現值、均價、現價、多功能操作區
+            if isExpanded {
+                VStack(spacing: 10) {
+                    Divider()
+                    HStack {
+                        Text("現值: $\(Int(item.marketValue).formatted())")
+                        Spacer()
+                        Text("均價: $\(String(format: "%.2f", item.averageCost))")
+                        Spacer()
+                        Text("現價: $\(String(format: "%.2f", item.currentPrice))")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    
+                    // 操作按鈕組
+                    HStack(spacing: 8) {
+                        Button(action: onEdit) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "pencil")
+                                Text("編輯")
+                            }
+                            .font(.caption.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(8)
+                        }
+                        
+                        Button(action: onShowDetail) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chart.bar.doc.horizontal")
+                                Text("股息紀錄")
+                            }
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 7)
+                            .background(Color(hex: "#007AFF"))
+                            .cornerRadius(8)
+                        }
+                        
+                        Button(action: onDelete) {
+                            Image(systemName: "trash")
+                                .font(.caption.bold())
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(Color.red.opacity(0.12))
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private var profitRateText: String {
+        let rate = item.unrealizedProfitRate
+        return String(format: "%@%.2f%%", rate >= 0 ? "+" : "", rate)
+    }
+    
+    private var profitBadgeBg: Color {
+        (item.unrealizedProfitRate >= 0 ? Color.red : Color.green).opacity(0.12)
+    }
+    
+    private var profitTextColor: Color {
+        item.unrealizedProfitRate >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77")
+    }
+}
+
 struct HoldingsListView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
     @State private var expandedSymbols: Set<String> = []
@@ -950,162 +1115,20 @@ struct HoldingsListView: View {
         NavigationStack {
             List {
                 ForEach(filteredHoldings) { item in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            // 標的代號 + 頻率Badge + 券商Badge
-                            HStack(spacing: 6) {
-                                Text(item.symbol)
-                                    .font(.headline.bold())
-                                
-                                Text(item.frequency.rawValue)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color(hex: item.frequency.badgeColorHex).opacity(0.15))
-                                    .foregroundColor(Color(hex: item.frequency.badgeColorHex))
-                                    .cornerRadius(4)
-                                
-                                if !item.brokerage.isEmpty {
-                                    Text(item.brokerage)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 2)
-                                        .background(Color(.systemGray5))
-                                        .foregroundColor(.secondary)
-                                        .cornerRadius(4)
-                                }
+                    StockHoldingRowView(
+                        item: item,
+                        isExpanded: expandedSymbols.contains(item.symbol),
+                        onToggleExpand: {
+                            if expandedSymbols.contains(item.symbol) {
+                                expandedSymbols.remove(item.symbol)
+                            } else {
+                                expandedSymbols.insert(item.symbol)
                             }
-                            
-                            Spacer()
-                            
-                            // 展開收合箭頭
-                            Button {
-                                if expandedSymbols.contains(item.symbol) {
-                                    expandedSymbols.remove(item.symbol)
-                                } else {
-                                    expandedSymbols.insert(item.symbol)
-                                }
-                            } label: {
-                                Image(systemName: expandedSymbols.contains(item.symbol) ? "chevron.up" : "chevron.down")
-                                    .font(.caption.bold())
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        Text(item.name)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("總成本")
-                                    .font(.caption).foregroundColor(.secondary)
-                                Text("$\(Int(item.totalCostWithFee).formatted())")
-                                    .font(.subheadline.bold())
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("總股數")
-                                    .font(.caption).foregroundColor(.secondary)
-                                Text("\(item.shares.formatted())股")
-                                    .font(.subheadline.bold())
-                            }
-                        }
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("總損益")
-                                    .font(.caption).foregroundColor(.secondary)
-                                HStack(spacing: 6) {
-                                    Text("\(item.unrealizedProfit >= 0 ? "+" : "")$\(Int(item.unrealizedProfit).formatted())")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
-                                    
-                                    let rate = item.unrealizedProfitRate
-                                    Text(String(format: "%@%.2f%%", rate >= 0 ? "+" : "", rate))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background((rate >= 0 ? Color.red : Color.green).opacity(0.12))
-                                        .foregroundColor(rate >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
-                                        .cornerRadius(6)
-                                }
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("已領息")
-                                    .font(.caption).foregroundColor(.secondary)
-                                Text("(領息\(item.dividendCount)次)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        // 展開內容：現值、均價、現價、多功能操作區
-                        if expandedSymbols.contains(item.symbol) {
-                            VStack(spacing: 10) {
-                                Divider()
-                                HStack {
-                                    Text("現值: $\(Int(item.marketValue).formatted())")
-                                    Spacer()
-                                    Text("均價: $\(String(format: "%.2f", item.averageCost))")
-                                    Spacer()
-                                    Text("現價: $\(String(format: "%.2f", item.currentPrice))")
-                                }
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                
-                                // 操作按鈕組
-                                HStack(spacing: 8) {
-                                    // 編輯按鈕
-                                    Button {
-                                        holdingToEdit = item
-                                    } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "pencil")
-                                            Text("編輯")
-                                        }
-                                        .font(.caption.bold())
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 7)
-                                        .background(Color(.systemGray5))
-                                        .cornerRadius(8)
-                                    }
-                                    
-                                    // 股息紀錄按鈕
-                                    Button {
-                                        selectedHoldingForDetail = item
-                                    } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "chart.bar.doc.horizontal")
-                                            Text("股息紀錄")
-                                        }
-                                        .font(.caption.bold())
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 7)
-                                        .background(Color(hex: "#007AFF"))
-                                        .cornerRadius(8)
-                                    }
-                                    
-                                    // 刪除按鈕
-                                    Button {
-                                        holdingToDelete = item
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .font(.caption.bold())
-                                            .foregroundColor(.red)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 7)
-                                            .background(Color.red.opacity(0.12))
-                                            .cornerRadius(8)
-                                    }
-                                }
-                                .padding(.top, 2)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
+                        },
+                        onEdit: { holdingToEdit = item },
+                        onShowDetail: { selectedHoldingForDetail = item },
+                        onDelete: { holdingToDelete = item }
+                    )
                 }
                 .onDelete(perform: deleteHolding)
             }
