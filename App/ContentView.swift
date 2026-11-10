@@ -1640,10 +1640,15 @@ struct DividendCalendarTabView: View {
                     .padding(.vertical, 8)
                 }
                 
-                // 3. 重大行事曆清單 (依剩餘天數倒數排序)
+                // 3. 重大行事曆清單 (依剩餘天數倒數排序，支援滑動刪除)
                 TaiwanStockCountdownListView(
                     events: filteredEvents,
-                    heldSymbols: heldSymbols
+                    heldSymbols: heldSymbols,
+                    onDelete: { eventToDelete in
+                        StorageService.shared.deleteEvent(id: eventToDelete.id)
+                        events = StorageService.shared.loadEvents()
+                        NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
+                    }
                 )
             }
             .navigationTitle("台股日曆")
@@ -1699,6 +1704,7 @@ struct DividendCalendarTabView: View {
 struct TaiwanStockCountdownListView: View {
     let events: [DividendEvent]
     let heldSymbols: Set<String>
+    var onDelete: ((DividendEvent) -> Void)? = nil
     
     var sortedEvents: [DividendEvent] {
         events.sorted { $0.daysRemaining < $1.daysRemaining }
@@ -1726,6 +1732,19 @@ struct TaiwanStockCountdownListView: View {
                 List {
                     ForEach(sortedEvents) { event in
                         StockEventRowView(event: event, isHeld: heldSymbols.contains(event.symbol))
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    onDelete?(event)
+                                } label: {
+                                    Label("刪除", systemImage: "trash")
+                                }
+                            }
+                    }
+                    .onDelete { indexSet in
+                        for index in indexSet {
+                            let ev = sortedEvents[index]
+                            onDelete?(ev)
+                        }
                     }
                 }
                 .listStyle(.insetGrouped)

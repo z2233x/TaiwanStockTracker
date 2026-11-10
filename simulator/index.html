@@ -934,39 +934,115 @@
 
   function renderSimEventCards(items, heldSyms) {
     if (items.length === 0) {
-      return `<div style="text-align: center; padding: 20px; font-size: 12px; color: #8E8E93;">此期間暫無重大行事曆</div>`;
+      return `<div style="text-align: center; padding: 24px; font-size: 13px; color: #8E8E93;">此期間暫無重大行事曆</div>`;
     }
     return items.map(ev => {
       const isHeld = heldSyms.has(ev.symbol);
       const color = eventTypeColors[ev.type] || '#007AFF';
       return `
-        <div class="card" style="margin: 8px 0; display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">
-              ${ev.type.substring(0, 1)}
-            </div>
-            <div>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-weight: 800; font-size: 14px;">${ev.symbol}</span>
-                <span style="font-size: 12px; color: #666;">${ev.name}</span>
-                ${isHeld ? `<span style="font-size: 9px; font-weight: 700; background: rgba(0,122,255,0.12); color: var(--ios-blue); padding: 1px 5px; border-radius: 4px;">📌持有現股</span>` : ''}
-              </div>
-              <div style="font-size: 11px; margin-top: 2px; display: flex; gap: 4px; align-items: center;">
-                <b style="color: ${color};">${ev.type}</b>
-                ${ev.note ? `<span style="color: #666;">· ${ev.note}</span>` : ''}
-                ${ev.cash > 0 ? `<span style="color: var(--ios-blue); font-weight: 700;">· 每股配 $${ev.cash}</span>` : ''}
-              </div>
-            </div>
+        <div class="swipe-container" style="position: relative; overflow: hidden; border-radius: 12px; margin: 8px 0; background: #FF3B30;">
+          <!-- 滑出顯示之紅色刪除按鈕 -->
+          <div onclick="deleteCalendarEventSim('${ev.id}')" style="position: absolute; right: 0; top: 0; bottom: 0; width: 75px; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; cursor: pointer; z-index: 1;">
+            🗑️ 刪除
           </div>
-          <div style="text-align: right;">
-            <div style="background: ${ev.days === 0 ? '#34C759' : (ev.days <= 3 ? '#FF9500' : '#8E8E93')}; color: #FFF; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 10px; display: inline-block;">
-              ${ev.days === 0 ? '今天' : `剩 ${ev.days} 天`}
+          <!-- 主卡片 (支援左滑動作) -->
+          <div class="card" id="event-card-${ev.id}" style="margin: 0; border-radius: 12px; background: #FFF; position: relative; z-index: 2; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; align-items: center; justify-content: space-between; user-select: none;"
+               ontouchstart="handleEventSwipeStart(event, '${ev.id}')"
+               ontouchmove="handleEventSwipeMove(event, '${ev.id}')"
+               ontouchend="handleEventSwipeEnd(event, '${ev.id}')"
+               onmousedown="handleEventSwipeStart(event, '${ev.id}')"
+               onmousemove="handleEventSwipeMove(event, '${ev.id}')"
+               onmouseup="handleEventSwipeEnd(event, '${ev.id}')">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;">
+                ${ev.type.substring(0, 1)}
+              </div>
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-weight: 800; font-size: 14px;">${ev.symbol}</span>
+                  <span style="font-size: 12px; color: #666;">${ev.name}</span>
+                  ${isHeld ? `<span style="font-size: 9px; font-weight: 700; background: rgba(0,122,255,0.12); color: var(--ios-blue); padding: 1px 5px; border-radius: 4px;">📌持有現股</span>` : ''}
+                </div>
+                <div style="font-size: 11px; margin-top: 2px; display: flex; gap: 4px; align-items: center;">
+                  <b style="color: ${color};">${ev.type}</b>
+                  ${ev.note ? `<span style="color: #666;">· ${ev.note}</span>` : ''}
+                  ${ev.cash > 0 ? `<span style="color: var(--ios-blue); font-weight: 700;">· 每股配 $${ev.cash}</span>` : ''}
+                </div>
+              </div>
             </div>
-            <div style="font-size: 10px; color: #8E8E93; margin-top: 2px;">${ev.date}</div>
+            <div style="text-align: right; display: flex; align-items: center; gap: 8px;">
+              <div>
+                <div style="background: ${ev.days === 0 ? '#34C759' : (ev.days <= 3 ? '#FF9500' : '#8E8E93')}; color: #FFF; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 10px; display: inline-block;">
+                  ${ev.days === 0 ? '今天' : `剩 ${ev.days} 天`}
+                </div>
+                <div style="font-size: 10px; color: #8E8E93; margin-top: 2px;">${ev.date}</div>
+              </div>
+              <!-- 快捷滑動/刪除按鈕 (支援桌機點擊滑開) -->
+              <span title="向左滑動刪除" onclick="event.stopPropagation(); toggleEventSwipe('${ev.id}')" style="cursor: pointer; color: #C7C7CC; font-size: 18px; padding: 2px 4px;">‹</span>
+            </div>
           </div>
         </div>
       `;
     }).join('');
+  }
+
+  let swipeEventId = null;
+  let swipeEventStartX = 0;
+  let isEventSwiping = false;
+
+  function handleEventSwipeStart(e, id) {
+    swipeEventId = id;
+    swipeEventStartX = e.touches ? e.touches[0].clientX : e.clientX;
+    isEventSwiping = true;
+    const card = document.getElementById(`event-card-${id}`);
+    if (card) card.style.transition = 'none';
+  }
+
+  function handleEventSwipeMove(e, id) {
+    if (!isEventSwiping || swipeEventId !== id) return;
+    const curX = e.touches ? e.touches[0].clientX : e.clientX;
+    const diff = curX - swipeEventStartX;
+    if (diff < 0) {
+      const card = document.getElementById(`event-card-${id}`);
+      if (card) {
+        const trans = Math.max(-85, diff);
+        card.style.transform = `translateX(${trans}px)`;
+      }
+    }
+  }
+
+  function handleEventSwipeEnd(e, id) {
+    if (!isEventSwiping || swipeEventId !== id) return;
+    isEventSwiping = false;
+    const endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : (e.clientX !== undefined ? e.clientX : swipeEventStartX);
+    const diff = endX - swipeEventStartX;
+    const card = document.getElementById(`event-card-${id}`);
+    if (card) {
+      card.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      if (diff < -35) {
+        card.style.transform = 'translateX(-75px)';
+      } else {
+        card.style.transform = 'translateX(0px)';
+      }
+    }
+  }
+
+  function toggleEventSwipe(id) {
+    const card = document.getElementById(`event-card-${id}`);
+    if (card) {
+      const isOpened = card.style.transform.includes('-75px');
+      card.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      card.style.transform = isOpened ? 'translateX(0px)' : 'translateX(-75px)';
+    }
+  }
+
+  function deleteCalendarEventSim(id) {
+    const target = events.find(e => String(e.id) === String(id));
+    const desc = target ? `${target.symbol} ${target.name} ${target.type}` : '行事曆事件';
+    events = events.filter(e => String(e.id) !== String(id));
+    saveState();
+    renderApp();
+    triggerNotification('🗑️ 已滑動刪除行事曆', `已自台股日曆移除：${desc}`);
   }
 
   function syncHoldingEventsSim() {
