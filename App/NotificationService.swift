@@ -61,8 +61,16 @@ public final class NotificationService: NSObject, UNUserNotificationCenterDelega
                     ? "，持有 \(heldShares.formatted()) 股預估入帳 $\(Int(Double(heldShares) * event.cashPerShare).formatted()) 元"
                     : ""
                 
-                content.title = "🔔【除息前提醒】\(event.symbol) \(event.name)"
-                content.body = "明日即將迎來 \(event.eventType.rawValue)！每股配息 $\(String(format: "%.2f", event.cashPerShare)) 元\(estMoney)。"
+                content.title = event.eventType.isDividendRelated 
+                    ? "🔔【除權息提醒】\(event.symbol) \(event.name)"
+                    : "📅【重大行事曆】\(event.symbol) \(event.name)"
+                
+                let notePart = event.note.isEmpty ? "" : "（\(event.note)）"
+                if event.eventType.isDividendRelated {
+                    content.body = "明日即將迎來 \(event.eventType.rawValue)\(notePart)！每股配息 $\(String(format: "%.2f", event.cashPerShare)) 元\(estMoney)。"
+                } else {
+                    content.body = "明日預定舉行 \(event.eventType.rawValue)\(notePart)！敬請留意盤勢與相關公告。"
+                }
                 content.sound = .default
                 
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comp, repeats: false)

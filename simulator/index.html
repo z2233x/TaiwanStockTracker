@@ -342,6 +342,10 @@
       🏦 券商銀行對接與匯入
     </button>
 
+    <button class="sim-btn" onclick="syncHoldingEventsSim()">
+      ⚡ 一鍵同步現股重大行事曆 (法說/股東會/月營收)
+    </button>
+
     <button class="sim-btn" onclick="openRankModal()">
       🏅 存股晉升榮譽榜 (等級天梯)
     </button>
@@ -394,7 +398,7 @@
       <div class="tab-bar">
         <div class="tab-item" onclick="switchTab(0)" id="tab0">
           <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
-          <span>股息日曆</span>
+          <span>台股日曆</span>
         </div>
         <div class="tab-item" onclick="switchTab(1)" id="tab1">
           <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
@@ -460,12 +464,28 @@
     return investorRanks.find(r => r.level === rank.level + 1) || null;
   }
 
+  const eventTypeColors = {
+    '股東會': '#AF52DE',
+    '法說會': '#FF2D55',
+    '財報公告': '#FF9500',
+    '月營收公告': '#30D158',
+    '除息日': '#007AFF',
+    '除權日': '#5AC8FA',
+    '股利發放日': '#34C759',
+    '最後購買日': '#00C7BE',
+    '停止過戶': '#8E8E93'
+  };
+
   const defaultEvents = [
-    { id: '1', symbol: '00939', name: '統一台灣高息', frequency: '月配', type: '除息日', date: '2026-11-10', days: 0, cash: 0.063 },
-    { id: '2', symbol: '00940', name: '元大台灣價值', frequency: '月配', type: '最後購買日', date: '2026-11-10', days: 0, cash: 0.04 },
-    { id: '3', symbol: '00940', name: '元大台灣價值', frequency: '月配', type: '除息日', date: '2026-11-12', days: 2, cash: 0.04 },
-    { id: '4', symbol: '00936', name: '台新永續高息', frequency: '月配', type: '股利發放日', date: '2026-11-16', days: 6, cash: 0.08 },
-    { id: '5', symbol: '00717', name: '富邦美國特別', frequency: '季配', type: '除息日', date: '2026-11-22', days: 12, cash: 0.16 }
+    { id: '1', symbol: '2330', name: '台積電', frequency: '季配', type: '法說會', date: '2026-11-10', days: 0, cash: 0, note: '第3季線上法人說明會' },
+    { id: '2', symbol: '0056', name: '元大高股息', frequency: '季配', type: '月營收公告', date: '2026-11-11', days: 1, cash: 0, note: '基金月度明細揭露與自結淨值' },
+    { id: '3', symbol: '00939', name: '統一台灣高息', frequency: '月配', type: '除息日', date: '2026-11-12', days: 2, cash: 0.063, note: '月配現金除息' },
+    { id: '4', symbol: '2454', name: '聯發科', frequency: '半年配', type: '財報公告', date: '2026-11-14', days: 4, cash: 0, note: '第3季財務報告董事會決議' },
+    { id: '5', symbol: '2881', name: '富邦金', frequency: '年配', type: '月營收公告', date: '2026-11-16', days: 6, cash: 0, note: '10月自結合併損益' },
+    { id: '6', symbol: '00940', name: '元大台灣價值', frequency: '月配', type: '除息日', date: '2026-11-17', days: 7, cash: 0.04, note: '現金股息除息日' },
+    { id: '7', symbol: '2330', name: '台積電', frequency: '季配', type: '除息日', date: '2026-11-22', days: 12, cash: 4.0, note: '113年第二季現金股利除息' },
+    { id: '8', symbol: '00919', name: '群益台灣精選', frequency: '季配', type: '股東會', date: '2026-11-26', days: 16, cash: 0, note: '受益人會議 / 股東常會' },
+    { id: '9', symbol: '00878', name: '國泰永續高股息', frequency: '季配', type: '股利發放日', date: '2026-11-30', days: 20, cash: 0.55, note: '現金股利發放入帳' }
   ];
 
   const defaultJournals = [
@@ -751,59 +771,250 @@
     }).join('');
   }
 
-  // ==================== 模組 3: 股息日曆 + 倒數日 ====================
-  let calendarMode = 1; // 0: 日曆, 1: 倒數日
+  // ==================== 模組 3: 台股日曆 + 個股重大行事曆 (日曆顯示/股東會/法說會/財報/月營收) ====================
+  let calendarMode = 0; // 0: 日曆顯示, 1: 倒數日
+  let selectedEventCat = '全部';
+  let simCurrentYear = 2026;
+  let simCurrentMonth = 11; // 11月
+  let simSelectedDateStr = '2026-11-10';
+
   function renderCalendarTab() {
+    const heldSyms = new Set(holdings.map(h => h.symbol));
+    
+    // 類別篩選
+    let filtered = events;
+    if (selectedEventCat === '📌 持有現股') {
+      filtered = filtered.filter(e => heldSyms.has(e.symbol));
+    } else if (selectedEventCat === '除權息') {
+      filtered = filtered.filter(e => e.type.includes('除息') || e.type.includes('除權') || e.type.includes('最後購買') || e.type.includes('發放'));
+    } else if (selectedEventCat !== '全部') {
+      filtered = filtered.filter(e => e.type === selectedEventCat);
+    }
+
+    // 選取日期的事件
+    const eventsOnSelected = filtered.filter(e => e.date === simSelectedDateStr);
+    const displayEvents = eventsOnSelected.length > 0 ? eventsOnSelected : filtered;
+
+    const cats = ['全部', '📌 持有現股', '除權息', '股東會', '財報公告', '月營收公告', '法說會'];
+
     return `
       <div class="nav-bar">
-        <div></div>
-        <h1>ETF日曆</h1>
+        <button class="nav-btn" onclick="syncHoldingEventsSim()" title="一鍵同步持有現股行事曆" style="font-size: 11px; padding: 4px 8px;">⚡ 同步現股</button>
+        <h1>台股日曆</h1>
         <button class="nav-btn" onclick="openAddEventSheet()">➕</button>
       </div>
 
-      <!-- 除息通知推播開關 (進階功能) -->
-      <div style="background: #E5E5EA; padding: 10px 16px; margin: 0 16px 8px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+      <!-- 重大行事曆推播開關 -->
+      <div style="background: #E5E5EA; padding: 8px 14px; margin: 0 16px 6px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div style="font-size: 12px; font-weight: 700;">🔔 除息前一日 08:30 推播通知</div>
-          <div style="font-size: 10px; color: #666;">即時提醒除息金額與入帳預估</div>
+          <div style="font-size: 11px; font-weight: 700;">🔔 重大行事曆前日 08:30 推播通知</div>
+          <div style="font-size: 9px; color: #666;">支援除權息、法說會、股東會前日提醒</div>
         </div>
-        <input type="checkbox" ${isNotificationEnabled ? 'checked' : ''} onchange="toggleNotification(this.checked)" style="transform: scale(1.3); cursor: pointer;">
+        <input type="checkbox" ${isNotificationEnabled ? 'checked' : ''} onchange="toggleNotification(this.checked)" style="transform: scale(1.2); cursor: pointer;">
       </div>
 
-      <div class="seg-control">
-        <button class="seg-btn ${calendarMode === 0 ? 'active' : ''}" onclick="setCalendarMode(0)">股息日曆</button>
-        <button class="seg-btn ${calendarMode === 1 ? 'active' : ''}" onclick="setCalendarMode(1)">倒數日</button>
+      <!-- 模式切換 Switch (日曆顯示 vs 倒數日) -->
+      <div class="seg-control" style="margin-bottom: 6px;">
+        <button class="seg-btn ${calendarMode === 0 ? 'active' : ''}" onclick="setCalendarMode(0)">日曆顯示</button>
+        <button class="seg-btn ${calendarMode === 1 ? 'active' : ''}" onclick="setCalendarMode(1)">行事曆倒數</button>
       </div>
 
-      ${calendarMode === 1 ? `
-        <div style="padding: 4px 16px;">
-          ${events.map(ev => `
-            <div class="card" style="margin: 8px 0; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="font-weight: 700; font-size: 14px;">${ev.symbol} ${ev.name}</div>
-                <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${ev.type}: ${ev.date} · 每股配 $${ev.cash}</div>
-              </div>
-              <div style="background: ${ev.days === 0 ? '#34C759' : (ev.days <= 3 ? '#FF9500' : '#007AFF')}; color: #FFF; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 14px;">
-                ${ev.days === 0 ? '今天' : `剩 ${ev.days} 天`}
-              </div>
-            </div>
-          `).join('')}
+      <!-- 分類篩選 Chip 列 -->
+      <div style="display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 8px 16px;">
+        ${cats.map(c => `
+          <button style="border: none; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; background: ${selectedEventCat === c ? 'var(--ios-blue)' : '#E5E5EA'}; color: ${selectedEventCat === c ? '#FFF' : '#333'};" onclick="filterEventsByCategory('${c}')">
+            ${c}
+          </button>
+        `).join('')}
+      </div>
+
+      ${calendarMode === 0 ? `
+        <!-- 模式 A: 互動式月曆顯示 -->
+        <div style="background: #FFF; margin: 0 16px 10px 16px; border-radius: 14px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+          <!-- 月份切換列 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <button class="nav-btn" style="font-size: 12px; font-weight: 800;" onclick="changeSimMonth(-1)">◀</button>
+            <span style="font-weight: 800; font-size: 14px;">${simCurrentYear}年 ${simCurrentMonth}月</span>
+            <button class="nav-btn" style="font-size: 12px; font-weight: 800;" onclick="changeSimMonth(1)">▶</button>
+            <button style="border: none; background: #E5E5EA; padding: 3px 8px; border-radius: 8px; font-size: 10px; font-weight: 700; cursor: pointer;" onclick="jumpToSimToday()">今天</button>
+          </div>
+
+          <!-- 星期標頭 -->
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: #8E8E93; margin-bottom: 6px;">
+            <div style="color: #FF9500;">日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div style="color: #FF9500;">六</div>
+          </div>
+
+          <!-- 7 欄日曆格子 -->
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
+            ${renderSimCalendarDays(simCurrentYear, simCurrentMonth, filtered)}
+          </div>
+        </div>
+
+        <!-- 下方行事曆清單 -->
+        <div style="padding: 0 16px;">
+          <div style="font-size: 12px; font-weight: 700; color: #666; margin-bottom: 6px;">
+            ${eventsOnSelected.length > 0 ? `📅 ${simSelectedDateStr} 重大行事曆 (${eventsOnSelected.length} 筆)` : `📅 當月重大行事曆一覽 (${filtered.length} 筆)`}
+          </div>
+          ${renderSimEventCards(displayEvents, heldSyms)}
         </div>
       ` : `
-        <div class="card">
-          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">當月除權息日程</div>
-          ${events.map(ev => `
-            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 8px 0; border-bottom: 1px solid #EEE;">
-              <div>
-                <span class="badge ${ev.type.includes('除息') ? 'badge-monthly' : 'badge-quarterly'}">${ev.type}</span>
-                <span style="font-weight: 700; margin-left: 4px;">${ev.symbol} ${ev.name}</span>
-              </div>
-              <div style="color: var(--ios-blue); font-weight: 700;">$${ev.cash} (${ev.date.substring(5)})</div>
-            </div>
-          `).join('')}
+        <!-- 模式 B: 行事曆倒數日清單 -->
+        <div style="padding: 0 16px;">
+          ${renderSimEventCards(filtered.slice().sort((a,b) => a.days - b.days), heldSyms)}
         </div>
       `}
     `;
+  }
+
+  function changeSimMonth(delta) {
+    simCurrentMonth += delta;
+    if (simCurrentMonth > 12) { simCurrentMonth = 1; simCurrentYear++; }
+    if (simCurrentMonth < 1) { simCurrentMonth = 12; simCurrentYear--; }
+    renderApp();
+  }
+
+  function jumpToSimToday() {
+    simCurrentYear = 2026;
+    simCurrentMonth = 11;
+    simSelectedDateStr = '2026-11-10';
+    renderApp();
+  }
+
+  function filterEventsByCategory(cat) {
+    selectedEventCat = cat;
+    renderApp();
+  }
+
+  function selectSimDate(dateStr) {
+    simSelectedDateStr = dateStr;
+    renderApp();
+  }
+
+  function renderSimCalendarDays(year, month, filteredEvents) {
+    const firstDay = new Date(year, month - 1, 1).getDay(); // 0 是週日
+    const daysInMonth = new Date(year, month, 0).getDate();
+    let html = '';
+
+    // 上月留白
+    for (let i = 0; i < firstDay; i++) {
+      html += `<div style="height: 38px;"></div>`;
+    }
+
+    // 當月日期
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isSelected = dStr === simSelectedDateStr;
+      const isToday = dStr === '2026-11-10';
+      const dayEvs = filteredEvents.filter(e => e.date === dStr);
+
+      html += `
+        <div style="height: 38px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px; background: ${isSelected ? 'var(--ios-blue)' : (isToday ? 'rgba(0,122,255,0.1)' : 'transparent')};" onclick="selectSimDate('${dStr}')">
+          <span style="font-size: 12px; font-weight: ${isSelected || isToday ? '800' : '500'}; color: ${isSelected ? '#FFF' : (isToday ? 'var(--ios-blue)' : '#1C1C1E')};">
+            ${d}
+          </span>
+          <div style="display: flex; gap: 2px; height: 4px; margin-top: 1px;">
+            ${dayEvs.slice(0, 3).map(e => `
+              <span style="width: 4px; height: 4px; border-radius: 50%; background: ${eventTypeColors[e.type] || '#007AFF'};"></span>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+    return html;
+  }
+
+  function renderSimEventCards(items, heldSyms) {
+    if (items.length === 0) {
+      return `<div style="text-align: center; padding: 20px; font-size: 12px; color: #8E8E93;">此期間暫無重大行事曆</div>`;
+    }
+    return items.map(ev => {
+      const isHeld = heldSyms.has(ev.symbol);
+      const color = eventTypeColors[ev.type] || '#007AFF';
+      return `
+        <div class="card" style="margin: 8px 0; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${color}; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">
+              ${ev.type.substring(0, 1)}
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 800; font-size: 14px;">${ev.symbol}</span>
+                <span style="font-size: 12px; color: #666;">${ev.name}</span>
+                ${isHeld ? `<span style="font-size: 9px; font-weight: 700; background: rgba(0,122,255,0.12); color: var(--ios-blue); padding: 1px 5px; border-radius: 4px;">📌持有現股</span>` : ''}
+              </div>
+              <div style="font-size: 11px; margin-top: 2px; display: flex; gap: 4px; align-items: center;">
+                <b style="color: ${color};">${ev.type}</b>
+                ${ev.note ? `<span style="color: #666;">· ${ev.note}</span>` : ''}
+                ${ev.cash > 0 ? `<span style="color: var(--ios-blue); font-weight: 700;">· 每股配 $${ev.cash}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="background: ${ev.days === 0 ? '#34C759' : (ev.days <= 3 ? '#FF9500' : '#8E8E93')}; color: #FFF; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 10px; display: inline-block;">
+              ${ev.days === 0 ? '今天' : `剩 ${ev.days} 天`}
+            </div>
+            <div style="font-size: 10px; color: #8E8E93; margin-top: 2px;">${ev.date}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function syncHoldingEventsSim() {
+    let added = 0;
+    holdings.forEach(h => {
+      // 1. 月營收
+      if (!events.some(e => e.symbol === h.symbol && e.type === '月營收公告')) {
+        events.push({
+          id: Date.now() + Math.random(),
+          symbol: h.symbol,
+          name: h.name,
+          frequency: h.frequency,
+          type: '月營收公告',
+          date: '2026-11-10',
+          days: 0,
+          cash: 0,
+          note: '上月合併營收自結公告'
+        });
+        added++;
+      }
+      // 2. 法說會 (若為個股)
+      if (h.symbol === '2330' || h.symbol === '2454' || !events.some(e => e.symbol === h.symbol && e.type === '法說會')) {
+        if (!events.some(e => e.symbol === h.symbol && e.type === '法說會')) {
+          events.push({
+            id: Date.now() + Math.random(),
+            symbol: h.symbol,
+            name: h.name,
+            frequency: h.frequency,
+            type: '法說會',
+            date: '2026-11-15',
+            days: 5,
+            cash: 0,
+            note: '受邀參加券商法人說明會'
+          });
+          added++;
+        }
+      }
+      // 3. 股東會
+      if (!events.some(e => e.symbol === h.symbol && e.type === '股東會')) {
+        events.push({
+          id: Date.now() + Math.random(),
+          symbol: h.symbol,
+          name: h.name,
+          frequency: h.frequency,
+          type: '股東會',
+          date: '2026-11-28',
+          days: 18,
+          cash: 0,
+          note: '股東常會決議案討論'
+        });
+        added++;
+      }
+    });
+
+    saveState();
+    renderApp();
+    triggerNotification('⚡ 行事曆同步完成', `已為持有現股自動導入 ${added} 筆重大行事曆（法說會、股東會、月營收）！`);
   }
 
   // ==================== 模組 4: 日記管理 (遊戲化等級系統) ====================
@@ -988,6 +1199,108 @@
   }
   function closeSheet() {
     document.getElementById('sheetOverlay').classList.remove('active');
+  }
+
+  // 新增重大行事曆 Sheet (股東會、法說會、財報、月營收、除權息)
+  function openAddEventSheet() {
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px;">新增重大行事曆</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+
+      <div class="form-group">
+        <label>快速選擇持有現股</label>
+        <select class="form-input" id="eventHoldingSelect" onchange="applyHoldingToEvent(this.value)">
+          <option value="">-- 手動輸入或選擇現股 --</option>
+          ${holdings.map(h => `<option value="${h.symbol}|${h.name}">${h.symbol} ${h.name}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>股票代號</label>
+        <input class="form-input" id="eventSymbol" placeholder="例: 2330" value="2330">
+      </div>
+      <div class="form-group">
+        <label>股票名稱</label>
+        <input class="form-input" id="eventName" placeholder="例: 台積電" value="台積電">
+      </div>
+
+      <div class="form-group">
+        <label>重大行事曆類型</label>
+        <select class="form-input" id="eventType">
+          <option value="法說會">法說會</option>
+          <option value="股東會">股東會</option>
+          <option value="財報公告">財報公告</option>
+          <option value="月營收公告">月營收公告</option>
+          <option value="除息日">除息日</option>
+          <option value="除權日">除權日</option>
+          <option value="股利發放日">股利發放日</option>
+          <option value="最後購買日">最後購買日</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>預定日期</label>
+        <input class="form-input" id="eventDate" type="date" value="2026-11-20">
+      </div>
+
+      <div class="form-group">
+        <label>備註說明</label>
+        <input class="form-input" id="eventNote" placeholder="例: 第3季法人說明會 / 114年常會" value="線上法人說明會">
+      </div>
+
+      <div class="form-group">
+        <label>每股配息金額 (元，非除息可填 0)</label>
+        <input class="form-input" id="eventCash" type="number" step="0.01" value="0">
+      </div>
+
+      <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="saveNewEvent()">
+        確認儲存重大行事曆
+      </button>
+    `);
+  }
+
+  function applyHoldingToEvent(val) {
+    if (!val) return;
+    const [sym, name] = val.split('|');
+    document.getElementById('eventSymbol').value = sym;
+    document.getElementById('eventName').value = name;
+  }
+
+  function saveNewEvent() {
+    const sym = document.getElementById('eventSymbol').value.trim();
+    const name = document.getElementById('eventName').value.trim() || sym;
+    const type = document.getElementById('eventType').value;
+    const date = document.getElementById('eventDate').value;
+    const note = document.getElementById('eventNote').value.trim();
+    const cash = parseFloat(document.getElementById('eventCash').value) || 0;
+
+    if (!sym || !date) {
+      alert('請輸入代號與預定日期');
+      return;
+    }
+
+    const target = new Date(date + 'T00:00:00');
+    const today = new Date('2026-11-10T00:00:00');
+    const days = Math.round((target - today) / (1000 * 60 * 60 * 24));
+
+    events.push({
+      id: Date.now() + Math.random(),
+      symbol: sym,
+      name: name,
+      frequency: '季配',
+      type: type,
+      date: date,
+      days: days,
+      cash: cash,
+      note: note
+    });
+
+    saveState();
+    closeSheet();
+    renderApp();
+    triggerNotification('📅 行事曆已新增', `已將 ${sym} ${name} 的「${type}」記入重大行事曆！`);
   }
 
   // 新增存股 Sheet

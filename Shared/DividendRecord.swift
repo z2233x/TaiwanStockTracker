@@ -1,16 +1,49 @@
 import Foundation
 
-public enum DividendEventType: String, Codable {
-    case lastBuyDate = "最後購買日"
+public enum DividendEventType: String, Codable, CaseIterable {
+    // 1. 除權息與股利
     case exDividendDate = "除息日"
+    case exRightsDate = "除權日"
     case paymentDate = "股利發放日"
+    case lastBuyDate = "最後購買日"
+    
+    // 2. 台股重大行事曆 (股東會、財報、月營收、法說會)
+    case shareholdersMeeting = "股東會"
+    case financialReport = "財報公告"
+    case monthlyRevenue = "月營收公告"
+    case investorConference = "法說會"
+    case bookClosure = "停止過戶"
     
     public var badgeColorHex: String {
         switch self {
-        case .lastBuyDate: return "#5AC8FA"  // 淺天藍
-        case .exDividendDate: return "#007AFF" // 官方深藍
-        case .paymentDate: return "#34C759"   // 綠色
+        case .exDividendDate: return "#007AFF"        // 經典深藍
+        case .exRightsDate: return "#5AC8FA"          // 天藍色
+        case .paymentDate: return "#34C759"           // 綠色
+        case .lastBuyDate: return "#00C7BE"           // 青綠色
+        case .shareholdersMeeting: return "#AF52DE"   // 紫色 (股東會)
+        case .financialReport: return "#FF9500"       // 橘色 (財報)
+        case .monthlyRevenue: return "#30D158"        // 翠綠色 (月營收)
+        case .investorConference: return "#FF2D55"    // 緋紅色 (法說會)
+        case .bookClosure: return "#8E8E93"           // 灰色
         }
+    }
+    
+    public var iconName: String {
+        switch self {
+        case .exDividendDate: return "dollarsign.circle.fill"
+        case .exRightsDate: return "gift.fill"
+        case .paymentDate: return "banknote.fill"
+        case .lastBuyDate: return "cart.fill"
+        case .shareholdersMeeting: return "person.3.fill"
+        case .financialReport: return "chart.bar.doc.horizontal.fill"
+        case .monthlyRevenue: return "chart.line.uptrend.xyaxis"
+        case .investorConference: return "mic.fill"
+        case .bookClosure: return "lock.fill"
+        }
+    }
+    
+    public var isDividendRelated: Bool {
+        self == .exDividendDate || self == .exRightsDate || self == .paymentDate || self == .lastBuyDate
     }
 }
 
@@ -24,6 +57,7 @@ public struct DividendEvent: Identifiable, Codable, Equatable {
     public var cashPerShare: Double         // 每股配發現金 (元)
     public var stockPerShare: Double        // 每股股票股利 (元)
     public var sharesSnapshot: Int          // 除息當下持有股數
+    public var note: String                 // 行事曆補充備註 (如: Q3法說會, 114年常會, 10月合併營收)
     
     public init(
         id: UUID = UUID(),
@@ -34,7 +68,8 @@ public struct DividendEvent: Identifiable, Codable, Equatable {
         targetDate: Date,
         cashPerShare: Double = 0.0,
         stockPerShare: Double = 0.0,
-        sharesSnapshot: Int = 0
+        sharesSnapshot: Int = 0,
+        note: String = ""
     ) {
         self.id = id
         self.symbol = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -45,6 +80,25 @@ public struct DividendEvent: Identifiable, Codable, Equatable {
         self.cashPerShare = cashPerShare
         self.stockPerShare = stockPerShare
         self.sharesSnapshot = sharesSnapshot
+        self.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, symbol, name, frequency, eventType, targetDate, cashPerShare, stockPerShare, sharesSnapshot, note
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.symbol = try c.decode(String.self, forKey: .symbol)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.frequency = try c.decodeIfPresent(FrequencyType.self, forKey: .frequency) ?? .quarterly
+        self.eventType = try c.decodeIfPresent(DividendEventType.self, forKey: .eventType) ?? .exDividendDate
+        self.targetDate = try c.decode(Date.self, forKey: .targetDate)
+        self.cashPerShare = try c.decodeIfPresent(Double.self, forKey: .cashPerShare) ?? 0.0
+        self.stockPerShare = try c.decodeIfPresent(Double.self, forKey: .stockPerShare) ?? 0.0
+        self.sharesSnapshot = try c.decodeIfPresent(Int.self, forKey: .sharesSnapshot) ?? 0
+        self.note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
     }
     
     // 預估領取總股息
@@ -92,6 +146,8 @@ public struct DividendEvent: Identifiable, Codable, Equatable {
         return formatter.string(from: targetDate)
     }
 }
+
+public typealias StockCalendarEvent = DividendEvent
 
 // 單一標的歷史領息流水紀錄 (對應截圖 4「股息紀錄」)
 public struct HoldingDividendHistory: Identifiable, Codable, Equatable {

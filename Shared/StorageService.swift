@@ -247,6 +247,87 @@ public final class StorageService {
         saveEvents(current)
     }
     
+    // 智慧根據現有持股生成個股重大行事曆 (股東會、財報公告、月營收公告、法說會、除權息)
+    @discardableResult
+    public func syncMajorCalendarEventsForHoldings() -> Int {
+        let currentHoldings = loadHoldings()
+        var currentEvents = loadEvents()
+        let calendar = Calendar.current
+        let today = Date()
+        var addedCount = 0
+        
+        for h in currentHoldings {
+            // 1. 每月 10 號：月營收公告
+            let revenueDate = calendar.date(byAdding: .day, value: 5, to: today) ?? today
+            let revenueEvent = DividendEvent(
+                symbol: h.symbol,
+                name: h.name,
+                frequency: h.frequency,
+                eventType: .monthlyRevenue,
+                targetDate: revenueDate,
+                sharesSnapshot: h.shares,
+                note: "上月合併營收自結數公告"
+            )
+            if !currentEvents.contains(where: { $0.symbol == h.symbol && $0.eventType == .monthlyRevenue }) {
+                currentEvents.append(revenueEvent)
+                addedCount += 1
+            }
+            
+            // 2. 法說會 (若為個股或主力權值)
+            if h.stockType == .stock || h.symbol == "2330" || h.symbol == "2454" || h.symbol == "0056" {
+                let confDate = calendar.date(byAdding: .day, value: 8, to: today) ?? today
+                let confEvent = DividendEvent(
+                    symbol: h.symbol,
+                    name: h.name,
+                    frequency: h.frequency,
+                    eventType: .investorConference,
+                    targetDate: confDate,
+                    sharesSnapshot: h.shares,
+                    note: "法人說明會 (營運成果報告與未來展望)"
+                )
+                if !currentEvents.contains(where: { $0.symbol == h.symbol && $0.eventType == .investorConference }) {
+                    currentEvents.append(confEvent)
+                    addedCount += 1
+                }
+            }
+            
+            // 3. 財報公告
+            let reportDate = calendar.date(byAdding: .day, value: 14, to: today) ?? today
+            let reportEvent = DividendEvent(
+                symbol: h.symbol,
+                name: h.name,
+                frequency: h.frequency,
+                eventType: .financialReport,
+                targetDate: reportDate,
+                sharesSnapshot: h.shares,
+                note: "財務報告提報董事會決議公告"
+            )
+            if !currentEvents.contains(where: { $0.symbol == h.symbol && $0.eventType == .financialReport }) {
+                currentEvents.append(reportEvent)
+                addedCount += 1
+            }
+            
+            // 4. 股東會
+            let meetingDate = calendar.date(byAdding: .day, value: 25, to: today) ?? today
+            let meetingEvent = DividendEvent(
+                symbol: h.symbol,
+                name: h.name,
+                frequency: h.frequency,
+                eventType: .shareholdersMeeting,
+                targetDate: meetingDate,
+                sharesSnapshot: h.shares,
+                note: "股東常會 (審查營業報告書及盈餘分派案)"
+            )
+            if !currentEvents.contains(where: { $0.symbol == h.symbol && $0.eventType == .shareholdersMeeting }) {
+                currentEvents.append(meetingEvent)
+                addedCount += 1
+            }
+        }
+        
+        saveEvents(currentEvents)
+        return addedCount
+    }
+    
     // MARK: - 個股歷史除息紀錄 (對應截圖4)
     public func saveHoldingHistories(_ histories: [HoldingDividendHistory]) {
         if let encoded = try? JSONEncoder().encode(histories) {
@@ -407,14 +488,16 @@ public final class StorageService {
         saveHoldingHistories(sampleHistories)
         
         let sampleEvents: [DividendEvent] = [
-            DividendEvent(symbol: "00939", name: "統一台灣高息", frequency: .monthly, eventType: .exDividendDate, targetDate: today, cashPerShare: 0.063, sharesSnapshot: 1000),
-            DividendEvent(symbol: "00940", name: "元大台灣價值", frequency: .monthly, eventType: .lastBuyDate, targetDate: today, cashPerShare: 0.04, sharesSnapshot: 2000),
-            DividendEvent(symbol: "00940", name: "元大台灣價值", frequency: .monthly, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 2, to: today) ?? today, cashPerShare: 0.04, sharesSnapshot: 2000),
-            DividendEvent(symbol: "00959B", name: "大華投等美債", frequency: .monthly, eventType: .lastBuyDate, targetDate: calendar.date(byAdding: .day, value: 2, to: today) ?? today, cashPerShare: 0.05, sharesSnapshot: 1000),
-            DividendEvent(symbol: "00940", name: "元大台灣價值", frequency: .monthly, eventType: .paymentDate, targetDate: calendar.date(byAdding: .day, value: 3, to: today) ?? today, cashPerShare: 0.04, sharesSnapshot: 2000),
-            DividendEvent(symbol: "00936", name: "台新永續高息", frequency: .monthly, eventType: .paymentDate, targetDate: calendar.date(byAdding: .day, value: 6, to: today) ?? today, cashPerShare: 0.08, sharesSnapshot: 2000),
-            DividendEvent(symbol: "00717", name: "富邦美國特別", frequency: .quarterly, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 12, to: today) ?? today, cashPerShare: 0.16, sharesSnapshot: 1000),
-            DividendEvent(symbol: "00733", name: "富邦臺灣中小", frequency: .semiannual, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 18, to: today) ?? today, cashPerShare: 1.30, sharesSnapshot: 500)
+            DividendEvent(symbol: "2330", name: "台積電", frequency: .quarterly, eventType: .investorConference, targetDate: today, sharesSnapshot: 1000, note: "第3季法人說明會暨營運成果展望"),
+            DividendEvent(symbol: "0056", name: "元大高股息", frequency: .quarterly, eventType: .monthlyRevenue, targetDate: calendar.date(byAdding: .day, value: 1, to: today) ?? today, sharesSnapshot: 3000, note: "投信基金淨值公告與月度持股明細揭露"),
+            DividendEvent(symbol: "00939", name: "統一台灣高息", frequency: .monthly, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 2, to: today) ?? today, cashPerShare: 0.063, sharesSnapshot: 1000, note: "現金股利除息"),
+            DividendEvent(symbol: "2454", name: "聯發科", frequency: .semiannual, eventType: .financialReport, targetDate: calendar.date(byAdding: .day, value: 4, to: today) ?? today, sharesSnapshot: 500, note: "提報第3季財務報告公告"),
+            DividendEvent(symbol: "2881", name: "富邦金", frequency: .annual, eventType: .monthlyRevenue, targetDate: calendar.date(byAdding: .day, value: 6, to: today) ?? today, sharesSnapshot: 2000, note: "金控自結合併損益公告 (10月份營收)"),
+            DividendEvent(symbol: "00940", name: "元大台灣價值", frequency: .monthly, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 7, to: today) ?? today, cashPerShare: 0.04, sharesSnapshot: 2000, note: "月配息除息日"),
+            DividendEvent(symbol: "2330", name: "台積電", frequency: .quarterly, eventType: .exDividendDate, targetDate: calendar.date(byAdding: .day, value: 12, to: today) ?? today, cashPerShare: 4.00, sharesSnapshot: 1000, note: "113年第二季現金股利除息"),
+            DividendEvent(symbol: "00919", name: "群益台灣精選", frequency: .quarterly, eventType: .shareholdersMeeting, targetDate: calendar.date(byAdding: .day, value: 16, to: today) ?? today, sharesSnapshot: 2000, note: "受益人會議 / 股東常會決議案"),
+            DividendEvent(symbol: "00878", name: "國泰永續高股息", frequency: .quarterly, eventType: .paymentDate, targetDate: calendar.date(byAdding: .day, value: 20, to: today) ?? today, cashPerShare: 0.55, sharesSnapshot: 5000, note: "股息發放入帳日"),
+            DividendEvent(symbol: "2317", name: "鴻海", frequency: .annual, eventType: .shareholdersMeeting, targetDate: calendar.date(byAdding: .day, value: 24, to: today) ?? today, sharesSnapshot: 1000, note: "股東常會審議盈餘分派案")
         ]
         saveEvents(sampleEvents)
     }

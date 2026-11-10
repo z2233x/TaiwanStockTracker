@@ -7,10 +7,10 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // 分頁 1: 股息日曆 + 倒數日 (對應截圖 5)
+            // 分頁 1: 台股日曆 + 重大行事曆 (對應截圖 5)
             DividendCalendarTabView()
                 .tabItem {
-                    Label("股息日曆", systemImage: "calendar.badge.clock")
+                    Label("台股日曆", systemImage: "calendar")
                 }
                 .tag(0)
             
@@ -1370,29 +1370,55 @@ struct HoldingDividendDetailView: View {
 }
 
 // MARK: ==========================================
-// MARK: 模組 5: ETF 日曆 + 倒數日 (對應截圖 5)
+// MARK: 模組 5: 台股日曆 + 個股重大行事曆 (股東會/財報/除權息/月營收/法說會)
 // MARK: ==========================================
 
 struct DividendCalendarTabView: View {
-    @State private var selectedMode: Int = 1 // 0: 股息日曆, 1: 倒數日
+    @State private var selectedMode: Int = 0 // 0: 日曆顯示, 1: 行事曆倒數
     @State private var events: [DividendEvent] = StorageService.shared.loadEvents()
+    @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
+    @State private var selectedCategory: String = "全部"
     @State private var isNotificationsEnabled: Bool = NotificationService.shared.isNotificationsEnabled
     @State private var isShowingAdd = false
     @State private var notificationStatusMessage = ""
     @State private var showNotificationToast = false
+    @State private var syncAlertMessage = ""
+    @State private var showSyncAlert = false
+    
+    // 目前選取的日期與月份
+    @State private var selectedCalendarDate: Date = Date()
+    @State private var currentCalendarMonth: Date = Date()
+    
+    var heldSymbols: Set<String> {
+        Set(holdings.map { $0.symbol })
+    }
+    
+    var filteredEvents: [DividendEvent] {
+        var list = events
+        if selectedCategory == "📌 持有現股" {
+            list = list.filter { heldSymbols.contains($0.symbol) }
+        } else if selectedCategory == "除權息" {
+            list = list.filter { $0.eventType.isDividendRelated }
+        } else if selectedCategory != "全部" {
+            list = list.filter { $0.eventType.rawValue == selectedCategory }
+        }
+        return list
+    }
+    
+    let categoryOptions = ["全部", "📌 持有現股", "除權息", "股東會", "財報公告", "月營收公告", "法說會"]
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 頂部除息推播通知開關欄 (進階功能)
+                // 1. 頂部重大行事曆推播提醒開關
                 HStack {
                     Image(systemName: isNotificationsEnabled ? "bell.badge.fill" : "bell.slash")
                         .foregroundColor(isNotificationsEnabled ? Color(hex: "#007AFF") : .secondary)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("除息前一天推播提醒 (08:30)")
+                        Text("重大行事曆推播提醒 (08:30)")
                             .font(.subheadline.bold())
-                        Text(isNotificationsEnabled ? "已開啟除息前日提醒與當日提醒" : "點擊開啟本機推播通知，不再錯過除息")
+                        Text(isNotificationsEnabled ? "已開啟除權息、股東會、法說會前日提醒" : "開啟推播，掌握持有個股重大行事曆")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -1405,9 +1431,8 @@ struct DividendCalendarTabView: View {
                             if enabled {
                                 NotificationService.shared.requestAuthorization { granted in
                                     if granted {
-                                        let holdings = StorageService.shared.loadHoldings()
                                         NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
-                                        notificationStatusMessage = "🔔 已成功排程除息前通知！"
+                                        notificationStatusMessage = "🔔 已成功排程個股重大行事曆通知！"
                                         showNotificationToast = true
                                     } else {
                                         isNotificationsEnabled = false
@@ -1425,26 +1450,69 @@ struct DividendCalendarTabView: View {
                 .padding(.vertical, 8)
                 .background(Color(.secondarySystemBackground))
                 
-                // 模式切換 Switch
+                // 2. 模式切換 Switch (日曆顯示 vs 倒數日)
                 Picker("顯示模式", selection: $selectedMode) {
-                    Text("股息日曆").tag(0)
-                    Text("倒數日").tag(1)
+                    Text("日曆顯示").tag(0)
+                    Text("行事曆倒數").tag(1)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
+                
+                // 3. 重大行事曆分類篩選 Chip
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(categoryOptions, id: \.self) { cat in
+                            Button {
+                                selectedCategory = cat
+                            } label: {
+                                Text(cat)
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(selectedCategory == cat ? Color(hex: "#007AFF") : Color(.systemGray5))
+                                    .foregroundColor(selectedCategory == cat ? .white : .primary)
+                                    .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 6)
+                }
                 
                 if selectedMode == 0 {
-                    // 模式 A: 股息日曆 (帶圓點之月曆 + 當月配息清單)
-                    DividendCalendarMonthView(events: events)
+                    // 模式 A: 互動式月曆顯示 (月曆 Grid + 當日/當月重大行事曆)
+                    TaiwanStockCalendarMonthView(
+                        events: filteredEvents,
+                        heldSymbols: heldSymbols,
+                        selectedDate: $selectedCalendarDate,
+                        currentMonth: $currentCalendarMonth
+                    )
                 } else {
-                    // 模式 B: 倒數日 (按剩餘天數精準排序之清單)
-                    DividendCountdownListView(events: events)
+                    // 模式 B: 倒數日 (按剩餘天數精準排序之重大行事曆清單)
+                    TaiwanStockCountdownListView(
+                        events: filteredEvents,
+                        heldSymbols: heldSymbols
+                    )
                 }
             }
-            .navigationTitle("ETF日曆")
+            .navigationTitle("台股日曆")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        let count = StorageService.shared.syncMajorCalendarEventsForHoldings()
+                        events = StorageService.shared.loadEvents()
+                        syncAlertMessage = "已為您持有的現股成功同步 \(count) 筆個股重大行事曆 (含法說會、股東會、財報與月營收)！"
+                        showSyncAlert = true
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "bolt.fill")
+                            Text("同步現股")
+                                .font(.caption.bold())
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         isShowingAdd = true
@@ -1454,18 +1522,21 @@ struct DividendCalendarTabView: View {
                 }
             }
             .sheet(isPresented: $isShowingAdd) {
-                AddDividendEventSheet { newEvent in
+                AddDividendEventSheet(holdings: holdings) { newEvent in
                     events.append(newEvent)
                     StorageService.shared.saveEvents(events)
-                    let holdings = StorageService.shared.loadHoldings()
                     NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
                 }
+            }
+            .alert(syncAlertMessage, isPresented: $showSyncAlert) {
+                Button("好") {}
             }
             .alert(notificationStatusMessage, isPresented: $showNotificationToast) {
                 Button("確定") {}
             }
             .onAppear {
                 events = StorageService.shared.loadEvents()
+                holdings = StorageService.shared.loadHoldings()
                 NotificationService.shared.checkAuthorization { auth in
                     isNotificationsEnabled = auth && NotificationService.shared.isNotificationsEnabled
                 }
@@ -1475,8 +1546,9 @@ struct DividendCalendarTabView: View {
 }
 
 // 倒數日清單視圖
-struct DividendCountdownListView: View {
+struct TaiwanStockCountdownListView: View {
     let events: [DividendEvent]
+    let heldSymbols: Set<String>
     
     var sortedEvents: [DividendEvent] {
         events.sorted { $0.daysRemaining < $1.daysRemaining }
@@ -1485,93 +1557,257 @@ struct DividendCountdownListView: View {
     var body: some View {
         List {
             ForEach(sortedEvents) { event in
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text(event.symbol).font(.headline)
-                            Text(event.name).font(.subheadline)
-                        }
-                        Text("\(event.eventType.rawValue): \(event.dateString)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    // 倒數天數 Badge (如: 今天, 剩 2 天, 剩 6 天)
-                    Text(event.countdownBadgeText)
-                        .font(.subheadline.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Color(hex: event.countdownBadgeColorHex))
-                        .cornerRadius(16)
-                }
-                .padding(.vertical, 2)
+                StockEventRowView(event: event, isHeld: heldSymbols.contains(event.symbol))
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
     }
 }
 
-// 股息日曆月曆視圖
-struct DividendCalendarMonthView: View {
-    let events: [DividendEvent]
-    @State private var currentMonth: Date = Date()
+// 單一重大行事曆 Row 卡片
+struct StockEventRowView: View {
+    let event: DividendEvent
+    let isHeld: Bool
     
     var body: some View {
-        VStack(spacing: 12) {
-            // 月曆圖例標記
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Circle().fill(Color(hex: "#007AFF")).frame(width: 8, height: 8)
-                    Text("除息日").font(.caption).foregroundColor(.secondary)
+        HStack(spacing: 10) {
+            Image(systemName: event.eventType.iconName)
+                .font(.subheadline)
+                .foregroundColor(.white)
+                .frame(width: 32, height: 32)
+                .background(Color(hex: event.eventType.badgeColorHex))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(event.symbol)
+                        .font(.subheadline.bold())
+                    Text(event.name)
+                        .font(.subheadline)
+                    
+                    if isHeld {
+                        Text("📌持有現股")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color(hex: "#007AFF").opacity(0.12))
+                            .foregroundColor(Color(hex: "#007AFF"))
+                            .cornerRadius(4)
+                    }
                 }
+                
                 HStack(spacing: 4) {
-                    Circle().fill(Color(hex: "#5AC8FA")).frame(width: 8, height: 8)
-                    Text("最後購買日").font(.caption).foregroundColor(.secondary)
+                    Text(event.eventType.rawValue)
+                        .font(.caption2.bold())
+                        .foregroundColor(Color(hex: event.eventType.badgeColorHex))
+                    
+                    if !event.note.isEmpty {
+                        Text("· \(event.note)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                HStack(spacing: 4) {
-                    Circle().fill(Color(hex: "#34C759")).frame(width: 8, height: 8)
-                    Text("發放日").font(.caption).foregroundColor(.secondary)
+                
+                if event.cashPerShare > 0 {
+                    Text("每股配息 $\(String(format: "%.2f", event.cashPerShare)) 元")
+                        .font(.caption2)
+                        .foregroundColor(Color(hex: "#007AFF"))
                 }
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(event.countdownBadgeText)
+                    .font(.caption2.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color(hex: event.countdownBadgeColorHex))
+                    .cornerRadius(10)
+                
+                Text(event.dateString)
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+// 互動式月曆顯示視圖 (包含月曆網格、色彩圓點標記、點選連動)
+struct TaiwanStockCalendarMonthView: View {
+    let events: [DividendEvent]
+    let heldSymbols: Set<String>
+    @Binding var selectedDate: Date
+    @Binding var currentMonth: Date
+    
+    private let calendar = Calendar.current
+    private let weekDays = ["日", "一", "二", "三", "四", "五", "六"]
+    
+    var daysInMonth: [Date?] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
+              let monthFirstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: currentMonth)) else {
+            return []
+        }
+        
+        let weekdayOfFirst = calendar.component(.weekday, from: monthFirstDay) - 1 // 0: 週日
+        let numberOfDays = calendar.dateComponents([.day], from: monthInterval.start, to: monthInterval.end).day ?? 30
+        
+        var list: [Date?] = Array(repeating: nil, count: weekdayOfFirst)
+        for d in 0..<numberOfDays {
+            if let dayDate = calendar.date(byAdding: .day, value: d, to: monthInterval.start) {
+                list.append(dayDate)
+            }
+        }
+        return list
+    }
+    
+    var eventsOnSelectedDate: [DividendEvent] {
+        events.filter { calendar.isDate($0.targetDate, inSameDayAs: selectedDate) }
+    }
+    
+    var eventsInCurrentMonth: [DividendEvent] {
+        events.filter { calendar.isDate($0.targetDate, equalTo: currentMonth, toGranularity: .month) }
+              .sorted { $0.targetDate < $1.targetDate }
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // 月曆頂部切換
+            HStack {
+                Button {
+                    changeMonth(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.subheadline.bold())
+                        .foregroundColor(Color(hex: "#007AFF"))
+                }
+                
                 Spacer()
+                
+                Text(monthTitle(for: currentMonth))
+                    .font(.headline.bold())
+                
+                Spacer()
+                
+                Button {
+                    changeMonth(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.bold())
+                        .foregroundColor(Color(hex: "#007AFF"))
+                }
+                
+                Button("今天") {
+                    currentMonth = Date()
+                    selectedDate = Date()
+                }
+                .font(.caption.bold())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray5))
+                .cornerRadius(8)
+                .padding(.leading, 6)
             }
             .padding(.horizontal)
             .padding(.top, 4)
             
-            // 當期配發清單 (對應截圖 5 下方)
-            List {
-                Section("當月配息日程") {
-                    ForEach(events) { ev in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 4) {
-                                    Text(ev.symbol).font(.headline)
-                                    Text(ev.frequency.rawValue)
-                                        .font(.system(size: 9, weight: .bold))
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1)
-                                        .background(Color(hex: ev.frequency.badgeColorHex).opacity(0.15))
-                                        .foregroundColor(Color(hex: ev.frequency.badgeColorHex))
-                                        .cornerRadius(4)
+            // 星期表頭 (日 一 二 三 四 五 六)
+            HStack {
+                ForEach(0..<7) { idx in
+                    Text(weekDays[idx])
+                        .font(.caption.bold())
+                        .foregroundColor(idx == 0 || idx == 6 ? Color(hex: "#FF9500") : .secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 8)
+            
+            // 月曆 7 欄 Grid
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(0..<daysInMonth.count, id: \.self) { idx in
+                    if let date = daysInMonth[idx] {
+                        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+                        let isToday = calendar.isDateInToday(date)
+                        let dayEvents = events.filter { calendar.isDate($0.targetDate, inSameDayAs: date) }
+                        
+                        Button {
+                            selectedDate = date
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text("\(calendar.component(.day, from: date))")
+                                    .font(.system(size: 13, weight: isSelected || isToday ? .bold : .medium))
+                                    .foregroundColor(isSelected ? .white : (isToday ? Color(hex: "#007AFF") : .primary))
+                                    .frame(width: 28, height: 28)
+                                    .background(
+                                        isSelected ? Circle().fill(Color(hex: "#007AFF")) :
+                                        (isToday ? Circle().stroke(Color(hex: "#007AFF"), lineWidth: 1.5) : nil)
+                                    )
+                                
+                                // 事件彩點標記 (最多 3 顆彩點)
+                                HStack(spacing: 2) {
+                                    ForEach(dayEvents.prefix(3)) { ev in
+                                        Circle()
+                                            .fill(Color(hex: ev.eventType.badgeColorHex))
+                                            .frame(width: 4, height: 4)
+                                    }
                                 }
-                                Text(ev.name).font(.caption).foregroundColor(.secondary)
+                                .frame(height: 5)
                             }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("$\(String(format: "%.2f", ev.cashPerShare))")
-                                    .font(.headline.bold())
-                                    .foregroundColor(Color(hex: "#007AFF"))
-                                Text(ev.dateString)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                        }
+                    } else {
+                        Color.clear.frame(minHeight: 38)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color(.systemBackground))
+            
+            Divider()
+            
+            // 下方：選取日期事件 or 當月日程清單
+            List {
+                Section(header: Text(listHeaderTitle)) {
+                    let displayList = eventsOnSelectedDate.isEmpty ? eventsInCurrentMonth : eventsOnSelectedDate
+                    if displayList.isEmpty {
+                        Text("此期間暫無重大行事曆")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(displayList) { ev in
+                            StockEventRowView(event: ev, isHeld: heldSymbols.contains(ev.symbol))
                         }
                     }
                 }
             }
             .listStyle(.insetGrouped)
+        }
+    }
+    
+    private var listHeaderTitle: String {
+        if !eventsOnSelectedDate.isEmpty {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "M月d日 (E)"
+            formatter.locale = Locale(identifier: "zh_TW")
+            return "📅 \(formatter.string(from: selectedDate)) 重大行事曆 (\(eventsOnSelectedDate.count) 筆)"
+        } else {
+            return "📅 當月重大行事曆一覽 (\(eventsInCurrentMonth.count) 筆)"
+        }
+    }
+    
+    private func monthTitle(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年 M月"
+        return formatter.string(from: date)
+    }
+    
+    private func changeMonth(by val: Int) {
+        if let newMonth = calendar.date(byAdding: .month, value: val, to: currentMonth) {
+            currentMonth = newMonth
         }
     }
 }
@@ -1860,30 +2096,54 @@ struct AddJournalSheet: View {
 
 struct AddDividendEventSheet: View {
     @Environment(\.dismiss) var dismiss
+    let holdings: [StockHolding]
     var onSave: (DividendEvent) -> Void
     
-    @State private var symbol = "0056"
-    @State private var name = "元大高股息"
-    @State private var eventType: DividendEventType = .exDividendDate
+    @State private var symbol = "2330"
+    @State private var name = "台積電"
+    @State private var eventType: DividendEventType = .investorConference
     @State private var targetDate = Date()
-    @State private var cash = "0.79"
+    @State private var cash = "0.0"
+    @State private var note = "第3季法人說明會展望未來營運"
     
     var body: some View {
         NavigationStack {
             Form {
                 Section("事件標的") {
-                    TextField("代號", text: $symbol)
-                    TextField("名稱", text: $name)
-                    Picker("事件類型", selection: $eventType) {
-                        Text("最後購買日").tag(DividendEventType.lastBuyDate)
-                        Text("除息日").tag(DividendEventType.exDividendDate)
-                        Text("股利發放日").tag(DividendEventType.paymentDate)
+                    if !holdings.isEmpty {
+                        Picker("快速帶入持有現股", selection: $symbol) {
+                            ForEach(holdings) { h in
+                                Text("\(h.symbol) \(h.name)").tag(h.symbol)
+                            }
+                        }
+                        .onChange(of: symbol) { newSym in
+                            if let h = holdings.first(where: { $0.symbol == newSym }) {
+                                name = h.name
+                            }
+                        }
                     }
-                    DatePicker("日期", selection: $targetDate, displayedComponents: .date)
-                    TextField("每股配息金額 (元)", text: $cash).keyboardType(.decimalPad)
+                    TextField("股票代號 (例: 2330)", text: $symbol)
+                    TextField("股票名稱 (例: 台積電)", text: $name)
+                }
+                
+                Section("重大行事曆類型") {
+                    Picker("事件類型", selection: $eventType) {
+                        ForEach(DividendEventType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    DatePicker("預定日期", selection: $targetDate, displayedComponents: .date)
+                    TextField("備註說明 (例: 114年常會 / Q3法說會 / 10月營收)", text: $note)
+                }
+                
+                if eventType.isDividendRelated {
+                    Section("配息金額") {
+                        TextField("每股配息金額 (元)", text: $cash).keyboardType(.decimalPad)
+                    }
                 }
             }
-            .navigationTitle("新增日程")
+            .navigationTitle("新增重大行事曆")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("儲存") {
@@ -1892,13 +2152,20 @@ struct AddDividendEventSheet: View {
                             name: name,
                             eventType: eventType,
                             targetDate: targetDate,
-                            cashPerShare: Double(cash) ?? 0
+                            cashPerShare: Double(cash) ?? 0,
+                            note: note
                         )
                         onSave(ev)
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+            }
+            .onAppear {
+                if let first = holdings.first {
+                    symbol = first.symbol
+                    name = first.name
+                }
             }
         }
     }
