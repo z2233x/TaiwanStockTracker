@@ -606,7 +606,7 @@ struct JournalManagementView: View {
                             VStack(alignment: .trailing, spacing: 2) {
                                 Text("$\(Int(item.totalAmount).formatted())")
                                     .font(.headline.bold())
-                                Text("$\(String(format: "%.2f", item.price)) · \(item.sharesDisplay)")
+                                Text("$\(String(format: "%.2f", item.price)) · \(item.lotsText)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

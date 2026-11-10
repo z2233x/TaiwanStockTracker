@@ -79,6 +79,8 @@ public struct JournalEntry: Identifiable, Codable, Equatable {
         }
     }
     
+    public var sharesDisplay: String { lotsText }
+    
     public var dateString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
