@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 // MARK: - 主應用程式五分頁 (對應截圖底部導航列)
 struct ContentView: View {
@@ -54,6 +55,13 @@ struct DashboardView: View {
     @State private var isPrivacyMasked: Bool = StorageService.shared.isPrivacyMasked
     @State private var isShowingAdd = false
     @State private var isRefreshing = false
+    @State private var refreshMessage = ""
+    @State private var lastRefreshedTime = ""
+    
+    // 存股被動收入目標計算機 State
+    @State private var targetMonthlyIncome: Double = 30000 // 目標月領 3 萬元
+    @State private var expectedYield: Double = 0.075       // 預期平均殖利率 7.5%
+    @State private var monthlyDCAAmount: Double = 20000     // 每月定期定額 2 萬元
     
     var totalMarketValue: Double { holdings.reduce(0) { $0 + $1.marketValue } }
     var totalCost: Double { holdings.reduce(0) { $0 + $1.totalCostWithFee } }
@@ -61,6 +69,21 @@ struct DashboardView: View {
     var totalDividends: Double { holdings.reduce(0) { $0 + $1.totalDividendsReceived } }
     var totalDividendCount: Int { holdings.reduce(0) { $0 + $1.dividendCount } }
     var frequencyDict: [FrequencyType: Int] { StorageService.shared.getFrequencyDistribution(holdings: holdings) }
+    
+    // 當前推算年化股息與月均股息
+    var estimatedAnnualDividend: Double { totalMarketValue * expectedYield }
+    var currentMonthlyDividend: Double { estimatedAnnualDividend / 12.0 }
+    var goalProgress: Double {
+        targetMonthlyIncome > 0 ? min(1.0, currentMonthlyDividend / targetMonthlyIncome) : 0
+    }
+    var neededPrincipal: Double {
+        expectedYield > 0 ? (targetMonthlyIncome * 12.0) / expectedYield : 0
+    }
+    var principalGap: Double { max(0, neededPrincipal - totalMarketValue) }
+    var yearsToGoal: Double {
+        let monthly = monthlyDCAAmount > 0 ? monthlyDCAAmount : 10000
+        return (principalGap / (monthly * 12.0))
+    }
     
     var body: some View {
         NavigationStack {
@@ -136,6 +159,15 @@ struct DashboardView: View {
                                 .background(Color.white)
                                 .cornerRadius(10)
                             }
+                            
+                            if !lastRefreshedTime.isEmpty {
+                                HStack {
+                                    Image(systemName: "clock")
+                                    Text("報價更新時間: \(lastRefreshedTime)")
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.8))
+                            }
                         }
                         .padding(18)
                         .background(
@@ -148,92 +180,133 @@ struct DashboardView: View {
                         .cornerRadius(20)
                         .shadow(color: Color(hex: "#2F80ED").opacity(0.3), radius: 10, y: 5)
                     }
-                    .padding(.horizontal)
                     
-                    // 2. 領息頻率卡片 (月配 6 | 雙月配 4 | 季配 2 | 半年配 0 | 年配 4)
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("領息頻率")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
+                    // 2. 存股被動收入目標計算機 (進階功能)
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            ForEach(FrequencyType.allCases, id: \.self) { freq in
-                                VStack(spacing: 4) {
-                                    Text(freq.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("\(frequencyDict[freq] ?? 0)")
-                                        .font(.title3.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
+                            Label("存股被動收入目標", systemImage: "target")
+                                .font(.headline.bold())
+                            Spacer()
+                            Text("達成率 \(String(format: "%.1f", goalProgress * 100))%")
+                                .font(.subheadline.bold())
+                                .foregroundColor(Color(hex: "#007AFF"))
                         }
-                        .padding(.vertical, 8)
-                    }
-                    .padding(16)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(16)
-                    .padding(.horizontal)
-                    
-                    // 3. ETF 投資佔比圓餅環形圖 (Donut Chart)
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("ETF投資佔比")
-                            .font(.headline)
                         
-                        if holdings.isEmpty {
-                            Text("尚無持股數據")
-                                .foregroundColor(.secondary)
-                                .padding(.vertical, 20)
-                        } else {
-                            // 環形圖中心
-                            ZStack {
-                                DonutChartView(holdings: holdings)
-                                    .frame(width: 170, height: 170)
-                                
-                                VStack(spacing: 2) {
-                                    Text("ETF")
-                                        .font(.caption.bold())
-                                        .foregroundColor(.secondary)
-                                    Text("投資佔比")
-                                        .font(.subheadline.bold())
-                                }
+                        // 進度條
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(.systemGray5))
+                                    .frame(height: 10)
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#007AFF"), Color(hex: "#5AC8FA")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(10, geo.size.width * CGFloat(goalProgress)), height: 10)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                        }
+                        .frame(height: 10)
+                        
+                        // 目標快選按鈕
+                        HStack(spacing: 8) {
+                            GoalChipButton(title: "月領1萬", target: 10000, current: $targetMonthlyIncome)
+                            GoalChipButton(title: "月領3萬", target: 30000, current: $targetMonthlyIncome)
+                            GoalChipButton(title: "月領5萬", target: 50000, current: $targetMonthlyIncome)
+                            GoalChipButton(title: "月領10萬", target: 100000, current: $targetMonthlyIncome)
+                        }
+                        
+                        Divider().padding(.vertical, 2)
+                        
+                        // 試算數據網格
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("目前推算月股息").font(.caption).foregroundColor(.secondary)
+                                Text("$\(Int(currentMonthlyDividend).formatted())")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                            }
+                            Spacer()
+                            VStack(alignment: .center, spacing: 2) {
+                                Text("距目標本金還差").font(.caption).foregroundColor(.secondary)
+                                Text("$\(Int(principalGap).formatted())")
+                                    .font(.subheadline.bold())
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("定期定額預估").font(.caption).foregroundColor(.secondary)
+                                Text(principalGap <= 0 ? "已達成目標！" : "約 \(String(format: "%.1f", yearsToGoal)) 年")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(principalGap <= 0 ? .green : .orange)
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
+                    // 3. 領息頻率卡片 (月配 / 雙月配 / 季配 / 半年配 / 年配)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("領息頻率")
+                            .font(.headline.bold())
+                        
+                        HStack(spacing: 8) {
+                            FrequencyBadgeCard(title: "月配", count: frequencyDict[.monthly] ?? 0, colorHex: FrequencyType.monthly.badgeColorHex)
+                            FrequencyBadgeCard(title: "雙月配", count: frequencyDict[.bimonthly] ?? 0, colorHex: FrequencyType.bimonthly.badgeColorHex)
+                            FrequencyBadgeCard(title: "季配", count: frequencyDict[.quarterly] ?? 0, colorHex: FrequencyType.quarterly.badgeColorHex)
+                            FrequencyBadgeCard(title: "半年配", count: frequencyDict[.semiannual] ?? 0, colorHex: FrequencyType.semiannual.badgeColorHex)
+                            FrequencyBadgeCard(title: "年配", count: frequencyDict[.annual] ?? 0, colorHex: FrequencyType.annual.badgeColorHex)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
+                    // 4. ETF 投資佔比 (環形圓餅圖 Donut Chart)
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("ETF 投資佔比")
+                            .font(.headline.bold())
+                        
+                        // Donut Chart 圖形
+                        ZStack {
+                            DonutChartView(holdings: holdings)
+                                .frame(width: 200, height: 200)
                             
-                            // 標的比例明細列表
-                            VStack(spacing: 10) {
-                                ForEach(Array(holdings.sorted { $0.marketValue > $1.marketValue }.enumerated()), id: \.element.id) { index, item in
-                                    let ratio = totalMarketValue > 0 ? (item.marketValue / totalMarketValue) * 100.0 : 0.0
-                                    HStack {
-                                        RoundedRectangle(cornerRadius: 3)
-                                            .fill(chartColor(at: index))
-                                            .frame(width: 4, height: 26)
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.symbol)
-                                                .font(.subheadline.bold())
-                                            Text(item.name)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Text("$\(Int(item.marketValue).formatted())")
-                                            .font(.subheadline.bold())
-                                        
-                                        Text("\(String(format: "%.0f", ratio))%")
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(.secondary)
-                                            .frame(width: 44, alignment: .trailing)
-                                    }
-                                    .padding(.vertical, 2)
+                            VStack(spacing: 4) {
+                                Text("ETF")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("投資佔比")
+                                    .font(.subheadline.bold())
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        
+                        // 各標的佔比清單
+                        VStack(spacing: 12) {
+                            ForEach(Array(holdings.enumerated()), id: \.element.id) { index, item in
+                                let percentage = totalMarketValue > 0 ? (item.marketValue / totalMarketValue) * 100.0 : 0
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(donutColor(index: index))
+                                        .frame(width: 4, height: 20)
                                     
-                                    if index < holdings.count - 1 {
-                                        Divider()
-                                    }
+                                    Text("\(item.symbol) \(item.name)")
+                                        .font(.subheadline.bold())
+                                    
+                                    Spacer()
+                                    
+                                    Text(isPrivacyMasked ? "*****" : "$\(Int(item.marketValue).formatted())")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text(String(format: "%.1f%%", percentage))
+                                        .font(.subheadline.bold())
+                                        .frame(width: 55, alignment: .trailing)
                                 }
                             }
                         }
@@ -241,23 +314,28 @@ struct DashboardView: View {
                     .padding(16)
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(16)
-                    .padding(.horizontal)
-                    .padding(.bottom, 20)
                 }
-                .padding(.top, 10)
+                .padding()
+            }
+            .refreshable {
+                await refreshQuotes()
             }
             .navigationTitle("投資總覽")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        refreshQuotes()
+                        Task { await refreshQuotes() }
                     } label: {
-                        if isRefreshing {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.clockwise")
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                                .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                            Text(isRefreshing ? "更新中..." : "更新報價")
+                                .font(.caption)
                         }
                     }
+                    .disabled(isRefreshing)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -265,81 +343,133 @@ struct DashboardView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
+                            .foregroundColor(Color(hex: "#007AFF"))
                     }
                 }
             }
             .sheet(isPresented: $isShowingAdd) {
-                AddHoldingSheet { newHolding in
-                    holdings.append(newHolding)
-                    StorageService.shared.saveHoldings(holdings)
+                AddHoldingSheet { newHolding, isDCA in
+                    StorageService.shared.addOrUpdateHolding(newHolding, isDCA: isDCA, autoAddJournal: true)
+                    holdings = StorageService.shared.loadHoldings()
                 }
+            }
+            .onAppear {
+                holdings = StorageService.shared.loadHoldings()
             }
         }
     }
     
-    private func refreshQuotes() {
-        guard !isRefreshing else { return }
+    private func refreshQuotes() async {
         isRefreshing = true
-        Task {
-            for i in 0..<holdings.count {
-                if let quote = try? await StockQuoteService.shared.fetchQuote(symbol: holdings[i].symbol) {
-                    holdings[i].currentPrice = quote.currentPrice
-                    holdings[i].previousClose = quote.previousClose
-                }
-            }
-            StorageService.shared.saveHoldings(holdings)
-            isRefreshing = false
+        let res = await StorageService.shared.refreshAllStockQuotes()
+        holdings = StorageService.shared.loadHoldings()
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        lastRefreshedTime = formatter.string(from: Date())
+        isRefreshing = false
+    }
+    
+    private func donutColor(index: Int) -> Color {
+        let palette = [
+            Color(hex: "#007AFF"), Color(hex: "#5856D6"), Color(hex: "#FF9500"),
+            Color(hex: "#34C759"), Color(hex: "#AF52DE"), Color(hex: "#5AC8FA"),
+            Color(hex: "#FF2D55"), Color(hex: "#FFCC00")
+        ]
+        return palette[index % palette.count]
+    }
+}
+
+struct GoalChipButton: View {
+    let title: String
+    let target: Double
+    @Binding var current: Double
+    
+    var isSelected: Bool { Int(current) == Int(target) }
+    
+    var body: some View {
+        Button {
+            current = target
+        } label: {
+            Text(title)
+                .font(.caption.bold())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color(hex: "#007AFF") : Color(.systemGray5))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(12)
         }
     }
 }
 
-// MARK: - 甜甜圈環形圓餅圖實作 (相容 iOS 16 & 17)
+struct FrequencyBadgeCard: View {
+    let title: String
+    let count: Int
+    let colorHex: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption2.bold())
+                .foregroundColor(Color(hex: colorHex))
+            Text("\(count)")
+                .font(.headline.bold())
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color(hex: colorHex).opacity(0.12))
+        .cornerRadius(10)
+    }
+}
+
+// 繪製 Donut Chart 圓餅圖
 struct DonutChartView: View {
     let holdings: [StockHolding]
     
-    var body: some View {
-        let total = holdings.reduce(0.0) { $0 + $1.marketValue }
-        GeometryReader { geo in
-            ZStack {
-                ForEach(Array(holdings.enumerated()), id: \.element.id) { index, item in
-                    let startAngle = calculateAngle(index: index, total: total)
-                    let endAngle = calculateAngle(index: index + 1, total: total)
-                    
-                    DonutSlice(startAngle: startAngle, endAngle: endAngle)
-                        .stroke(chartColor(at: index), lineWidth: 28)
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
+    var totalValue: Double { holdings.reduce(0) { $0 + $1.marketValue } }
+    
+    var slices: [(startAngle: Angle, endAngle: Angle, color: Color)] {
+        guard totalValue > 0 else { return [] }
+        var list: [(startAngle: Angle, endAngle: Angle, color: Color)] = []
+        var currentDegree: Double = -90.0
+        
+        let palette = [
+            Color(hex: "#007AFF"), Color(hex: "#5856D6"), Color(hex: "#FF9500"),
+            Color(hex: "#34C759"), Color(hex: "#AF52DE"), Color(hex: "#5AC8FA"),
+            Color(hex: "#FF2D55"), Color(hex: "#FFCC00")
+        ]
+        
+        for (i, h) in holdings.enumerated() {
+            let sliceDeg = (h.marketValue / totalValue) * 360.0
+            let start = Angle(degrees: currentDegree)
+            let end = Angle(degrees: currentDegree + sliceDeg)
+            list.append((startAngle: start, endAngle: end, color: palette[i % palette.count]))
+            currentDegree += sliceDeg
         }
+        return list
     }
     
-    private func calculateAngle(index: Int, total: Double) -> Angle {
-        guard total > 0 else { return .degrees(0) }
-        let subtotal = holdings.prefix(index).reduce(0.0) { $0 + $1.marketValue }
-        return .degrees((subtotal / total) * 360.0 - 90.0)
+    var body: some View {
+        ZStack {
+            ForEach(Array(slices.enumerated()), id: \.offset) { _, slice in
+                DonutSlice(startAngle: slice.startAngle, endAngle: slice.endAngle)
+                    .stroke(slice.color, style: StrokeStyle(lineWidth: 24, lineCap: .butt))
+            }
+        }
     }
 }
 
 struct DonutSlice: Shape {
-    var startAngle: Angle
-    var endAngle: Angle
+    let startAngle: Angle
+    let endAngle: Angle
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2 - 14
+        let radius = min(rect.width, rect.height) / 2 - 12
         path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
         return path
     }
-}
-
-func chartColor(at index: Int) -> Color {
-    let colors = [
-        Color(hex: "#2F80ED"), Color(hex: "#56CCF2"), Color(hex: "#FFB03A"),
-        Color(hex: "#EB5757"), Color(hex: "#6FCF97"), Color(hex: "#BB6BD9"),
-        Color(hex: "#F2994A"), Color(hex: "#9B51E0")
-    ]
-    return colors[index % colors.count]
 }
 
 // MARK: ==========================================
@@ -349,31 +479,38 @@ func chartColor(at index: Int) -> Color {
 struct JournalManagementView: View {
     @State private var journals: [JournalEntry] = StorageService.shared.loadJournals()
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
-    @State private var selectedFilter: String = "ALL"
+    @State private var selectedFilterSymbol: String = "全部"
     @State private var isShowingAdd = false
+    @State private var isShowingBackup = false
     
     var filteredJournals: [JournalEntry] {
-        if selectedFilter == "ALL" {
+        if selectedFilterSymbol == "全部" {
             return journals
-        } else {
-            return journals.filter { $0.symbol == selectedFilter }
         }
+        return journals.filter { $0.symbol == selectedFilterSymbol }
+    }
+    
+    var filterOptions: [String] {
+        var set = Array(Set(journals.map { $0.symbol })).sorted()
+        set.insert("全部", at: 0)
+        return set
     }
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 用戶資訊頂部卡 (助手 ID 與複製按鈕)
+                // 1. 助手專屬頂部列 (對應截圖 2 個人資訊欄)
                 HStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 38))
-                        .foregroundColor(Color(hex: "#007AFF"))
+                    Circle()
+                        .fill(LinearGradient(colors: [Color(hex: "#007AFF"), Color(hex: "#5AC8FA")], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 44, height: 44)
+                        .overlay(Image(systemName: "person.fill").foregroundColor(.white))
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("股息助手")
-                            .font(.headline)
+                        Text("存股助手")
+                            .font(.headline.bold())
                         HStack(spacing: 4) {
-                            Text("ID: 10535785149")
+                            Text("ID: 8886291")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Image(systemName: "doc.on.doc")
@@ -381,96 +518,102 @@ struct JournalManagementView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    
                     Spacer()
+                    
                     Button {
-                        // 設定
+                        isShowingBackup = true
                     } label: {
-                        Image(systemName: "gearshape")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath.circle")
+                            Text("備份/還原")
+                        }
+                        .font(.caption.bold())
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(12)
                     }
                 }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                
+                // 2. 標的下拉篩選選單
+                HStack {
+                    Text("篩選標的:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Picker("選擇標的", selection: $selectedFilterSymbol) {
+                        ForEach(filterOptions, id: \.self) { opt in
+                            Text(opt == "全部" ? "全部標的" : opt).tag(opt)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    
+                    Spacer()
+                    
+                    Text("共 \(filteredJournals.count) 筆日記")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 .padding(.horizontal)
-                .padding(.vertical, 12)
-                .background(Color(.systemBackground))
+                .padding(.vertical, 8)
                 
                 Divider()
                 
-                // 標的下拉篩選器 (如: 0056-元大高股息)
-                HStack {
-                    Menu {
-                        Button("全部標的") { selectedFilter = "ALL" }
-                        ForEach(holdings) { h in
-                            Button("\(h.symbol)-\(h.name)") { selectedFilter = h.symbol }
-                        }
-                    } label: {
-                        HStack {
-                            Text(filterTitle)
-                                .font(.subheadline.bold())
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                
-                // 買賣流水日記列表
+                // 3. 交易日記流水清單 (對應截圖 2)
                 List {
-                    if filteredJournals.isEmpty {
-                        Text("目前無此標的之投資日記紀錄")
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 20)
-                    } else {
-                        ForEach(filteredJournals) { entry in
-                            HStack(alignment: .center, spacing: 12) {
-                                // 橘色買 / 綠色賣 標籤
-                                Text(entry.type.rawValue)
-                                    .font(.caption.bold())
-                                    .foregroundColor(.white)
-                                    .frame(width: 26, height: 26)
-                                    .background(Color(hex: entry.type.badgeColorHex))
-                                    .clipShape(Circle())
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(entry.dateString)
+                    ForEach(filteredJournals) { item in
+                        HStack(spacing: 12) {
+                            // 橘色「買」/ 綠色「賣」圓形 Badge
+                            Text(item.type.rawValue)
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Color(hex: item.type.badgeColorHex))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(item.dateString)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    if !item.note.isEmpty {
+                                        Text(item.note)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(Color(.systemGray5))
+                                            .cornerRadius(4)
+                                    }
+                                }
+                                HStack(spacing: 6) {
+                                    Text(item.symbol)
                                         .font(.subheadline.bold())
-                                    Text("買入日期")
-                                        .font(.caption2)
+                                    Text(item.name)
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                
-                                Spacer()
-                                
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text("$\(String(format: "%.2f", entry.price))")
-                                        .font(.subheadline.bold())
-                                    Text("買入金額")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text("$\(Int(entry.totalAmount))")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
-                                    Text(entry.lotsText)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(width: 80, alignment: .trailing)
                             }
-                            .padding(.vertical, 4)
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("$\(Int(item.totalAmount).formatted())")
+                                    .font(.headline.bold())
+                                Text("$\(String(format: "%.2f", item.price)) · \(item.sharesDisplay)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        .onDelete(perform: deleteJournal)
+                        .padding(.vertical, 4)
                     }
+                    .onDelete(perform: deleteJournal)
                 }
                 .listStyle(.plain)
             }
@@ -491,15 +634,13 @@ struct JournalManagementView: View {
                     StorageService.shared.saveJournals(journals)
                 }
             }
+            .sheet(isPresented: $isShowingBackup) {
+                DataBackupSheet {
+                    journals = StorageService.shared.loadJournals()
+                    holdings = StorageService.shared.loadHoldings()
+                }
+            }
         }
-    }
-    
-    private var filterTitle: String {
-        if selectedFilter == "ALL" { return "全部標的" }
-        if let h = holdings.first(where: { $0.symbol == selectedFilter }) {
-            return "\(h.symbol)-\(h.name)"
-        }
-        return selectedFilter
     }
     
     private func deleteJournal(at offsets: IndexSet) {
@@ -508,102 +649,157 @@ struct JournalManagementView: View {
     }
 }
 
+// 資料備份與還原 Sheet
+struct DataBackupSheet: View {
+    @Environment(\.dismiss) var dismiss
+    var onDataRestored: () -> Void
+    
+    @State private var jsonString: String = ""
+    @State private var importText: String = ""
+    @State private var isCopied = false
+    @State private var alertMessage = ""
+    @State private var showAlert = false
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("匯出資料 (全體備份)") {
+                    Text("可將您的所有存股持股、日記流水、除息事件轉為 JSON 文字，換機或更新 IPA 時無痛還原。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Button {
+                        if let json = StorageService.shared.exportAllDataAsJSON() {
+                            UIPasteboard.general.string = json
+                            isCopied = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: isCopied ? "checkmark.circle.fill" : "doc.on.doc")
+                            Text(isCopied ? "已複製完整 JSON 至剪貼簿！" : "一鍵複製全部備份至剪貼簿")
+                        }
+                        .foregroundColor(isCopied ? .green : Color(hex: "#007AFF"))
+                    }
+                }
+                
+                Section("還原資料 (匯入備份)") {
+                    Text("請在此貼上先前複製的備份 JSON 文字：")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    TextEditor(text: $importText)
+                        .frame(height: 120)
+                        .font(.system(size: 11, design: .monospaced))
+                    
+                    Button("執行資料還原") {
+                        if StorageService.shared.importDataFromJSON(importText) {
+                            alertMessage = "資料還原成功！"
+                            showAlert = true
+                            onDataRestored()
+                        } else {
+                            alertMessage = "還原失敗：JSON 格式無效，請確認貼上完整的備份文字。"
+                            showAlert = true
+                        }
+                    }
+                    .disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .navigationTitle("備份與還原")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("關閉") { dismiss() }
+                }
+            }
+            .alert(alertMessage, isPresented: $showAlert) {
+                Button("確定") {
+                    if alertMessage.contains("成功") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
 // MARK: ==========================================
 // MARK: 模組 3: 股息歷程時間軸 (對應截圖 3)
 // MARK: ==========================================
 
 struct DividendTimelineView: View {
-    @State private var monthlyList: [MonthlyTimelineSummary] = StorageService.shared.getMonthlyTimelineSummaries()
+    let monthlySummaries: [MonthlyTimelineSummary] = StorageService.shared.getMonthlyTimelineSummaries()
     
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    ForEach(Array(monthlyList.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(monthlySummaries.enumerated()), id: \.element.id) { index, item in
                         HStack(alignment: .top, spacing: 14) {
-                            // 左側垂直時間軸節點與線條
+                            // 左側垂直時間軸線條與節點
                             VStack(spacing: 0) {
-                                Text(item.monthKey.replacingOccurrences(of: "2025年 ", with: "").replacingOccurrences(of: "2024年 ", with: ""))
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.primary)
-                                
-                                Text(item.monthKey.contains("2025") ? "2025" : "2024")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                                    .padding(.bottom, 6)
-                                
                                 Circle()
                                     .fill(Color(hex: "#007AFF"))
-                                    .frame(width: 10, height: 10)
+                                    .frame(width: 12, height: 12)
+                                    .padding(.top, 4)
                                 
-                                if index < monthlyList.count - 1 {
+                                if index < monthlySummaries.count - 1 {
                                     Rectangle()
                                         .fill(Color(hex: "#007AFF").opacity(0.3))
                                         .frame(width: 2)
                                         .frame(maxHeight: .infinity)
                                 }
                             }
-                            .frame(width: 48)
                             
-                            // 右側詳細月度數據卡片
-                            VStack(spacing: 8) {
+                            // 右側月份數據卡片 (對應截圖 3)
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(item.monthKey)
+                                    .font(.headline.bold())
+                                
                                 HStack {
-                                    Text("總價值")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("總價值").font(.caption).foregroundColor(.secondary)
+                                        Text("$\(Int(item.totalMarketValue).formatted())").font(.subheadline.bold())
+                                    }
                                     Spacer()
-                                    Text("$\(Int(item.totalMarketValue).formatted())")
-                                        .font(.headline.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("總成本").font(.caption).foregroundColor(.secondary)
+                                        Text("$\(Int(item.totalCost).formatted())").font(.subheadline.bold())
+                                    }
+                                }
+                                
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("價差獲利").font(.caption).foregroundColor(.secondary)
+                                        Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("手續費").font(.caption).foregroundColor(.secondary)
+                                        Text("$\(Int(item.totalFee).formatted())").font(.subheadline.bold())
+                                    }
                                 }
                                 
                                 Divider()
                                 
                                 HStack {
-                                    Text("總成本")
-                                        .font(.caption).foregroundColor(.secondary)
-                                    Spacer()
-                                    Text("$\(Int(item.totalCost).formatted())")
-                                        .font(.subheadline)
-                                }
-                                
-                                HStack {
-                                    Text("價差獲利")
-                                        .font(.caption).foregroundColor(.secondary)
-                                    Spacer()
-                                    Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
-                                }
-                                
-                                HStack {
-                                    Text("手續費")
-                                        .font(.caption).foregroundColor(.secondary)
-                                    Spacer()
-                                    Text("$\(Int(item.totalFee))")
-                                        .font(.caption)
-                                }
-                                
-                                HStack {
                                     Text("當月股息")
-                                        .font(.caption).foregroundColor(.secondary)
+                                        .font(.subheadline.bold())
                                     Spacer()
                                     Text("$\(Int(item.monthDividend).formatted())")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(Color(hex: "#FF9500"))
+                                        .font(.title3.bold())
+                                        .foregroundColor(Color(hex: "#007AFF"))
                                 }
                             }
                             .padding(14)
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(14)
+                            .padding(.bottom, 16)
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 16)
                     }
                 }
-                .padding(.top, 16)
+                .padding()
             }
             .navigationTitle("股息歷程")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -616,12 +812,24 @@ struct HoldingsListView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
     @State private var expandedSymbols: Set<String> = []
     @State private var selectedHoldingForDetail: StockHolding? = nil
+    @State private var holdingToEdit: StockHolding? = nil
+    @State private var holdingToDelete: StockHolding? = nil
     @State private var isShowingAdd = false
+    @State private var searchText = ""
+    @State private var isRefreshing = false
+    
+    var filteredHoldings: [StockHolding] {
+        if searchText.isEmpty { return holdings }
+        return holdings.filter {
+            $0.symbol.localizedCaseInsensitiveContains(searchText) ||
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
     
     var body: some View {
         NavigationStack {
             List {
-                ForEach(holdings) { item in
+                ForEach(filteredHoldings) { item in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             // 標的代號 + 頻率Badge + 名稱
@@ -692,9 +900,9 @@ struct HoldingsListView: View {
                             }
                         }
                         
-                        // 展開內容：現值、均價、現價、股息明細按鈕
+                        // 展開內容：現值、均價、現價、多功能操作區
                         if expandedSymbols.contains(item.symbol) {
-                            VStack(spacing: 8) {
+                            VStack(spacing: 10) {
                                 Divider()
                                 HStack {
                                     Text("現值: $\(Int(item.marketValue).formatted())")
@@ -706,21 +914,53 @@ struct HoldingsListView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 
-                                Button {
-                                    selectedHoldingForDetail = item
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "chart.bar.doc.horizontal")
-                                        Text("查看 \(item.name) 股息紀錄")
+                                // 操作按鈕組
+                                HStack(spacing: 8) {
+                                    // 編輯按鈕
+                                    Button {
+                                        holdingToEdit = item
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "pencil")
+                                            Text("編輯")
+                                        }
+                                        .font(.caption.bold())
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .background(Color(.systemGray5))
+                                        .cornerRadius(8)
                                     }
-                                    .font(.caption.bold())
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color(hex: "#007AFF"))
-                                    .cornerRadius(8)
+                                    
+                                    // 股息紀錄按鈕
+                                    Button {
+                                        selectedHoldingForDetail = item
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "chart.bar.doc.horizontal")
+                                            Text("股息紀錄")
+                                        }
+                                        .font(.caption.bold())
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .background(Color(hex: "#007AFF"))
+                                        .cornerRadius(8)
+                                    }
+                                    
+                                    // 刪除按鈕
+                                    Button {
+                                        holdingToDelete = item
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.red)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 7)
+                                            .background(Color.red.opacity(0.12))
+                                            .cornerRadius(8)
+                                    }
                                 }
-                                .padding(.top, 4)
+                                .padding(.top, 2)
                             }
                         }
                     }
@@ -729,8 +969,21 @@ struct HoldingsListView: View {
                 .onDelete(perform: deleteHolding)
             }
             .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
+            .refreshable {
+                await refreshQuotes()
+            }
             .navigationTitle("持有ETF")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        Task { await refreshQuotes() }
+                    } label: {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                            .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         isShowingAdd = true
@@ -739,14 +992,42 @@ struct HoldingsListView: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "確定要刪除 \(holdingToDelete?.symbol ?? "") \(holdingToDelete?.name ?? "") 嗎？",
+                isPresented: Binding(get: { holdingToDelete != nil }, set: { if !$0 { holdingToDelete = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("刪除存股", role: .destructive) {
+                    if let target = holdingToDelete {
+                        StorageService.shared.deleteHolding(id: target.id)
+                        holdings = StorageService.shared.loadHoldings()
+                    }
+                    holdingToDelete = nil
+                }
+                Button("取消", role: .cancel) { holdingToDelete = nil }
+            } message: {
+                Text("此操作將從您的總資產與追蹤清單中移除此標的。")
+            }
             .sheet(item: $selectedHoldingForDetail) { h in
                 HoldingDividendDetailView(holding: h)
             }
-            .sheet(isPresented: $isShowingAdd) {
-                AddHoldingSheet { newHolding in
-                    holdings.append(newHolding)
-                    StorageService.shared.saveHoldings(holdings)
+            .sheet(item: $holdingToEdit) { h in
+                EditHoldingSheet(holding: h) { updated in
+                    StorageService.shared.updateHolding(updated)
+                    holdings = StorageService.shared.loadHoldings()
+                } onDelete: {
+                    StorageService.shared.deleteHolding(id: h.id)
+                    holdings = StorageService.shared.loadHoldings()
                 }
+            }
+            .sheet(isPresented: $isShowingAdd) {
+                AddHoldingSheet { newHolding, isDCA in
+                    StorageService.shared.addOrUpdateHolding(newHolding, isDCA: isDCA, autoAddJournal: true)
+                    holdings = StorageService.shared.loadHoldings()
+                }
+            }
+            .onAppear {
+                holdings = StorageService.shared.loadHoldings()
             }
         }
     }
@@ -754,6 +1035,127 @@ struct HoldingsListView: View {
     private func deleteHolding(at offsets: IndexSet) {
         holdings.remove(atOffsets: offsets)
         StorageService.shared.saveHoldings(holdings)
+    }
+    
+    private func refreshQuotes() async {
+        isRefreshing = true
+        _ = await StorageService.shared.refreshAllStockQuotes()
+        holdings = StorageService.shared.loadHoldings()
+        isRefreshing = false
+    }
+}
+
+// 編輯持股 Sheet
+struct EditHoldingSheet: View {
+    @Environment(\.dismiss) var dismiss
+    let holding: StockHolding
+    var onSave: (StockHolding) -> Void
+    var onDelete: () -> Void
+    
+    @State private var name: String = ""
+    @State private var frequency: FrequencyType = .quarterly
+    @State private var shares: String = ""
+    @State private var averageCost: String = ""
+    @State private var currentPrice: String = ""
+    @State private var totalDividends: String = ""
+    @State private var dividendCount: String = ""
+    @State private var showDeleteConfirm = false
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("標的資訊 (\(holding.symbol))") {
+                    TextField("名稱", text: $name)
+                    Picker("配息頻率", selection: $frequency) {
+                        ForEach(FrequencyType.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                }
+                
+                Section("持股與成本") {
+                    HStack {
+                        Text("持有股數")
+                        Spacer()
+                        TextField("股數", text: $shares).keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("買入均價 (元)")
+                        Spacer()
+                        TextField("均價", text: $averageCost).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("目前現價 (元)")
+                        Spacer()
+                        TextField("現價", text: $currentPrice).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                    }
+                }
+                
+                Section("累計已領股息") {
+                    HStack {
+                        Text("累計股息 (元)")
+                        Spacer()
+                        TextField("總股息", text: $totalDividends).keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("領息次數")
+                        Spacer()
+                        TextField("次數", text: $dividendCount).keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                    }
+                }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "trash")
+                            Text("刪除此存股標的")
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("編輯 \(holding.symbol)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("儲存修改") {
+                        var updated = holding
+                        updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        updated.frequency = frequency
+                        updated.shares = Int(shares) ?? holding.shares
+                        updated.averageCost = Double(averageCost) ?? holding.averageCost
+                        updated.currentPrice = Double(currentPrice) ?? holding.currentPrice
+                        updated.totalDividendsReceived = Double(totalDividends) ?? holding.totalDividendsReceived
+                        updated.dividendCount = Int(dividendCount) ?? holding.dividendCount
+                        updated.updatedAt = Date()
+                        onSave(updated)
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+            }
+            .confirmationDialog("確定要刪除 \(holding.symbol) 嗎？", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("確定刪除", role: .destructive) {
+                    onDelete()
+                    dismiss()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("刪除後將無法恢復，並將自總市值扣除。")
+            }
+            .onAppear {
+                name = holding.name
+                frequency = holding.frequency
+                shares = "\(holding.shares)"
+                averageCost = String(format: "%.2f", holding.averageCost)
+                currentPrice = String(format: "%.2f", holding.currentPrice)
+                totalDividends = "\(Int(holding.totalDividendsReceived))"
+                dividendCount = "\(holding.dividendCount)"
+            }
+        }
     }
 }
 
@@ -860,11 +1262,55 @@ struct HoldingDividendDetailView: View {
 struct DividendCalendarTabView: View {
     @State private var selectedMode: Int = 1 // 0: 股息日曆, 1: 倒數日
     @State private var events: [DividendEvent] = StorageService.shared.loadEvents()
+    @State private var isNotificationsEnabled: Bool = NotificationService.shared.isNotificationsEnabled
     @State private var isShowingAdd = false
+    @State private var notificationStatusMessage = ""
+    @State private var showNotificationToast = false
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // 頂部除息推播通知開關欄 (進階功能)
+                HStack {
+                    Image(systemName: isNotificationsEnabled ? "bell.badge.fill" : "bell.slash")
+                        .foregroundColor(isNotificationsEnabled ? Color(hex: "#007AFF") : .secondary)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("除息前一天推播提醒 (08:30)")
+                            .font(.subheadline.bold())
+                        Text(isNotificationsEnabled ? "已開啟除息前日提醒與當日提醒" : "點擊開啟本機推播通知，不再錯過除息")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $isNotificationsEnabled)
+                        .labelsHidden()
+                        .onChange(of: isNotificationsEnabled) { enabled in
+                            if enabled {
+                                NotificationService.shared.requestAuthorization { granted in
+                                    if granted {
+                                        let holdings = StorageService.shared.loadHoldings()
+                                        NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
+                                        notificationStatusMessage = "🔔 已成功排程除息前通知！"
+                                        showNotificationToast = true
+                                    } else {
+                                        isNotificationsEnabled = false
+                                        notificationStatusMessage = "請至 iOS「設定」允許本 App 通知權限"
+                                        showNotificationToast = true
+                                    }
+                                }
+                            } else {
+                                NotificationService.shared.isNotificationsEnabled = false
+                                NotificationService.shared.syncDividendReminders(events: events, holdings: [])
+                            }
+                        }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(.secondarySystemBackground))
+                
                 // 模式切換 Switch
                 Picker("顯示模式", selection: $selectedMode) {
                     Text("股息日曆").tag(0)
@@ -897,6 +1343,17 @@ struct DividendCalendarTabView: View {
                 AddDividendEventSheet { newEvent in
                     events.append(newEvent)
                     StorageService.shared.saveEvents(events)
+                    let holdings = StorageService.shared.loadHoldings()
+                    NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
+                }
+            }
+            .alert(notificationStatusMessage, isPresented: $showNotificationToast) {
+                Button("確定") {}
+            }
+            .onAppear {
+                events = StorageService.shared.loadEvents()
+                NotificationService.shared.checkAuthorization { auth in
+                    isNotificationsEnabled = auth && NotificationService.shared.isNotificationsEnabled
                 }
             }
         }
@@ -1011,45 +1468,123 @@ struct DividendCalendarMonthView: View {
 
 struct AddHoldingSheet: View {
     @Environment(\.dismiss) var dismiss
-    var onSave: (StockHolding) -> Void
+    var onSave: (StockHolding, Bool) -> Void // (holding, isDCA)
     
     @State private var symbol = ""
     @State private var name = ""
     @State private var frequency: FrequencyType = .quarterly
+    @State private var stockType: StockType = .etf
     @State private var shares = "1000"
     @State private var cost = ""
+    @State private var isDCAMode = true
+    @State private var autoAddJournal = true
+    
+    private var existingHolding: StockHolding? {
+        let clean = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return StorageService.shared.loadHoldings().first { $0.symbol == clean }
+    }
     
     var body: some View {
         NavigationStack {
             Form {
+                // 熱門標的快速選取 Chip 列
+                Section("熱門台股 / 高股息 ETF 快速選取") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(PopularStockPreset.allPresets) { preset in
+                                Button {
+                                    symbol = preset.symbol
+                                    name = preset.name
+                                    frequency = preset.frequency
+                                    stockType = preset.stockType
+                                    if cost.isEmpty {
+                                        cost = String(format: "%.2f", preset.defaultPrice)
+                                    }
+                                } label: {
+                                    VStack(spacing: 2) {
+                                        Text(preset.symbol)
+                                            .font(.subheadline.bold())
+                                        Text(preset.name)
+                                            .font(.caption2)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(symbol == preset.symbol ? Color(hex: "#007AFF") : Color(.systemGray5))
+                                    .foregroundColor(symbol == preset.symbol ? .white : .primary)
+                                    .cornerRadius(10)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
                 Section("標的資料") {
-                    TextField("代號 (例: 0056, 00878)", text: $symbol).keyboardType(.asciiCapable)
+                    TextField("代號 (例: 0056, 00878, 2330)", text: $symbol)
+                        .keyboardType(.asciiCapable)
                     TextField("名稱 (例: 元大高股息)", text: $name)
                     Picker("配息頻率", selection: $frequency) {
                         ForEach(FrequencyType.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
+                    Picker("標的類型", selection: $stockType) {
+                        Text("ETF 指數型 (證交稅 0.1%)").tag(StockType.etf)
+                        Text("一般個股 (證交稅 0.3%)").tag(StockType.stock)
+                    }
                 }
-                Section("持股與成本") {
-                    TextField("持有股數", text: $shares).keyboardType(.numberPad)
-                    TextField("買入均價", text: $cost).keyboardType(.decimalPad)
+                
+                // 智慧加碼提示
+                if let existing = existingHolding {
+                    Section("🔄 加碼存股試算 (您已持有 \(existing.symbol))") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("目前已持有: \(existing.shares.formatted()) 股 · 均價 $\(String(format: "%.2f", existing.averageCost))")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                            
+                            Picker("存股操作模式", selection: $isDCAMode) {
+                                Text("定期定額加碼 (加權均價)").tag(true)
+                                Text("直接覆蓋原資料").tag(false)
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            if isDCAMode, let addShares = Int(shares), addShares > 0, let addPrice = Double(cost), addPrice > 0 {
+                                let totalS = existing.shares + addShares
+                                let newCost = ((Double(existing.shares) * existing.averageCost) + (Double(addShares) * addPrice)) / Double(totalS)
+                                HStack {
+                                    Text("加碼後新總股數: \(totalS.formatted()) 股")
+                                    Spacer()
+                                    Text("新均價: $\(String(format: "%.2f", newCost))")
+                                        .foregroundColor(Color(hex: "#007AFF"))
+                                }
+                                .font(.caption.bold())
+                                .padding(.top, 4)
+                            }
+                        }
+                    }
+                }
+                
+                Section(existingHolding != nil && isDCAMode ? "本次買進加碼規格" : "持股與成本") {
+                    TextField("股數 (例: 1,000 股 = 1 張)", text: $shares).keyboardType(.numberPad)
+                    TextField("成交單價 (元)", text: $cost).keyboardType(.decimalPad)
+                    Toggle("自動寫入買賣日記流水帳", isOn: $autoAddJournal)
                 }
             }
-            .navigationTitle("新增持股")
+            .navigationTitle(existingHolding != nil ? "加碼存股" : "新增存股")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("儲存") {
+                    Button(existingHolding != nil && isDCAMode ? "確認加碼" : "儲存") {
                         let h = StockHolding(
                             symbol: symbol,
                             name: name.isEmpty ? symbol : name,
                             frequency: frequency,
                             shares: Int(shares) ?? 0,
                             averageCost: Double(cost) ?? 0,
-                            currentPrice: Double(cost) ?? 0
+                            currentPrice: Double(cost) ?? 0,
+                            stockType: stockType
                         )
-                        onSave(h)
+                        onSave(h, existingHolding != nil && isDCAMode)
                         dismiss()
                     }
-                    .disabled(symbol.isEmpty || cost.isEmpty)
+                    .disabled(symbol.isEmpty || cost.isEmpty || (Int(shares) ?? 0) <= 0)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
@@ -1069,6 +1604,7 @@ struct AddJournalSheet: View {
     @State private var price = ""
     @State private var shares = "1000"
     @State private var date = Date()
+    @State private var note = ""
     
     var body: some View {
         NavigationStack {
@@ -1090,6 +1626,7 @@ struct AddJournalSheet: View {
                     TextField("單價 (元)", text: $price).keyboardType(.decimalPad)
                     TextField("股數 (1,000股 = 1張)", text: $shares).keyboardType(.numberPad)
                     DatePicker("交易日期", selection: $date, displayedComponents: .date)
+                    TextField("備註 (例: 定期定額加碼)", text: $note)
                 }
             }
             .navigationTitle("新增日記")
@@ -1103,7 +1640,8 @@ struct AddJournalSheet: View {
                             type: type,
                             date: date,
                             price: Double(price) ?? 0,
-                            shares: Int(shares) ?? 0
+                            shares: Int(shares) ?? 0,
+                            note: note
                         )
                         onSave(entry)
                         dismiss()

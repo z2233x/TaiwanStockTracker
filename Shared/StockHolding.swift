@@ -30,6 +30,33 @@ public enum StockType: String, Codable, CaseIterable {
     }
 }
 
+public struct PopularStockPreset: Identifiable, Equatable {
+    public var id: String { symbol }
+    public let symbol: String
+    public let name: String
+    public let frequency: FrequencyType
+    public let stockType: StockType
+    public let defaultPrice: Double
+    
+    public static let allPresets: [PopularStockPreset] = [
+        PopularStockPreset(symbol: "0056", name: "元大高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 37.5),
+        PopularStockPreset(symbol: "00878", name: "國泰永續高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 22.8),
+        PopularStockPreset(symbol: "00919", name: "群益台灣精選高息", frequency: .quarterly, stockType: .etf, defaultPrice: 24.2),
+        PopularStockPreset(symbol: "00929", name: "復華台灣科技優息", frequency: .monthly, stockType: .etf, defaultPrice: 19.5),
+        PopularStockPreset(symbol: "0050", name: "元大台灣50", frequency: .semiannual, stockType: .etf, defaultPrice: 195.0),
+        PopularStockPreset(symbol: "006208", name: "富邦台50", frequency: .semiannual, stockType: .etf, defaultPrice: 115.0),
+        PopularStockPreset(symbol: "00940", name: "元大台灣價值高息", frequency: .monthly, stockType: .etf, defaultPrice: 9.8),
+        PopularStockPreset(symbol: "00939", name: "統一台灣高息動能", frequency: .monthly, stockType: .etf, defaultPrice: 14.5),
+        PopularStockPreset(symbol: "00915", name: "凱基優選高股息30", frequency: .quarterly, stockType: .etf, defaultPrice: 26.8),
+        PopularStockPreset(symbol: "00713", name: "元大台灣高息低波", frequency: .quarterly, stockType: .etf, defaultPrice: 57.0),
+        PopularStockPreset(symbol: "2330", name: "台積電", frequency: .quarterly, stockType: .stock, defaultPrice: 1050.0),
+        PopularStockPreset(symbol: "2454", name: "聯發科", frequency: .semiannual, stockType: .stock, defaultPrice: 1300.0),
+        PopularStockPreset(symbol: "2881", name: "富邦金", frequency: .annual, stockType: .stock, defaultPrice: 92.0),
+        PopularStockPreset(symbol: "2882", name: "國泰金", frequency: .annual, stockType: .stock, defaultPrice: 68.0),
+        PopularStockPreset(symbol: "2891", name: "中信金", frequency: .annual, stockType: .stock, defaultPrice: 38.0)
+    ]
+}
+
 public struct StockHolding: Identifiable, Codable, Equatable {
     public var id: UUID
     public var symbol: String              // 代號 (如 0056, 00878, 2330)
@@ -73,6 +100,20 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         self.totalDividendsReceived = totalDividendsReceived
         self.dividendCount = dividendCount
         self.updatedAt = updatedAt
+    }
+    
+    // 定期定額加碼存股試算：加權更新均價與股數
+    public mutating func addDCA(newShares: Int, buyPrice: Double) {
+        guard newShares > 0 else { return }
+        let currentCost = Double(shares) * averageCost
+        let addedCost = Double(newShares) * buyPrice
+        let total = shares + newShares
+        let newAverageCost = (currentCost + addedCost) / Double(total)
+        
+        self.shares = total
+        self.averageCost = (newAverageCost * 100.0).rounded() / 100.0
+        self.currentPrice = buyPrice
+        self.updatedAt = Date()
     }
     
     // 總成本本金 (不含買進手續費)

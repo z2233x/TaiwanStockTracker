@@ -39,6 +39,15 @@ public struct WidgetDataSummary: Codable {
     public let lastUpdated: Date
 }
 
+public struct AppBackupPayload: Codable {
+    public let version: String
+    public let exportDate: Date
+    public let holdings: [StockHolding]
+    public let journals: [JournalEntry]
+    public let events: [DividendEvent]
+    public let histories: [HoldingDividendHistory]
+}
+
 public final class StorageService {
     public static let shared = StorageService()
     public static let appGroupId = "group.com.twstock.tracker"
@@ -59,7 +68,7 @@ public final class StorageService {
         }
     }
     
-    // MARK: - 持股管理
+    // MARK: - 持股管理 (CRUD)
     public func saveHoldings(_ holdings: [StockHolding]) {
         if let encoded = try? JSONEncoder().encode(holdings) {
             userDefaults?.set(encoded, forKey: holdingsKey)
@@ -73,6 +82,93 @@ public final class StorageService {
             return []
         }
         return list
+    }
+    
+    // 新增或加碼存股
+    public func addOrUpdateHolding(_ newHolding: StockHolding, isDCA: Bool = false, autoAddJournal: Bool = true) {
+        var current = loadHoldings()
+        if let idx = current.firstIndex(where: { $0.symbol == newHolding.symbol }) {
+            if isDCA {
+                // 定期定額加碼存股：加權重新計算均價與總股數
+                current[idx].addDCA(newShares: newHolding.shares, buyPrice: newHolding.averageCost)
+            } else {
+                // 直接更新或覆蓋
+                current[idx] = newHolding
+            }
+        } else {
+            current.append(newHolding)
+        }
+        saveHoldings(current)
+        
+        // 若勾選自動建立日記
+        if autoAddJournal && newHolding.shares > 0 {
+            var journals = loadJournals()
+            let journal = JournalEntry(
+                symbol: newHolding.symbol,
+                name: newHolding.name,
+                type: .buy,
+                date: Date(),
+                price: newHolding.averageCost,
+                shares: newHolding.shares,
+                fee: newHolding.buyFee,
+                note: isDCA ? "定期定額加碼存股" : "建立初始持股"
+            )
+            journals.insert(journal, at: 0)
+            saveJournals(journals)
+        }
+    }
+    
+    // 修改持股資料
+    public func updateHolding(_ updated: StockHolding) {
+        var current = loadHoldings()
+        if let idx = current.firstIndex(where: { $0.id == updated.id || $0.symbol == updated.symbol }) {
+            current[idx] = updated
+            saveHoldings(current)
+        }
+    }
+    
+    // 刪除持股
+    public func deleteHolding(id: UUID) {
+        var current = loadHoldings()
+        current.removeAll { $0.id == id }
+        saveHoldings(current)
+    }
+    
+    public func deleteHolding(symbol: String) {
+        var current = loadHoldings()
+        current.removeAll { $0.symbol == symbol }
+        saveHoldings(current)
+    }
+    
+    // MARK: - 即時報價更新 (Yahoo Finance 批次查詢)
+    public func refreshAllStockQuotes() async -> (successCount: Int, failedCount: Int) {
+        var current = loadHoldings()
+        guard !current.isEmpty else { return (0, 0) }
+        
+        var success = 0
+        var failed = 0
+        
+        for i in 0..<current.count {
+            let symbol = current[i].symbol
+            do {
+                let quote = try await StockQuoteService.shared.fetchQuote(symbol: symbol)
+                if quote.currentPrice > 0 {
+                    current[i].currentPrice = quote.currentPrice
+                    if quote.previousClose > 0 {
+                        current[i].previousClose = quote.previousClose
+                    }
+                    current[i].updatedAt = Date()
+                    success += 1
+                }
+            } catch {
+                failed += 1
+            }
+        }
+        
+        if success > 0 {
+            saveHoldings(current)
+        }
+        return (success, failed)
     }
     
     // MARK: - 日記紀錄
@@ -90,6 +186,18 @@ public final class StorageService {
         return list
     }
     
+    public func addJournal(_ entry: JournalEntry) {
+        var current = loadJournals()
+        current.insert(entry, at: 0)
+        saveJournals(current)
+    }
+    
+    public func deleteJournal(id: UUID) {
+        var current = loadJournals()
+        current.removeAll { $0.id == id }
+        saveJournals(current)
+    }
+    
     // MARK: - 除息日曆事件
     public func saveEvents(_ events: [DividendEvent]) {
         if let encoded = try? JSONEncoder().encode(events) {
@@ -104,6 +212,18 @@ public final class StorageService {
             return []
         }
         return list
+    }
+    
+    public func addEvent(_ event: DividendEvent) {
+        var current = loadEvents()
+        current.append(event)
+        saveEvents(current)
+    }
+    
+    public func deleteEvent(id: UUID) {
+        var current = loadEvents()
+        current.removeAll { $0.id == id }
+        saveEvents(current)
     }
     
     // MARK: - 個股歷史除息紀錄 (對應截圖4)
@@ -148,13 +268,46 @@ public final class StorageService {
     
     // MARK: - 股息歷程時間軸數據 (對應截圖3)
     public func getMonthlyTimelineSummaries() -> [MonthlyTimelineSummary] {
-        // 提供截圖中的真實歷程卡片數據
         return [
             MonthlyTimelineSummary(monthKey: "2025年 2月", totalMarketValue: 244490, totalCost: 240420, priceGainProfit: 4070, totalFee: 0, monthDividend: 390),
             MonthlyTimelineSummary(monthKey: "2025年 1月", totalMarketValue: 207400, totalCost: 206630, priceGainProfit: 770, totalFee: 0, monthDividend: 320),
             MonthlyTimelineSummary(monthKey: "2024年 12月", totalMarketValue: 206280, totalCost: 206630, priceGainProfit: -350, totalFee: 0, monthDividend: 1935),
             MonthlyTimelineSummary(monthKey: "2024年 11月", totalMarketValue: 203890, totalCost: 206630, priceGainProfit: -2740, totalFee: 0, monthDividend: 1250)
         ]
+    }
+    
+    // MARK: - 資料備份 (JSON 匯出/匯入)
+    public func exportAllDataAsJSON() -> String? {
+        let payload = AppBackupPayload(
+            version: "2.1",
+            exportDate: Date(),
+            holdings: loadHoldings(),
+            journals: loadJournals(),
+            events: loadEvents(),
+            histories: loadHoldingHistories()
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(payload),
+              let jsonString = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return jsonString
+    }
+    
+    public func importDataFromJSON(_ jsonString: String) -> Bool {
+        guard let data = jsonString.data(using: .utf8) else { return false }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let payload = try? decoder.decode(AppBackupPayload.self, from: data) else {
+            return false
+        }
+        saveHoldings(payload.holdings)
+        saveJournals(payload.journals)
+        saveEvents(payload.events)
+        saveHoldingHistories(payload.histories)
+        return true
     }
     
     // MARK: - Widget 資料同步
@@ -207,7 +360,6 @@ public final class StorageService {
         let calendar = Calendar.current
         let today = Date()
         
-        // 1. 持股清單 (對應截圖 1 & 截圖 4)
         let sampleHoldings: [StockHolding] = [
             StockHolding(symbol: "0056", name: "元大高股息", frequency: .quarterly, shares: 3000, averageCost: 37.84, currentPrice: 37.05, previousClose: 36.80, totalDividendsReceived: 1070, dividendCount: 1),
             StockHolding(symbol: "00929", name: "復華台灣科技優息", frequency: .monthly, shares: 4000, averageCost: 19.85, currentPrice: 19.90, previousClose: 19.75, totalDividendsReceived: 1590, dividendCount: 4),
@@ -218,7 +370,6 @@ public final class StorageService {
         ]
         saveHoldings(sampleHoldings)
         
-        // 2. 日記管理買入紀錄 (對應截圖 2)
         let sampleJournals: [JournalEntry] = [
             JournalEntry(symbol: "0056", name: "元大高股息", type: .buy, date: calendar.date(byAdding: .day, value: -14, to: today) ?? today, price: 36.67, shares: 1000, fee: 31),
             JournalEntry(symbol: "0056", name: "元大高股息", type: .buy, date: calendar.date(byAdding: .month, value: -3, to: today) ?? today, price: 35.58, shares: 1000, fee: 30),
@@ -226,7 +377,6 @@ public final class StorageService {
         ]
         saveJournals(sampleJournals)
         
-        // 3. 標的歷史配息紀錄 (對應截圖 4 00929 股息紀錄)
         let sampleHistories: [HoldingDividendHistory] = [
             HoldingDividendHistory(symbol: "00929", paymentDate: calendar.date(byAdding: .day, value: -10, to: today) ?? today, dividendPerShare: 0.11, sharesSnapshot: 3000),
             HoldingDividendHistory(symbol: "00929", paymentDate: calendar.date(byAdding: .month, value: -1, to: today) ?? today, dividendPerShare: 0.14, sharesSnapshot: 3000),
@@ -235,7 +385,6 @@ public final class StorageService {
         ]
         saveHoldingHistories(sampleHistories)
         
-        // 4. 除息行事曆與倒數日事件 (對應截圖 5)
         let sampleEvents: [DividendEvent] = [
             DividendEvent(symbol: "00939", name: "統一台灣高息", frequency: .monthly, eventType: .exDividendDate, targetDate: today, cashPerShare: 0.063, sharesSnapshot: 1000),
             DividendEvent(symbol: "00940", name: "元大台灣價值", frequency: .monthly, eventType: .lastBuyDate, targetDate: today, cashPerShare: 0.04, sharesSnapshot: 2000),
