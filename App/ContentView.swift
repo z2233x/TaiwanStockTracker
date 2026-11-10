@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import UniformTypeIdentifiers
 
 // MARK: - 官方 App 圖示與頭像視圖
 struct AppIconAvatarView: View {
@@ -328,55 +329,74 @@ struct DashboardView: View {
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(16)
                     
-                    // 4. 投資佔比 (環形圓餅圖 Donut Chart)
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("投資佔比")
-                            .font(.headline.bold())
-                        
-                        // Donut Chart 圖形
-                        ZStack {
-                            DonutChartView(holdings: holdings)
-                                .frame(width: 200, height: 200)
-                            
-                            VStack(spacing: 4) {
-                                Image(systemName: "chart.pie.fill")
-                                    .font(.caption)
-                                    .foregroundColor(Color(hex: "#007AFF"))
-                                Text("投資佔比")
-                                    .font(.subheadline.bold())
-                            }
+                    if holdings.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 38))
+                                .foregroundColor(.secondary)
+                            Text("目前尚無匯入持股資料")
+                                .font(.headline)
+                            Text("APP 僅會顯示您自己匯入的持股資料。\n請至「持有現股」對接券商匯入庫存，或點擊右上角「➕」新增存股！")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        
-                        // 各標的佔比清單
-                        VStack(spacing: 12) {
-                            ForEach(Array(holdings.enumerated()), id: \.element.id) { index, item in
-                                let percentage = totalMarketValue > 0 ? (item.marketValue / totalMarketValue) * 100.0 : 0
-                                HStack(spacing: 8) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(donutColor(index: index))
-                                        .frame(width: 4, height: 20)
-                                    
-                                    Text("\(item.symbol) \(item.name)")
+                        .padding(24)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(16)
+                    } else {
+                        // 4. 投資佔比 (環形圓餅圖 Donut Chart)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("投資佔比")
+                                .font(.headline.bold())
+                            
+                            // Donut Chart 圖形
+                            ZStack {
+                                DonutChartView(holdings: holdings)
+                                    .frame(width: 200, height: 200)
+                                
+                                VStack(spacing: 4) {
+                                    Image(systemName: "chart.pie.fill")
+                                        .font(.caption)
+                                        .foregroundColor(Color(hex: "#007AFF"))
+                                    Text("投資佔比")
                                         .font(.subheadline.bold())
-                                    
-                                    Spacer()
-                                    
-                                    Text(isPrivacyMasked ? "*****" : "$\(Int(item.marketValue).formatted())")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Text(String(format: "%.1f%%", percentage))
-                                        .font(.subheadline.bold())
-                                        .frame(width: 55, alignment: .trailing)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            
+                            // 各標的佔比清單
+                            VStack(spacing: 12) {
+                                ForEach(Array(holdings.enumerated()), id: \.element.id) { index, item in
+                                    let percentage = totalMarketValue > 0 ? (item.marketValue / totalMarketValue) * 100.0 : 0
+                                    HStack(spacing: 8) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(donutColor(index: index))
+                                            .frame(width: 4, height: 20)
+                                        
+                                        Text("\(item.symbol) \(item.name)")
+                                            .font(.subheadline.bold())
+                                        
+                                        Spacer()
+                                        
+                                        Text(isPrivacyMasked ? "*****" : "$\(Int(item.marketValue).formatted())")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text(String(format: "%.1f%%", percentage))
+                                            .font(.subheadline.bold())
+                                            .frame(width: 55, alignment: .trailing)
+                                    }
                                 }
                             }
                         }
+                        .padding(16)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(16)
                     }
-                    .padding(16)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(16)
                 }
                 .padding()
             }
@@ -556,15 +576,20 @@ struct JournalManagementView: View {
     var rankProgress: Double { InvestorRank.progress(for: totalMarketValue) }
     var remainingToNext: Double? { InvestorRank.remainingToNext(for: totalMarketValue) }
     
+    var heldSymbols: Set<String> { Set(holdings.map { $0.symbol }) }
+    
     var filteredJournals: [JournalEntry] {
+        // 連動真實持股：僅呈現當前持有現股之交易流水紀錄
+        let base = journals.filter { heldSymbols.contains($0.symbol) }
         if selectedFilterSymbol == "全部" {
-            return journals
+            return base
         }
-        return journals.filter { $0.symbol == selectedFilterSymbol }
+        return base.filter { $0.symbol == selectedFilterSymbol }
     }
     
     var filterOptions: [String] {
-        var set = Array(Set(journals.map { $0.symbol })).sorted()
+        let base = journals.filter { heldSymbols.contains($0.symbol) }
+        var set = Array(Set(base.map { $0.symbol })).sorted()
         set.insert("全部", at: 0)
         return set
     }
@@ -677,56 +702,74 @@ struct JournalManagementView: View {
                 
                 Divider()
                 
-                // 3. 交易日記流水清單 (對應截圖 2)
-                List {
-                    ForEach(filteredJournals) { item in
-                        HStack(spacing: 12) {
-                            // 橘色「買」/ 綠色「賣」圓形 Badge
-                            Text(item.type.rawValue)
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                                .frame(width: 32, height: 32)
-                                .background(Color(hex: item.type.badgeColorHex))
-                                .clipShape(Circle())
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    Text(item.dateString)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    if !item.note.isEmpty {
-                                        Text(item.note)
-                                            .font(.caption2)
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 1)
-                                            .background(Color(.systemGray5))
-                                            .cornerRadius(4)
+                // 3. 交易日記流水清單 (連動真實持股)
+                if filteredJournals.isEmpty {
+                    VStack(spacing: 14) {
+                        Spacer()
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 44))
+                            .foregroundColor(.secondary)
+                        Text("目前尚無符合之持股交易紀錄")
+                            .font(.headline)
+                        Text("APP 僅會顯示您自己匯入或建立的持股紀錄。\n當您在「持有現股」新增或對接券商匯入持股時，交易日記將自動連動呈現！")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(filteredJournals) { item in
+                            HStack(spacing: 12) {
+                                // 橘色「買」/ 綠色「賣」圓形 Badge
+                                Text(item.type.rawValue)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color(hex: item.type.badgeColorHex))
+                                    .clipShape(Circle())
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text(item.dateString)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        if !item.note.isEmpty {
+                                            Text(item.note)
+                                                .font(.caption2)
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color(.systemGray5))
+                                                .cornerRadius(4)
+                                        }
+                                    }
+                                    HStack(spacing: 6) {
+                                        Text(item.symbol)
+                                            .font(.subheadline.bold())
+                                        Text(item.name)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
                                 }
-                                HStack(spacing: 6) {
-                                    Text(item.symbol)
-                                        .font(.subheadline.bold())
-                                    Text(item.name)
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("$\(Int(item.totalAmount).formatted())")
+                                        .font(.headline.bold())
+                                    Text("$\(String(format: "%.2f", item.price)) · \(item.lotsText)")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("$\(Int(item.totalAmount).formatted())")
-                                    .font(.headline.bold())
-                                Text("$\(String(format: "%.2f", item.price)) · \(item.lotsText)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        .onDelete(perform: deleteJournal)
                     }
-                    .onDelete(perform: deleteJournal)
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
             }
             .navigationTitle("日記管理")
             .navigationBarTitleDisplayMode(.inline)
@@ -838,85 +881,113 @@ struct DataBackupSheet: View {
 }
 
 // MARK: ==========================================
-// MARK: 模組 3: 股息歷程時間軸 (對應截圖 3)
+// MARK: 模組 3: 股息歷程時間軸 (連動真實持股)
 // MARK: ==========================================
 
 struct DividendTimelineView: View {
-    let monthlySummaries: [MonthlyTimelineSummary] = StorageService.shared.getMonthlyTimelineSummaries()
+    @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
+    @State private var monthlySummaries: [MonthlyTimelineSummary] = []
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    ForEach(Array(monthlySummaries.enumerated()), id: \.element.id) { index, item in
-                        HStack(alignment: .top, spacing: 14) {
-                            // 左側垂直時間軸線條與節點
-                            VStack(spacing: 0) {
-                                Circle()
-                                    .fill(Color(hex: "#007AFF"))
-                                    .frame(width: 12, height: 12)
-                                    .padding(.top, 4)
-                                
-                                if index < monthlySummaries.count - 1 {
-                                    Rectangle()
-                                        .fill(Color(hex: "#007AFF").opacity(0.3))
-                                        .frame(width: 2)
-                                        .frame(maxHeight: .infinity)
+            Group {
+                if monthlySummaries.isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "chart.line.downtrend.xyaxis")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("尚未建立或匯入持股資料")
+                            .font(.headline)
+                        Text("只要在「持有現股」新增或對接券商匯入持股，系統將自動為您連動推算每月的股息累積與資產成長歷程時間軸！")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        Spacer()
+                    }
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(monthlySummaries.enumerated()), id: \.element.id) { index, item in
+                                HStack(alignment: .top, spacing: 14) {
+                                    // 左側垂直時間軸線條與節點
+                                    VStack(spacing: 0) {
+                                        Circle()
+                                            .fill(Color(hex: "#007AFF"))
+                                            .frame(width: 12, height: 12)
+                                            .padding(.top, 4)
+                                        
+                                        if index < monthlySummaries.count - 1 {
+                                            Rectangle()
+                                                .fill(Color(hex: "#007AFF").opacity(0.3))
+                                                .frame(width: 2)
+                                                .frame(maxHeight: .infinity)
+                                        }
+                                    }
+                                    
+                                    // 右側月份數據卡片 (對應截圖 3)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text(item.monthKey)
+                                            .font(.headline.bold())
+                                        
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("總價值").font(.caption).foregroundColor(.secondary)
+                                                Text("$\(Int(item.totalMarketValue).formatted())").font(.subheadline.bold())
+                                            }
+                                            Spacer()
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text("總成本").font(.caption).foregroundColor(.secondary)
+                                                Text("$\(Int(item.totalCost).formatted())").font(.subheadline.bold())
+                                            }
+                                        }
+                                        
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("價差獲利").font(.caption).foregroundColor(.secondary)
+                                                Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
+                                                    .font(.subheadline.bold())
+                                                    .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                            }
+                                            Spacer()
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text("手續費").font(.caption).foregroundColor(.secondary)
+                                                Text("$\(Int(item.totalFee).formatted())").font(.subheadline.bold())
+                                            }
+                                        }
+                                        
+                                        Divider()
+                                        
+                                        HStack {
+                                            Text("當月股息")
+                                                .font(.subheadline.bold())
+                                            Spacer()
+                                            Text("$\(Int(item.monthDividend).formatted())")
+                                                .font(.title3.bold())
+                                                .foregroundColor(Color(hex: "#007AFF"))
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(Color(.secondarySystemBackground))
+                                    .cornerRadius(14)
+                                    .padding(.bottom, 16)
                                 }
                             }
-                            
-                            // 右側月份數據卡片 (對應截圖 3)
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(item.monthKey)
-                                    .font(.headline.bold())
-                                
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("總價值").font(.caption).foregroundColor(.secondary)
-                                        Text("$\(Int(item.totalMarketValue).formatted())").font(.subheadline.bold())
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("總成本").font(.caption).foregroundColor(.secondary)
-                                        Text("$\(Int(item.totalCost).formatted())").font(.subheadline.bold())
-                                    }
-                                }
-                                
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("價差獲利").font(.caption).foregroundColor(.secondary)
-                                        Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("手續費").font(.caption).foregroundColor(.secondary)
-                                        Text("$\(Int(item.totalFee).formatted())").font(.subheadline.bold())
-                                    }
-                                }
-                                
-                                Divider()
-                                
-                                HStack {
-                                    Text("當月股息")
-                                        .font(.subheadline.bold())
-                                    Spacer()
-                                    Text("$\(Int(item.monthDividend).formatted())")
-                                        .font(.title3.bold())
-                                        .foregroundColor(Color(hex: "#007AFF"))
-                                }
-                            }
-                            .padding(14)
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(14)
-                            .padding(.bottom, 16)
                         }
+                        .padding()
                     }
                 }
-                .padding()
             }
             .navigationTitle("股息歷程")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                holdings = StorageService.shared.loadHoldings()
+                monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
+            }
+        }
+    }
+}
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -1113,27 +1184,63 @@ struct HoldingsListView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(filteredHoldings) { item in
-                    StockHoldingRowView(
-                        item: item,
-                        isExpanded: expandedSymbols.contains(item.symbol),
-                        onToggleExpand: {
-                            if expandedSymbols.contains(item.symbol) {
-                                expandedSymbols.remove(item.symbol)
-                            } else {
-                                expandedSymbols.insert(item.symbol)
+            Group {
+                if holdings.isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "briefcase")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("尚未建立或匯入持股")
+                            .font(.headline)
+                        Text("APP 僅會顯示您自己匯入的持股資料。\n您可以點擊下方按鈕對接券商/匯入對帳單，或點擊右上角「➕」新增！")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button {
+                            isShowingBrokerageSync = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "building.columns.fill")
+                                Text("對接券商 / 匯入對帳單")
                             }
-                        },
-                        onEdit: { holdingToEdit = item },
-                        onShowDetail: { selectedHoldingForDetail = item },
-                        onDelete: { holdingToDelete = item }
-                    )
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#007AFF"))
+                            .cornerRadius(12)
+                        }
+                        .padding(.top, 8)
+                        
+                        Spacer()
+                    }
+                } else {
+                    List {
+                        ForEach(filteredHoldings) { item in
+                            StockHoldingRowView(
+                                item: item,
+                                isExpanded: expandedSymbols.contains(item.symbol),
+                                onToggleExpand: {
+                                    if expandedSymbols.contains(item.symbol) {
+                                        expandedSymbols.remove(item.symbol)
+                                    } else {
+                                        expandedSymbols.insert(item.symbol)
+                                    }
+                                },
+                                onEdit: { holdingToEdit = item },
+                                onShowDetail: { selectedHoldingForDetail = item },
+                                onDelete: { holdingToDelete = item }
+                            )
+                        }
+                        .onDelete(perform: deleteHolding)
+                    }
+                    .listStyle(.insetGrouped)
+                    .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
                 }
-                .onDelete(perform: deleteHolding)
             }
-            .listStyle(.insetGrouped)
-            .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
             .refreshable {
                 await refreshQuotes()
             }
@@ -1445,7 +1552,6 @@ struct HoldingDividendDetailView: View {
 // MARK: ==========================================
 
 struct DividendCalendarTabView: View {
-    @State private var selectedMode: Int = 0 // 0: 日曆顯示, 1: 行事曆倒數
     @State private var events: [DividendEvent] = StorageService.shared.loadEvents()
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
     @State private var selectedCategory: String = "全部"
@@ -1455,10 +1561,6 @@ struct DividendCalendarTabView: View {
     @State private var showNotificationToast = false
     @State private var syncAlertMessage = ""
     @State private var showSyncAlert = false
-    
-    // 目前選取的日期與月份
-    @State private var selectedCalendarDate: Date = Date()
-    @State private var currentCalendarMonth: Date = Date()
     
     var heldSymbols: Set<String> {
         Set(holdings.map { $0.symbol })
@@ -1521,16 +1623,7 @@ struct DividendCalendarTabView: View {
                 .padding(.vertical, 8)
                 .background(Color(.secondarySystemBackground))
                 
-                // 2. 模式切換 Switch (日曆顯示 vs 倒數日)
-                Picker("顯示模式", selection: $selectedMode) {
-                    Text("日曆顯示").tag(0)
-                    Text("行事曆倒數").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 6)
-                
-                // 3. 重大行事曆分類篩選 Chip
+                // 2. 重大行事曆分類篩選 Chip
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(categoryOptions, id: \.self) { cat in
@@ -1548,24 +1641,14 @@ struct DividendCalendarTabView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 6)
+                    .padding(.vertical, 8)
                 }
                 
-                if selectedMode == 0 {
-                    // 模式 A: 互動式月曆顯示 (月曆 Grid + 當日/當月重大行事曆)
-                    TaiwanStockCalendarMonthView(
-                        events: filteredEvents,
-                        heldSymbols: heldSymbols,
-                        selectedDate: $selectedCalendarDate,
-                        currentMonth: $currentCalendarMonth
-                    )
-                } else {
-                    // 模式 B: 倒數日 (按剩餘天數精準排序之重大行事曆清單)
-                    TaiwanStockCountdownListView(
-                        events: filteredEvents,
-                        heldSymbols: heldSymbols
-                    )
-                }
+                // 3. 重大行事曆清單 (依剩餘天數倒數排序)
+                TaiwanStockCountdownListView(
+                    events: filteredEvents,
+                    heldSymbols: heldSymbols
+                )
             }
             .navigationTitle("台股日曆")
             .navigationBarTitleDisplayMode(.inline)
@@ -1616,7 +1699,7 @@ struct DividendCalendarTabView: View {
     }
 }
 
-// 倒數日清單視圖
+// 重大行事曆倒數清單視圖
 struct TaiwanStockCountdownListView: View {
     let events: [DividendEvent]
     let heldSymbols: Set<String>
@@ -1626,12 +1709,32 @@ struct TaiwanStockCountdownListView: View {
     }
     
     var body: some View {
-        List {
-            ForEach(sortedEvents) { event in
-                StockEventRowView(event: event, isHeld: heldSymbols.contains(event.symbol))
+        Group {
+            if sortedEvents.isEmpty {
+                VStack(spacing: 14) {
+                    Spacer()
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 46))
+                        .foregroundColor(.secondary)
+                    Text("目前無符合條件之重大行事曆")
+                        .font(.headline)
+                    Text("點擊左上方「同步現股」可自動載入持有個股之最新法說會、股東常會與除權息日程！")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(sortedEvents) { event in
+                        StockEventRowView(event: event, isHeld: heldSymbols.contains(event.symbol))
+                    }
+                }
+                .listStyle(.insetGrouped)
             }
         }
-        .listStyle(.insetGrouped)
     }
 }
 
@@ -2419,6 +2522,8 @@ struct BrokerageSyncSheet: View {
     @State private var apiKey: String = ""
     @State private var secretKey: String = ""
     @State private var certPath: String = ""
+    @State private var isShowingCertPicker = false
+    @State private var selectedCertFileName = ""
     @State private var isConnectingShioaji = false
     @State private var shioajiStatusMessage = ""
     
@@ -2577,8 +2682,38 @@ struct BrokerageSyncSheet: View {
                                     .textFieldStyle(.roundedBorder)
                                 SecureField("Secret Key", text: $secretKey)
                                     .textFieldStyle(.roundedBorder)
-                                TextField("憑證路徑 / 檔案 (選填)", text: $certPath)
-                                    .textFieldStyle(.roundedBorder)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 8) {
+                                        TextField("CA 憑證路徑 / 檔案 (選填)", text: $certPath)
+                                            .textFieldStyle(.roundedBorder)
+                                        
+                                        Button {
+                                            isShowingCertPicker = true
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "folder.badge.plus")
+                                                Text("選擇檔案")
+                                            }
+                                            .font(.system(size: 13, weight: .bold))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 8)
+                                            .background(Color(hex: "#007AFF"))
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                        }
+                                    }
+                                    
+                                    if !selectedCertFileName.isEmpty {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(Color(hex: "#34C759"))
+                                            Text("已載入憑證：\(selectedCertFileName)")
+                                                .font(.caption2.bold())
+                                                .foregroundColor(Color(hex: "#34C759"))
+                                        }
+                                    }
+                                }
                             }
                             
                             if !shioajiStatusMessage.isEmpty {
@@ -2631,6 +2766,28 @@ struct BrokerageSyncSheet: View {
                 Button("好") { dismiss() }
             } message: {
                 Text("已成功解析並同步 \(parseResultCount ?? 0) 筆持股至「持有現股」！")
+            }
+            .fileImporter(
+                isPresented: $isShowingCertPicker,
+                allowedContentTypes: [.item, .data]
+            ) { result in
+                switch result {
+                case .success(let url):
+                    let fileName = url.lastPathComponent
+                    if url.startAccessingSecurityScopedResource() {
+                        defer { url.stopAccessingSecurityScopedResource() }
+                        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                        try? FileManager.default.removeItem(at: dest)
+                        try? FileManager.default.copyItem(at: url, to: dest)
+                        certPath = dest.path
+                    } else {
+                        certPath = fileName
+                    }
+                    selectedCertFileName = fileName
+                    shioajiStatusMessage = "✅ 成功匯入 CA 憑證：\(fileName)"
+                case .failure(let error):
+                    shioajiStatusMessage = "選取憑證失敗：\(error.localizedDescription)"
+                }
             }
         }
     }
