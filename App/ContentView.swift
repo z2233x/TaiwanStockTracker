@@ -988,10 +988,6 @@ struct DividendTimelineView: View {
         }
     }
 }
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
 
 // MARK: ==========================================
 // MARK: 模組 4: 持有現股 + 股息明細 (對應截圖 4)
