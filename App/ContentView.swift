@@ -1470,6 +1470,8 @@ struct AddHoldingSheet: View {
     @Environment(\.dismiss) var dismiss
     var onSave: (StockHolding, Bool) -> Void // (holding, isDCA)
     
+    @State private var searchQuery = ""
+    @State private var searchResults: [StockMetaItem] = []
     @State private var symbol = ""
     @State private var name = ""
     @State private var frequency: FrequencyType = .quarterly
@@ -1487,7 +1489,74 @@ struct AddHoldingSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                // 熱門標的快速選取 Chip 列
+                // 1. 全台股 2,400+ 檔即時模糊搜尋列
+                Section("搜尋全台股標的 (2,400+ 檔上市/上櫃/全部ETF)") {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("輸入代號或名稱 (例: 2330, 台積電, 00929, 3293)", text: $searchQuery)
+                            .onChange(of: searchQuery) { q in
+                                searchResults = TaiwanStockDatabase.shared.search(keyword: q, limit: 8)
+                            }
+                        if !searchQuery.isEmpty {
+                            Button {
+                                searchQuery = ""
+                                searchResults = []
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    if !searchResults.isEmpty {
+                        ForEach(searchResults) { stock in
+                            Button {
+                                selectStock(stock)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(stock.symbol)
+                                                .font(.headline.bold())
+                                                .foregroundColor(.primary)
+                                            Text(stock.market)
+                                                .font(.caption2.bold())
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color(.systemGray5))
+                                                .cornerRadius(4)
+                                            Text(stock.frequency.rawValue)
+                                                .font(.caption2.bold())
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color(hex: stock.frequency.badgeColorHex).opacity(0.15))
+                                                .foregroundColor(Color(hex: stock.frequency.badgeColorHex))
+                                                .cornerRadius(4)
+                                        }
+                                        Text(stock.name)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    if stock.referencePrice > 0 {
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text("$\(String(format: "%.2f", stock.referencePrice))")
+                                                .font(.subheadline.bold())
+                                                .foregroundColor(.primary)
+                                            Text("參考收盤價")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                }
+                
+                // 2. 熱門標的快速選取 Chip 列
                 Section("熱門台股 / 高股息 ETF 快速選取") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -1591,6 +1660,18 @@ struct AddHoldingSheet: View {
                 }
             }
         }
+    }
+    
+    private func selectStock(_ stock: StockMetaItem) {
+        symbol = stock.symbol
+        name = stock.name
+        frequency = stock.frequency
+        stockType = stock.stockType
+        if cost.isEmpty || cost == "0" || cost == "0.0" {
+            cost = String(format: "%.2f", stock.referencePrice)
+        }
+        searchQuery = ""
+        searchResults = []
     }
 }
 

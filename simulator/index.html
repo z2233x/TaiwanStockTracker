@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>台股績效監控 - iOS 桌面即時模擬器</title>
+<script src="taiwan_stocks.js"></script>
 <style>
   :root {
     --ios-blue: #007AFF;
@@ -331,6 +332,10 @@
     
     <button class="sim-btn" onclick="openAddHoldingSheet()">
       ➕ 測試新增/加碼存股
+    </button>
+
+    <button class="sim-btn" onclick="openStockDatabaseModal()">
+      🔍 瀏覽全台股資料庫 (2,409 檔)
     </button>
 
     <button class="sim-btn" onclick="refreshQuotesSim()">
@@ -927,6 +932,12 @@
       </div>
 
       <div class="form-group">
+        <label>🔍 搜尋全台股標的 (2,400+ 檔上市/上櫃/全部ETF)</label>
+        <input class="form-input" id="searchStockInput" placeholder="輸入代號或名稱 (例: 2330, 台積, 00929, 3293)" oninput="searchTaiwanStocks(this.value)">
+        <div id="searchResultsBox" style="max-height: 180px; overflow-y: auto; background: #F2F2F7; border-radius: 8px; margin-top: 4px; display: none;"></div>
+      </div>
+
+      <div class="form-group">
         <label>熱門標的快速選取</label>
         <div class="chip-group">
           ${presets.map(p => `
@@ -973,8 +984,83 @@
   function selectPreset(sym, name, freq, price) {
     document.getElementById('newSymbol').value = sym;
     document.getElementById('newName').value = name;
-    document.getElementById('newFreq').value = freq;
-    document.getElementById('newPrice').value = price;
+    if (document.getElementById('newFreq')) document.getElementById('newFreq').value = freq;
+    if (document.getElementById('newPrice')) document.getElementById('newPrice').value = price;
+    const box = document.getElementById('searchResultsBox');
+    if (box) box.style.display = 'none';
+  }
+
+  function searchTaiwanStocks(query) {
+    const box = document.getElementById('searchResultsBox');
+    const clean = query.trim().toUpperCase();
+    if (!clean || typeof allTaiwanStocks === 'undefined') {
+      if (box) box.style.display = 'none';
+      return;
+    }
+    const matches = allTaiwanStocks.filter(s => s.symbol.includes(clean) || s.name.toUpperCase().includes(clean)).slice(0, 10);
+    if (matches.length === 0) {
+      box.style.display = 'block';
+      box.innerHTML = '<div style="padding: 8px 12px; font-size: 12px; color: #8E8E93;">查無相符台股標的</div>';
+      return;
+    }
+    box.style.display = 'block';
+    box.innerHTML = matches.map(s => `
+      <div style="padding: 8px 12px; border-bottom: 1px solid #E5E5EA; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="selectPreset('${s.symbol}', '${s.name}', '${s.frequency}', ${s.referencePrice})">
+        <div>
+          <span style="font-weight: 700; font-size: 13px;">${s.symbol}</span>
+          <span style="font-size: 10px; background: #E5E5EA; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">${s.market}</span>
+          <span style="font-size: 10px; background: rgba(0,122,255,0.15); color: var(--ios-blue); padding: 1px 4px; border-radius: 4px; margin-left: 4px;">${s.frequency}</span>
+          <div style="font-size: 12px; color: #555;">${s.name}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-weight: 700; font-size: 13px;">$${s.referencePrice}</div>
+          <div style="font-size: 10px; color: #8E8E93;">收盤價</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openStockDatabaseModal() {
+    if (typeof allTaiwanStocks === 'undefined') {
+      alert('台股資料庫載入中...');
+      return;
+    }
+    openSheet(`
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px;">台股全資料庫 (${allTaiwanStocks.length} 檔)</h3>
+        <button class="nav-btn" onclick="closeSheet()">關閉</button>
+      </div>
+      <input class="form-input" id="modalStockSearch" placeholder="🔍 搜尋 2,400+ 檔股票 (如 2330, 00929, 聯發科)" oninput="filterModalStocks(this.value)">
+      <div id="modalStocksList" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
+        ${renderModalStockItems(allTaiwanStocks.slice(0, 30))}
+      </div>
+    `);
+  }
+
+  function filterModalStocks(q) {
+    const clean = q.trim().toUpperCase();
+    const list = clean ? allTaiwanStocks.filter(s => s.symbol.includes(clean) || s.name.toUpperCase().includes(clean)).slice(0, 30) : allTaiwanStocks.slice(0, 30);
+    document.getElementById('modalStocksList').innerHTML = renderModalStockItems(list);
+  }
+
+  function renderModalStockItems(items) {
+    return items.map(s => `
+      <div style="padding: 10px 12px; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="closeSheet(); openAddHoldingSheet('${s.symbol}')">
+        <div>
+          <span style="font-weight: 700; font-size: 14px;">${s.symbol}</span>
+          <span style="font-size: 10px; background: #E5E5EA; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">${s.market}</span>
+          <span style="font-size: 10px; background: rgba(0,122,255,0.15); color: var(--ios-blue); padding: 1px 4px; border-radius: 4px; margin-left: 4px;">${s.frequency}</span>
+          <div style="font-size: 12px; color: #555;">${s.name}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="text-align: right;">
+            <div style="font-weight: 700; font-size: 14px;">$${s.referencePrice}</div>
+            <div style="font-size: 10px; color: #8E8E93;">收盤價</div>
+          </div>
+          <button class="sim-btn primary" style="padding: 4px 8px; font-size: 11px;">存股</button>
+        </div>
+      </div>
+    `).join('');
   }
 
   function saveNewHolding() {
