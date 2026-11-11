@@ -462,7 +462,7 @@ public final class StorageService {
         // 1. 找出每檔持股的最早買進日期 (若有日記買進紀錄優先取日記，否則取 updatedAt)
         var holdingPurchaseDates: [String: Date] = [:]
         for h in activeHoldings {
-            let buyJournals = journals.filter { $0.symbol == h.symbol && $0.action == .buy }
+            let buyJournals = journals.filter { $0.symbol == h.symbol && $0.type == .buy }
             if let earliestJournal = buyJournals.map({ $0.date }).min() {
                 holdingPurchaseDates[h.symbol] = earliestJournal
             } else {
