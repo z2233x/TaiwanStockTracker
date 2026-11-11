@@ -1192,12 +1192,20 @@ struct DataBackupSheet: View {
 }
 
 // MARK: ==========================================
-// MARK: 模組 3: 股息歷程時間軸 (連動真實持股)
+// MARK: 模組 3: 股息歷程時間軸 (連動真實持股、買入後起算配息、滑動刪除與配息加總)
 // MARK: ==========================================
 
 struct DividendTimelineView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
     @State private var monthlySummaries: [MonthlyTimelineSummary] = []
+    
+    var totalDividendsSum: Double {
+        monthlySummaries.reduce(0.0) { $0 + $1.monthDividend }
+    }
+    
+    var averageMonthlyDividend: Double {
+        monthlySummaries.isEmpty ? 0 : (totalDividendsSum / Double(monthlySummaries.count))
+    }
     
     var body: some View {
         NavigationStack {
@@ -1210,7 +1218,7 @@ struct DividendTimelineView: View {
                             .foregroundColor(.secondary)
                         Text("尚未建立或匯入持股資料")
                             .font(.headline)
-                        Text("只要在「持有現股」新增或對接券商匯入持股，系統將自動為您連動推算每月的股息累積與資產成長歷程時間軸！")
+                        Text("只要在「持有現股」新增或對接券商匯入持股，系統將自動依據持股買入月份起算配息與資產歷程！")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -1218,11 +1226,61 @@ struct DividendTimelineView: View {
                         Spacer()
                     }
                 } else {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
+                    List {
+                        // 1. 頂部配息加總統計卡片
+                        Section {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("歷程累計配息總額")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.white.opacity(0.85))
+                                        Text("$\(Int(totalDividendsSum).formatted())")
+                                            .font(.system(size: 32, weight: .heavy, design: .rounded))
+                                            .foregroundColor(.white)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 3) {
+                                        Text("平均月配息")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.85))
+                                        Text("$\(Int(averageMonthlyDividend).formatted()) /月")
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                
+                                Divider().background(Color.white.opacity(0.3))
+                                
+                                HStack {
+                                    Label("\(monthlySummaries.count) 個月份紀錄", systemImage: "calendar.badge.clock")
+                                        .font(.caption2.bold())
+                                        .foregroundColor(.white.opacity(0.9))
+                                    Spacer()
+                                    Text("💡 依各標的買入月份起算配息・左滑可刪除")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                            .padding(16)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "#007AFF"), Color(hex: "#5856D6")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+                        
+                        // 2. 時間軸月份卡片清單 (支援向左滑動刪除)
+                        Section {
                             ForEach(Array(monthlySummaries.enumerated()), id: \.element.id) { index, item in
-                                HStack(alignment: .top, spacing: 14) {
-                                    // 左側垂直時間軸線條與節點
+                                HStack(alignment: .top, spacing: 12) {
+                                    // 左側垂直時間軸節點與線條
                                     VStack(spacing: 0) {
                                         Circle()
                                             .fill(Color(hex: "#007AFF"))
@@ -1231,71 +1289,123 @@ struct DividendTimelineView: View {
                                         
                                         if index < monthlySummaries.count - 1 {
                                             Rectangle()
-                                                .fill(Color(hex: "#007AFF").opacity(0.3))
+                                                .fill(Color(hex: "#007AFF").opacity(0.25))
                                                 .frame(width: 2)
                                                 .frame(maxHeight: .infinity)
                                         }
                                     }
                                     
-                                    // 右側月份數據卡片 (對應截圖 3)
+                                    // 右側月份數據卡片
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Text(item.monthKey)
-                                            .font(.headline.bold())
-                                        
                                         HStack {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("總價值").font(.caption).foregroundColor(.secondary)
-                                                Text("$\(Int(item.totalMarketValue).formatted())").font(.subheadline.bold())
-                                            }
+                                            Text(item.monthKey)
+                                                .font(.headline.bold())
                                             Spacer()
-                                            VStack(alignment: .trailing, spacing: 2) {
-                                                Text("總成本").font(.caption).foregroundColor(.secondary)
-                                                Text("$\(Int(item.totalCost).formatted())").font(.subheadline.bold())
+                                            if item.cumulativeDividend > 0 {
+                                                Text("累計 $\(Int(item.cumulativeDividend).formatted())")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.green.opacity(0.12))
+                                                    .foregroundColor(.green)
+                                                    .cornerRadius(6)
                                             }
                                         }
                                         
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("價差獲利").font(.caption).foregroundColor(.secondary)
-                                                Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
-                                                    .font(.subheadline.bold())
-                                                    .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
-                                            }
-                                            Spacer()
-                                            VStack(alignment: .trailing, spacing: 2) {
-                                                Text("手續費").font(.caption).foregroundColor(.secondary)
-                                                Text("$\(Int(item.totalFee).formatted())").font(.subheadline.bold())
-                                            }
-                                        }
-                                        
-                                        Divider()
-                                        
-                                        HStack {
-                                            Text("當月股息")
+                                        // 當月配息重點展示
+                                        HStack(alignment: .firstTextBaseline) {
+                                            Text("當月配息")
                                                 .font(.subheadline.bold())
+                                                .foregroundColor(.secondary)
                                             Spacer()
                                             Text("$\(Int(item.monthDividend).formatted())")
-                                                .font(.title3.bold())
+                                                .font(.title2.bold())
                                                 .foregroundColor(Color(hex: "#007AFF"))
+                                        }
+                                        .padding(.vertical, 2)
+                                        
+                                        // 買入後生效計息之持股標籤
+                                        if !item.activeSymbols.isEmpty {
+                                            HStack(spacing: 4) {
+                                                Text("計息標的:")
+                                                    .font(.caption2.bold())
+                                                    .foregroundColor(.secondary)
+                                                Text(item.activeSymbols.joined(separator: ", "))
+                                                    .font(.caption2.bold())
+                                                    .foregroundColor(Color(hex: "#5856D6"))
+                                                Text("(\(item.activeHoldingCount)檔)")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        
+                                        Divider().padding(.vertical, 1)
+                                        
+                                        // 資產指標網格
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("總價值").font(.caption2).foregroundColor(.secondary)
+                                                Text("$\(Int(item.totalMarketValue).formatted())").font(.caption.bold())
+                                            }
+                                            Spacer()
+                                            VStack(alignment: .center, spacing: 2) {
+                                                Text("總成本").font(.caption2).foregroundColor(.secondary)
+                                                Text("$\(Int(item.totalCost).formatted())").font(.caption.bold())
+                                            }
+                                            Spacer()
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text("價差獲利").font(.caption2).foregroundColor(.secondary)
+                                                Text("\(item.priceGainProfit >= 0 ? "+" : "")$\(Int(item.priceGainProfit).formatted())")
+                                                    .font(.caption.bold())
+                                                    .foregroundColor(item.priceGainProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                                            }
                                         }
                                     }
                                     .padding(14)
                                     .background(Color(.secondarySystemBackground))
                                     .cornerRadius(14)
-                                    .padding(.bottom, 16)
+                                    .padding(.bottom, 8)
+                                }
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        deleteMonthSummary(item.monthKey)
+                                    } label: {
+                                        Label("刪除", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
-                        .padding()
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("股息歷程")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        StorageService.shared.resetDeletedTimelineMonths()
+                        monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption.bold())
+                    }
+                }
+            }
             .onAppear {
                 holdings = StorageService.shared.loadHoldings()
                 monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
             }
+        }
+    }
+    
+    private func deleteMonthSummary(_ monthKey: String) {
+        StorageService.shared.saveDeletedTimelineMonthKey(monthKey)
+        withAnimation {
+            monthlySummaries.removeAll { $0.monthKey == monthKey }
         }
     }
 }

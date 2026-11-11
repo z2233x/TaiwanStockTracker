@@ -523,6 +523,7 @@
   let isShowingSourceDetails = false;
   let currentTab = 2; // 預設第 3 個：投資總覽
   let expandedHoldings = new Set();
+  let deletedTimelineMonths = new Set(JSON.parse(localStorage.getItem('twstock_deleted_timeline_months')) || []);
 
   function saveState() {
     localStorage.setItem('twstock_user_holdings_v4', JSON.stringify(holdings));
@@ -1269,6 +1270,160 @@
   }
 
   // ==================== 模組 5: 股息歷程 (連動真實持有現股) ====================
+  
+  // ==================== 股息歷程：買入後起算配息、滑動刪除與加總 ====================
+  function getMonthlyTimelineData() {
+    if (!holdings || holdings.length === 0) return [];
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+
+    // 取得每檔標的最早買進時間 (若無則預設為當前時間或月初)
+    const holdingDates = holdings.map(h => {
+      let d = h.purchaseDate || h.createdAt || h.updatedAt;
+      if (!d) d = new Date().toISOString();
+      const pDate = new Date(d);
+      return {
+        holding: h,
+        purchaseDate: isNaN(pDate.getTime()) ? new Date() : pDate
+      };
+    });
+
+    // 找出所有標的最早買進日期
+    let earliestDate = now;
+    holdingDates.forEach(item => {
+      if (item.purchaseDate < earliestDate) earliestDate = item.purchaseDate;
+    });
+
+    const earliestYear = earliestDate.getFullYear();
+    const earliestMonth = earliestDate.getMonth() + 1;
+
+    // 計算月份跨度 (最多回溯 12 個月，至少當前月 1 個月)
+    const monthDiff = (currentYear - earliestYear) * 12 + (currentMonth - earliestMonth);
+    const totalMonths = Math.max(1, Math.min(12, monthDiff + 1));
+
+    let rawList = [];
+    let runningCumulative = 0;
+
+    // 從歷史最早月份依序往當前月份推算 (以利正確累計加總)
+    for (let offset = totalMonths - 1; offset >= 0; offset--) {
+      let targetM = currentMonth - offset;
+      let targetY = currentYear;
+      while (targetM <= 0) {
+        targetM += 12;
+        targetY -= 1;
+      }
+
+      const monthTitle = `${targetY}年 ${String(targetM).padStart(2, '0')}月`;
+      // 當月結束日 (次月 0 號 23:59:59)
+      const monthEnd = new Date(targetY, targetM, 0, 23, 59, 59);
+
+      // 【核心邏輯】：僅篩選出「買入日期 <= 該月結束日」之已買入持股！
+      const activeHoldingsInMonth = holdingDates
+        .filter(item => item.purchaseDate <= monthEnd)
+        .map(item => item.holding);
+
+      // 若該月份尚未買入任何持股，則跳過 (不顯示無持股月份)
+      if (activeHoldingsInMonth.length === 0) continue;
+
+      // 依 DividendSource 智慧推算當月已買入標的之配息
+      let monthDiv = 0;
+      activeHoldingsInMonth.forEach(h => {
+        const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
+        const monthly = (h.shares * h.currentPrice * p.yield) / 12;
+        monthDiv += monthly;
+      });
+      monthDiv = Math.round(monthDiv);
+      runningCumulative += monthDiv;
+
+      const mVal = activeHoldingsInMonth.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
+      const mCost = activeHoldingsInMonth.reduce((s, h) => s + (h.shares * h.averageCost), 0);
+      const mProfit = mVal - mCost;
+
+      rawList.push({
+        month: monthTitle,
+        value: Math.round(mVal),
+        cost: Math.round(mCost),
+        profit: Math.round(mProfit),
+        div: monthDiv,
+        cumulativeDiv: runningCumulative,
+        activeSymbols: activeHoldingsInMonth.map(h => h.symbol),
+        activeCount: activeHoldingsInMonth.length
+      });
+    }
+
+    // 依月份新到舊排序 (近月排前面)
+    let result = rawList.reverse();
+
+    // 排除使用者滑動刪除之月份
+    result = result.filter(item => !deletedTimelineMonths.has(item.month));
+    return result;
+  }
+
+  function deleteTimelineMonth(monthTitle) {
+    deletedTimelineMonths.add(monthTitle);
+    localStorage.setItem('twstock_deleted_timeline_months', JSON.stringify([...deletedTimelineMonths]));
+    renderApp();
+  }
+
+  function resetDeletedTimelineMonths() {
+    deletedTimelineMonths.clear();
+    localStorage.removeItem('twstock_deleted_timeline_months');
+    renderApp();
+  }
+
+  let timelineSwipeId = null;
+  let timelineSwipeStartX = 0;
+  let isTimelineSwiping = false;
+
+  function handleTimelineSwipeStart(e, id) {
+    timelineSwipeId = id;
+    timelineSwipeStartX = e.touches ? e.touches[0].clientX : e.clientX;
+    isTimelineSwiping = true;
+    const card = document.getElementById(`timeline-card-${id}`);
+    if (card) card.style.transition = 'none';
+  }
+
+  function handleTimelineSwipeMove(e, id) {
+    if (!isTimelineSwiping || timelineSwipeId !== id) return;
+    const currentX = e.touches ? e.touches[0].clientX : e.clientX;
+    const diff = currentX - timelineSwipeStartX;
+    const card = document.getElementById(`timeline-card-${id}`);
+    if (card) {
+      if (diff < 0) {
+        card.style.transform = `translateX(${Math.max(diff, -75)}px)`;
+      } else {
+        card.style.transform = 'translateX(0px)';
+      }
+    }
+  }
+
+  function handleTimelineSwipeEnd(e, id) {
+    if (!isTimelineSwiping || timelineSwipeId !== id) return;
+    isTimelineSwiping = false;
+    const currentX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : e.clientX;
+    const diff = currentX - timelineSwipeStartX;
+    const card = document.getElementById(`timeline-card-${id}`);
+    if (card) {
+      card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      if (diff < -35) {
+        card.style.transform = 'translateX(-75px)';
+      } else {
+        card.style.transform = 'translateX(0px)';
+      }
+    }
+  }
+
+  function toggleTimelineSwipe(id) {
+    const card = document.getElementById(`timeline-card-${id}`);
+    if (card) {
+      card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      const isSwiped = card.style.transform.includes('-75px');
+      card.style.transform = isSwiped ? 'translateX(0px)' : 'translateX(-75px)';
+    }
+  }
+
   function renderTimelineTab() {
     if (holdings.length === 0) {
       return `
@@ -1279,9 +1434,9 @@
         </div>
         <div style="padding: 40px 16px; text-align: center;">
           <div style="font-size: 44px; margin-bottom: 12px;">📈</div>
-          <div style="font-size: 16px; font-weight: 800; color: #1C1C1E; margin-bottom: 6px;">尚無股息累積紀錄</div>
+          <div style="font-size: 16px; font-weight: 800; color: #1C1C1E; margin-bottom: 6px;">尚未建立持股資料</div>
           <div style="font-size: 12px; color: #8E8E93; line-height: 1.5; margin-bottom: 20px;">
-            股息歷程已完全連動真實持有現股。<br>請先至「持有現股」匯入或手動建立持股資料。
+            股息歷程依持股買入月份起算。<br>請先至「持有現股」匯入或手動建立持股資料。
           </div>
           <button class="sim-btn" style="background: var(--ios-blue); color: #FFF; font-weight: 700; margin: 0 auto; padding: 10px 20px;" onclick="switchTab(1)">
             前往建立持股
@@ -1290,48 +1445,111 @@
       `;
     }
 
-    const totalVal = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
-    const totalCost = holdings.reduce((s, h) => s + (h.shares * h.averageCost), 0);
-    const totalProfit = totalVal - totalCost;
-    const estDiv = Math.round(holdings.reduce((s, h) => s + (h.shares * h.currentPrice * 0.05 / 12), 0));
-
-    const timelines = [
-      { month: '2026年 11月', value: totalVal, cost: totalCost, profit: totalProfit, div: estDiv },
-      { month: '2026年 10月', value: Math.round(totalVal * 0.97), cost: totalCost, profit: Math.round(totalProfit * 0.85), div: estDiv },
-      { month: '2026年 09月', value: Math.round(totalVal * 0.94), cost: Math.round(totalCost * 0.96), profit: Math.round(totalProfit * 0.7), div: Math.round(estDiv * 0.9) },
-      { month: '2026年 08月', value: Math.round(totalVal * 0.91), cost: Math.round(totalCost * 0.92), profit: Math.round(totalProfit * 0.5), div: Math.round(estDiv * 0.85) }
-    ];
+    const timelines = getMonthlyTimelineData();
+    const totalDividendsSum = timelines.reduce((s, t) => s + t.div, 0);
+    const averageMonthly = timelines.length > 0 ? Math.round(totalDividendsSum / timelines.length) : 0;
 
     return `
       <div class="nav-bar">
         <div></div>
         <h1>股息歷程</h1>
-        <div></div>
+        <button class="nav-btn" title="重設恢復所有月份" onclick="resetDeletedTimelineMonths()" style="font-size: 12px;">🔄 重設</button>
       </div>
 
-      <div style="padding: 16px;">
-        ${timelines.map(t => `
-          <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-              <div style="width: 12px; height: 12px; background: var(--ios-blue); border-radius: 50%; margin-top: 4px;"></div>
-              <div style="width: 2px; flex: 1; background: rgba(0,122,255,0.3); margin-top: 4px;"></div>
+      <div style="padding: 12px 16px 20px 16px;">
+        <!-- 頂部歷程累計配息總額加總卡片 -->
+        <div class="card" style="background: linear-gradient(135deg, #007AFF, #5856D6); color: #FFF; padding: 16px; margin-bottom: 14px; border: none;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+            <div>
+              <div style="font-size: 11px; opacity: 0.85; font-weight: 700;">歷程累計配息總額</div>
+              <div style="font-size: 30px; font-weight: 900; letter-spacing: -0.5px;">$\${totalDividendsSum.toLocaleString()}</div>
             </div>
-            <div class="card" style="margin: 0; flex: 1; padding: 12px;">
-              <div style="font-weight: 800; font-size: 14px; margin-bottom: 8px;">${t.month}</div>
-              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                <span>總價值: $${Math.round(t.value).toLocaleString()}</span>
-                <span>總成本: $${Math.round(t.cost).toLocaleString()}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
-                <span>價差獲利: <b style="color:${t.profit>=0?'#FF3B30':'#34C759'};">${t.profit>=0?'+':''}$${Math.round(t.profit).toLocaleString()}</b></span>
-              </div>
-              <div style="border-top: 1px solid #EEE; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 12px; font-weight: 700;">當月股息</span>
-                <span style="font-size: 16px; font-weight: 800; color: var(--ios-blue);">$${t.div.toLocaleString()}</span>
-              </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; opacity: 0.85;">平均月配息</div>
+              <div style="font-size: 16px; font-weight: 800;">$\${averageMonthly.toLocaleString()} <span style="font-size: 10px; font-weight: normal;">/月</span></div>
             </div>
           </div>
-        `).join('')}
+          <div style="border-top: 1px solid rgba(255,255,255,0.25); padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; opacity: 0.9;">
+            <span>📅 ${timelines.length} 個月份紀錄</span>
+            <span>💡 依各標的買入月份起算・左滑可刪除</span>
+          </div>
+        </div>
+
+        <!-- 每月份時間軸卡片 (支援向左滑動刪除) -->
+        ${timelines.length === 0 ? `
+          <div style="text-align: center; padding: 30px; color: #8E8E93;">所有月份紀錄均已刪除，點擊右上角「🔄 重設」可恢復</div>
+        ` : `
+          <div style="display: flex; flex-direction: column;">
+            ${timelines.map((t, idx) => {
+              const rowId = 'month_' + idx;
+              return `
+                <div style="display: flex; gap: 10px;">
+                  <!-- 左側垂直時間軸節點與線條 -->
+                  <div style="display: flex; flex-direction: column; align-items: center; width: 14px;">
+                    <div style="width: 12px; height: 12px; background: var(--ios-blue); border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 2px rgba(0,122,255,0.2);"></div>
+                    ${idx < timelines.length - 1 ? `<div style="width: 2px; flex: 1; background: rgba(0,122,255,0.3); margin-top: 4px;"></div>` : ''}
+                  </div>
+
+                  <!-- 右側滑動卡片容器 (支援向左滑動刪除) -->
+                  <div class="swipe-container" style="flex: 1; position: relative; overflow: hidden; border-radius: 12px; margin-bottom: 12px; background: #FF3B30;">
+                    <!-- 底層紅色刪除按鈕 -->
+                    <div onclick="deleteTimelineMonth('${t.month}')" style="position: absolute; right: 0; top: 0; bottom: 0; width: 75px; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; cursor: pointer; z-index: 1;">
+                      🗑️ 刪除
+                    </div>
+
+                    <!-- 上層月份數據卡片 -->
+                    <div class="card" id="timeline-card-${rowId}" style="margin: 0; padding: 12px; border-radius: 12px; background: #FFF; position: relative; z-index: 2; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); user-select: none;"
+                         ontouchstart="handleTimelineSwipeStart(event, '${rowId}')"
+                         ontouchmove="handleTimelineSwipeMove(event, '${rowId}')"
+                         ontouchend="handleTimelineSwipeEnd(event, '${rowId}')"
+                         onmousedown="handleTimelineSwipeStart(event, '${rowId}')"
+                         onmousemove="handleTimelineSwipeMove(event, '${rowId}')"
+                         onmouseup="handleTimelineSwipeEnd(event, '${rowId}')">
+                      
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-weight: 800; font-size: 14px;">${t.month}</span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          ${t.cumulativeDiv > 0 ? `<span style="background: rgba(52,199,89,0.12); color: #34C759; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px;">累計 $\${t.cumulativeDiv.toLocaleString()}</span>` : ''}
+                          <span title="向左滑動刪除" onclick="event.stopPropagation(); toggleTimelineSwipe('${rowId}')" style="cursor: pointer; color: #C7C7CC; font-size: 18px; padding: 0 4px;">‹</span>
+                        </div>
+                      </div>
+
+                      <!-- 當月配息重點展示 -->
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding: 4px 0;">
+                        <span style="font-size: 12px; font-weight: 700; color: #8E8E93;">當月配息</span>
+                        <span style="font-size: 20px; font-weight: 800; color: var(--ios-blue);">$\${t.div.toLocaleString()}</span>
+                      </div>
+
+                      <!-- 買入後生效計息之持股標籤 -->
+                      ${t.activeSymbols && t.activeSymbols.length > 0 ? `
+                        <div style="font-size: 10px; color: #666; margin-bottom: 8px;">
+                          <span style="color: #8E8E93;">計息標的: </span>
+                          <b style="color: #5856D6;">${t.activeSymbols.join(', ')}</b> (${t.activeCount}檔已買入)
+                        </div>
+                      ` : ''}
+
+                      <div style="border-top: 1px solid #EEE; padding-top: 6px; display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 11px; text-align: center;">
+                        <div>
+                          <div style="color: #8E8E93; font-size: 10px;">總價值</div>
+                          <div style="font-weight: 700;">$\${Math.round(t.value).toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div style="color: #8E8E93; font-size: 10px;">總成本</div>
+                          <div style="font-weight: 700;">$\${Math.round(t.cost).toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div style="color: #8E8E93; font-size: 10px;">價差獲利</div>
+                          <div style="font-weight: 700; color: ${t.profit >= 0 ? '#FF3B30' : '#34C759'};">${t.profit >= 0 ? '+' : ''}$\${Math.round(t.profit).toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
       </div>
     `;
   }

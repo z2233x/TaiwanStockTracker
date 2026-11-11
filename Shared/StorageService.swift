@@ -3,12 +3,15 @@ import WidgetKit
 
 public struct MonthlyTimelineSummary: Identifiable, Codable {
     public var id: String { monthKey }
-    public let monthKey: String          // e.g. "2025年 2月"
+    public let monthKey: String          // e.g. "2026年 11月"
     public let totalMarketValue: Double  // 總價值
     public let totalCost: Double         // 總成本
     public let priceGainProfit: Double   // 價差獲利
     public let totalFee: Double          // 手續費
     public let monthDividend: Double     // 當月股息
+    public let cumulativeDividend: Double // 截至該月累計配息加總
+    public let activeHoldingCount: Int    // 該月份已買入計息持股數
+    public let activeSymbols: [String]    // 該月份已買入計息標的
     
     public init(
         monthKey: String,
@@ -16,7 +19,10 @@ public struct MonthlyTimelineSummary: Identifiable, Codable {
         totalCost: Double,
         priceGainProfit: Double,
         totalFee: Double,
-        monthDividend: Double
+        monthDividend: Double,
+        cumulativeDividend: Double = 0.0,
+        activeHoldingCount: Int = 0,
+        activeSymbols: [String] = []
     ) {
         self.monthKey = monthKey
         self.totalMarketValue = totalMarketValue
@@ -24,6 +30,9 @@ public struct MonthlyTimelineSummary: Identifiable, Codable {
         self.priceGainProfit = priceGainProfit
         self.totalFee = totalFee
         self.monthDividend = monthDividend
+        self.cumulativeDividend = cumulativeDividend
+        self.activeHoldingCount = activeHoldingCount
+        self.activeSymbols = activeSymbols
     }
 }
 
@@ -422,49 +431,118 @@ public final class StorageService {
         return dict
     }
     
-    // MARK: - 股息歷程時間軸數據 (連動使用者真實持股)
+    private let deletedTimelineMonthKeysKey = "deleted_timeline_month_keys_v1"
+    
+    public func saveDeletedTimelineMonthKey(_ key: String) {
+        var keys = loadDeletedTimelineMonthKeys()
+        keys.insert(key)
+        userDefaults?.set(Array(keys), forKey: deletedTimelineMonthKeysKey)
+    }
+    
+    public func loadDeletedTimelineMonthKeys() -> Set<String> {
+        let arr = userDefaults?.stringArray(forKey: deletedTimelineMonthKeysKey) ?? []
+        return Set(arr)
+    }
+    
+    public func resetDeletedTimelineMonths() {
+        userDefaults?.removeObject(forKey: deletedTimelineMonthKeysKey)
+    }
+    
+    // MARK: - 股息歷程時間軸數據 (依持股買入日期起算當月配息，連動真實持股)
     public func getMonthlyTimelineSummaries(holdings: [StockHolding]? = nil) -> [MonthlyTimelineSummary] {
         let activeHoldings = holdings ?? loadHoldings()
         guard !activeHoldings.isEmpty else {
             return [] // 只要無自建或匯入持股，不顯示假歷程
         }
         
-        let totalVal = activeHoldings.reduce(0.0) { $0 + $1.marketValue }
-        let totalCost = activeHoldings.reduce(0.0) { $0 + $1.totalCostWithFee }
-        let totalProfit = activeHoldings.reduce(0.0) { $0 + $1.unrealizedProfit }
-        let totalFee = activeHoldings.reduce(0.0) { $0 + $1.buyFee }
-        
-        // 推算月均股息 (預估殖利率約 6.5%)
-        let baseMonthlyDiv = max(1.0, (totalVal * 0.065 / 12.0).rounded())
-        
+        let journals = loadJournals()
         let calendar = Calendar.current
         let now = Date()
-        var list: [MonthlyTimelineSummary] = []
+        
+        // 1. 找出每檔持股的最早買進日期 (若有日記買進紀錄優先取日記，否則取 updatedAt)
+        var holdingPurchaseDates: [String: Date] = [:]
+        for h in activeHoldings {
+            let buyJournals = journals.filter { $0.symbol == h.symbol && $0.action == .buy }
+            if let earliestJournal = buyJournals.map({ $0.date }).min() {
+                holdingPurchaseDates[h.symbol] = earliestJournal
+            } else {
+                holdingPurchaseDates[h.symbol] = h.updatedAt
+            }
+        }
+        
+        // 2. 找出全體持股中最先買入的日期
+        let earliestDate = holdingPurchaseDates.values.min() ?? now
+        
+        // 3. 計算從最早買入月份到當前月份相差多少個月 (最多回溯 12 個月，至少當前月 1 個月)
+        let nowComponents = calendar.dateComponents([.year, .month], from: now)
+        let earliestComponents = calendar.dateComponents([.year, .month], from: earliestDate)
+        
+        let yearDiff = (nowComponents.year ?? 2026) - (earliestComponents.year ?? 2026)
+        let monthDiff = (nowComponents.month ?? 11) - (earliestComponents.month ?? 11)
+        let totalMonths = max(1, min(12, yearDiff * 12 + monthDiff + 1))
         
         let monthFormatter = DateFormatter()
         monthFormatter.dateFormat = "yyyy年 M月"
         monthFormatter.locale = Locale(identifier: "zh_TW")
         
-        // 產生近 4 個月的真實持股歷程時間軸
-        for offset in 0..<4 {
+        var rawSummaries: [MonthlyTimelineSummary] = []
+        var runningCumulativeDividend: Double = 0.0
+        
+        // 4. 從歷史最早月份依序往當前月份推算 (以利精確累計配息加總)
+        for offset in (0..<totalMonths).reversed() {
             guard let monthDate = calendar.date(byAdding: .month, value: -offset, to: now) else { continue }
             let monthTitle = monthFormatter.string(from: monthDate)
             
-            let factor: Double = offset == 0 ? 1.0 : (offset == 1 ? 0.95 : (offset == 2 ? 1.15 : 0.9))
-            let monthDiv = (baseMonthlyDiv * factor).rounded()
+            // 該月的結束時間點 (當月最後一天)
+            guard let monthInterval = calendar.dateInterval(of: .month, for: monthDate) else { continue }
+            let monthEnd = monthInterval.end
             
-            list.append(
+            // 【核心邏輯】：僅篩選出「買入日期 <= 該月結束日」之已買入持股！
+            let holdingsBoughtByThisMonth = activeHoldings.filter { h in
+                let pDate = holdingPurchaseDates[h.symbol] ?? h.updatedAt
+                return pDate <= monthEnd
+            }
+            
+            // 若該月尚未買進任何持股，則不計入歷程
+            guard !holdingsBoughtByThisMonth.isEmpty else { continue }
+            
+            // 計算該月已買入標的之配息 (精準使用 DividendSourceService 智慧推算每檔月息)
+            var monthDividendSum: Double = 0.0
+            for h in holdingsBoughtByThisMonth {
+                let calc = DividendSourceService.shared.calculateHoldingDividend(holding: h)
+                monthDividendSum += calc.monthlyDividend
+            }
+            monthDividendSum = (monthDividendSum * 10.0).rounded() / 10.0
+            runningCumulativeDividend += monthDividendSum
+            
+            let monthVal = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.marketValue }
+            let monthCost = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.totalCostWithFee }
+            let monthProfit = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.unrealizedProfit }
+            let monthFee = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.buyFee }
+            
+            rawSummaries.append(
                 MonthlyTimelineSummary(
                     monthKey: monthTitle,
-                    totalMarketValue: totalVal,
-                    totalCost: totalCost,
-                    priceGainProfit: totalProfit,
-                    totalFee: totalFee,
-                    monthDividend: monthDiv
+                    totalMarketValue: monthVal.rounded(),
+                    totalCost: monthCost.rounded(),
+                    priceGainProfit: monthProfit.rounded(),
+                    totalFee: monthFee.rounded(),
+                    monthDividend: monthDividendSum.rounded(),
+                    cumulativeDividend: runningCumulativeDividend.rounded(),
+                    activeHoldingCount: holdingsBoughtByThisMonth.count,
+                    activeSymbols: holdingsBoughtByThisMonth.map { $0.symbol }
                 )
             )
         }
-        return list
+        
+        // 5. 依月份新到舊排序 (近月排前面)
+        var result = Array(rawSummaries.reversed())
+        
+        // 6. 排除使用者滑動刪除之月份
+        let deletedKeys = loadDeletedTimelineMonthKeys()
+        result.removeAll { deletedKeys.contains($0.monthKey) }
+        
+        return result
     }
     
     // MARK: - 資料備份 (JSON 匯出/匯入)
