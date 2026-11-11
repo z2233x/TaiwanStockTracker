@@ -39,7 +39,8 @@ public struct PopularStockPreset: Identifiable, Equatable {
     public let defaultPrice: Double
     
     public static let allPresets: [PopularStockPreset] = [
-        PopularStockPreset(symbol: "00406", name: "富邦科技高息(掩護性買權)", frequency: .monthly, stockType: .etf, defaultPrice: 15.0),
+        PopularStockPreset(symbol: "00406A", name: "主動中信台灣收益", frequency: .monthly, stockType: .etf, defaultPrice: 7.54),
+        PopularStockPreset(symbol: "00406", name: "主動中信台灣收益(掩護性買權)", frequency: .monthly, stockType: .etf, defaultPrice: 7.54),
         PopularStockPreset(symbol: "0056", name: "元大高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 37.5),
         PopularStockPreset(symbol: "00878", name: "國泰永續高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 22.8),
         PopularStockPreset(symbol: "00919", name: "群益台灣精選高息", frequency: .quarterly, stockType: .etf, defaultPrice: 24.2),
@@ -52,6 +53,7 @@ public struct PopularStockPreset: Identifiable, Equatable {
         PopularStockPreset(symbol: "00713", name: "元大台灣高息低波", frequency: .quarterly, stockType: .etf, defaultPrice: 57.0),
         PopularStockPreset(symbol: "2330", name: "台積電", frequency: .quarterly, stockType: .stock, defaultPrice: 1050.0),
         PopularStockPreset(symbol: "2454", name: "聯發科", frequency: .semiannual, stockType: .stock, defaultPrice: 1300.0),
+        PopularStockPreset(symbol: "7781", name: "昕力資", frequency: .annual, stockType: .stock, defaultPrice: 19.9),
         PopularStockPreset(symbol: "2881", name: "富邦金", frequency: .annual, stockType: .stock, defaultPrice: 92.0),
         PopularStockPreset(symbol: "2882", name: "國泰金", frequency: .annual, stockType: .stock, defaultPrice: 68.0),
         PopularStockPreset(symbol: "2891", name: "中信金", frequency: .annual, stockType: .stock, defaultPrice: 38.0)
@@ -93,7 +95,12 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         self.id = id
         self.symbol = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.frequency = frequency
+        // 自動校正 00406A / 00406 或包含中信台灣收益/掩護性買權為月配
+        if self.symbol == "00406A" || self.symbol == "00406" || self.name.contains("中信台灣收益") || self.name.contains("掩護性買權") {
+            self.frequency = .monthly
+        } else {
+            self.frequency = frequency
+        }
         self.shares = max(0, shares)
         self.averageCost = averageCost
         self.currentPrice = currentPrice

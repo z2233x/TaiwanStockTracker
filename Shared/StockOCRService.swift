@@ -45,11 +45,11 @@ public final class StockOCRService {
         }
     }
     
-    // MARK: - 座標與空間排版解析
+    // MARK: - 座標與空間排版解析 (以 Table Row 帶狀空間精準隔離)
     private func parseObservations(_ observations: [VNRecognizedTextObservation]) -> [StockHolding] {
         struct TextElement {
             let text: String
-            let box: CGRect // 歸一化座標 (0,0 在左下角)
+            let box: CGRect // 歸一化座標 (0,0 在左下角，Y 越大越靠上)
         }
         
         var elements: [TextElement] = []
@@ -62,69 +62,192 @@ public final class StockOCRService {
             }
         }
         
-        // 將文字區塊按 Y 軸座標由上至下（Y 遞減）、X 軸由左至右分行
-        let rowThreshold: CGFloat = 0.025
-        var rows: [[TextElement]] = []
+        // 1. 過濾雜訊區塊 (說明備註、頁碼、欄位表頭提示)
+        let filteredElements = elements.filter { elem in
+            let t = elem.text
+            // 排除表尾備註及免責文字 (如 ※2020/2/14 起現股[付出成本]自動計入該股票之除息金額)
+            if t.hasPrefix("※") || t.contains("自動計入") || t.contains("起現股") || t.contains("不區分幣別") || t.contains("自行篩選") {
+                return false
+            }
+            // 排除頁次與總損益摘要
+            if (t.contains("總損益") && t.contains("筆數")) || t.contains("頁次") {
+                return false
+            }
+            // 排除完整欄位表頭行
+            if (t.contains("股票名稱") && t.contains("庫存")) || (t.contains("即時庫存") && t.contains("現值")) {
+                return false
+            }
+            return true
+        }
         
-        // 先按 Y 由大到小排序 (Vision Y 原點在底部)
-        let sortedByY = elements.sorted { $0.box.midY > $1.box.midY }
+        // 2. 尋找股票錨點 (4~6 碼代號，含 ETF 00 系列與個股/興櫃)
+        struct StockAnchor {
+            let symbol: String
+            let midY: CGFloat
+            let minX: CGFloat
+            let rawText: String
+        }
         
-        for elem in sortedByY {
-            if let lastRow = rows.last, let firstInRow = lastRow.first, abs(firstInRow.box.midY - elem.box.midY) < rowThreshold {
-                rows[rows.count - 1].append(elem)
-            } else {
-                rows.append([elem])
+        // 正則：支援 ETF (如 00406A, 006208, 0056, 00878) 或 4 碼個股/興櫃 (如 2330, 7781)
+        // 排除含有斜線或橫線之日期 (如 2020/2/14, 2024-11)
+        let symbolPattern = "(?<![A-Za-z0-9/.-])(00\\d{2,4}[A-Za-z]?|[1-9]\\d{3}[A-Za-z]?)(?![A-Za-z0-9/.-])"
+        let regex = try? NSRegularExpression(pattern: symbolPattern)
+        
+        var anchors: [StockAnchor] = []
+        var seenSymbols = Set<String>()
+        
+        for elem in filteredElements {
+            // 若文字塊本身包含年月日日期分隔，直接略過該塊的代碼提取
+            if elem.text.contains("/") || elem.text.contains("年") || elem.text.contains("月") || elem.text.contains("日") {
+                continue
+            }
+            
+            let nsStr = elem.text as NSString
+            let matches = regex?.matches(in: elem.text, range: NSRange(location: 0, length: nsStr.length)) ?? []
+            for m in matches {
+                let sym = nsStr.substring(with: m.range(at: 1)).uppercased()
+                // 排除常見西元年誤判 (如 2020, 2024, 2025, 2026)，除非明確在股票資料庫且同行有股票名稱
+                if (sym == "2020" || sym == "2024" || sym == "2025" || sym == "2026") && !elem.text.contains("美亞") {
+                    continue
+                }
+                if !seenSymbols.contains(sym) {
+                    seenSymbols.insert(sym)
+                    anchors.append(StockAnchor(symbol: sym, midY: elem.box.midY, minX: elem.box.minX, rawText: elem.text))
+                }
             }
         }
         
-        // 每行按 X 座標由左到右排序
-        for i in 0..<rows.count {
-            rows[i].sort { $0.box.minX < $1.box.minX }
+        // 若找不到股票錨點，退回純文字分行解析
+        if anchors.isEmpty {
+            let sortedByY = filteredElements.sorted { $0.box.midY > $1.box.midY }
+            let lines = sortedByY.map { $0.text }
+            return extractHoldingsFromLines(lines)
         }
         
-        // 組合每行字串
-        var fullTextLines: [String] = []
-        for r in rows {
-            let lineStr = r.map { $0.text }.joined(separator: " ")
-            fullTextLines.append(lineStr)
-        }
+        // 將股票錨點按 Y 軸由上至下 (midY 由大到小) 排序
+        anchors.sort { $0.midY > $1.midY }
         
-        return extractHoldingsFromLines(fullTextLines)
-    }
-    
-    // MARK: - 智慧提取代號、股數與成本
-    public func extractHoldingsFromLines(_ lines: [String]) -> [StockHolding] {
         var holdings: [StockHolding] = []
-        var detectedSymbols = Set<String>()
         
-        let allStocks = TaiwanStockDatabase.shared.allStocks
-        
-        for (lineIdx, rawLine) in lines.enumerated() {
-            let line = rawLine.replacingOccurrences(of: ",", with: "")
+        // 3. 為每檔股票劃定專屬橫向資料帶 (Band)，杜絕跨行數字干擾
+        for i in 0..<anchors.count {
+            let cur = anchors[i]
+            let topBound: CGFloat = (i == 0) ? (cur.midY + 0.06) : ((anchors[i - 1].midY + cur.midY) / 2.0)
+            let bottomBound: CGFloat = (i == anchors.count - 1) ? (cur.midY - 0.06) : ((cur.midY + anchors[i + 1].midY) / 2.0)
             
-            // 1. 尋找台股代號 (4~5 位數字) 或 股票中文名稱
-            var foundSymbol: String? = nil
-            var foundName: String? = nil
+            // 抓取落在該持股帶狀區間的所有文字塊
+            let bandElements = filteredElements.filter { elem in
+                return elem.box.midY <= topBound && elem.box.midY >= bottomBound
+            }.sorted { $0.box.minX < $1.box.minX }
             
-            // 正則尋找 4~5 位台股代號 (如 2330, 0056, 00878)
-            let regex = try? NSRegularExpression(pattern: "(?<!\\d)(\\d{4,5}[A-Za-z]?)(?!\\d)")
-            if let matches = regex?.matches(in: line, range: NSRange(line.startIndex..., in: line)) {
-                for m in matches {
-                    if let range = Range(m.range(at: 1), in: line) {
-                        let sym = String(line[range]).uppercased()
-                        if let meta = allStocks.first(where: { $0.symbol == sym }) {
-                            foundSymbol = meta.symbol
-                            foundName = meta.name
+            let bandFullText = bandElements.map { $0.text }.joined(separator: " ")
+            
+            // 4. 解析股票名稱 (優先查資料庫，若無則從該區間提取連續中文字)
+            let meta = TaiwanStockDatabase.shared.find(symbol: cur.symbol)
+            var finalName = meta?.name
+            if finalName == nil || finalName?.isEmpty == true {
+                // 從帶狀文字提取中文名稱 (排除券商常見功能字)
+                let cleanedChinese = bandFullText
+                    .replacingOccurrences(of: "沖銷", with: " ")
+                    .replacingOccurrences(of: "明細", with: " ")
+                    .replacingOccurrences(of: "現股", with: " ")
+                    .replacingOccurrences(of: "興櫃", with: " ")
+                    .replacingOccurrences(of: "台幣", with: " ")
+                    .replacingOccurrences(of: "外幣", with: " ")
+                    .replacingOccurrences(of: "融資", with: " ")
+                    .replacingOccurrences(of: "融券", with: " ")
+                
+                let chRegex = try? NSRegularExpression(pattern: "[\\u4e00-\\u9fa5]{2,10}")
+                let chMatches = chRegex?.matches(in: cleanedChinese, range: NSRange(cleanedChinese.startIndex..., in: cleanedChinese)) ?? []
+                for cm in chMatches {
+                    if let range = Range(cm.range, in: cleanedChinese) {
+                        let word = String(cleanedChinese[range])
+                        if word != "台幣" && word != "現股" && word != "沖銷" && word != "明細" {
+                            finalName = word
                             break
                         }
                     }
                 }
             }
+            if finalName == nil || finalName?.isEmpty == true {
+                finalName = cur.symbol
+            }
             
-            // 若代號未對應，比對中文名稱
+            // 5. 提取該區間內的所有數字並使用數學公式交叉比對
+            let (shares, price) = extractBestSharesAndPrice(from: bandFullText, targetSymbol: cur.symbol, metaPrice: meta?.referencePrice ?? 0.0)
+            
+            // 6. 配息頻率判定 (00406A / 00406 強制月配)
+            var freq: FrequencyType = meta?.frequency ?? .annual
+            if cur.symbol == "00406A" || cur.symbol == "00406" ||
+               (finalName?.contains("中信台灣收益") == true) ||
+               (finalName?.contains("掩護性買權") == true) {
+                freq = .monthly
+            } else if cur.symbol == "006208" || cur.symbol == "0050" {
+                freq = .semiannual
+            } else if ["0056", "00878", "00919", "00713", "2330"].contains(cur.symbol) {
+                freq = .quarterly
+            } else if ["00929", "00940", "00939"].contains(cur.symbol) {
+                freq = .monthly
+            }
+            
+            let stockType: StockType = (cur.symbol.hasPrefix("00") ? .etf : (meta?.stockType ?? .stock))
+            
+            let holding = StockHolding(
+                symbol: cur.symbol,
+                name: finalName ?? cur.symbol,
+                frequency: freq,
+                shares: shares,
+                averageCost: price > 0 ? price : (meta?.referencePrice ?? 10.0),
+                currentPrice: meta?.referencePrice ?? (price > 0 ? price : 10.0),
+                stockType: stockType,
+                brokerage: "照片智慧辨識"
+            )
+            holdings.append(holding)
+        }
+        
+        return holdings
+    }
+    
+    // MARK: - 智慧提取代號、股數與成本 (文字行 Fallback 模式)
+    public func extractHoldingsFromLines(_ lines: [String]) -> [StockHolding] {
+        var holdings: [StockHolding] = []
+        var detectedSymbols = Set<String>()
+        
+        // 排除備註與表尾行
+        let cleanLines = lines.filter { line in
+            let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("※") || t.contains("自動計入") || t.contains("起現股") || t.contains("不區分幣別") { return false }
+            if (t.contains("總損益") && t.contains("筆數")) || t.contains("頁次") { return false }
+            return true
+        }
+        
+        let allStocks = TaiwanStockDatabase.shared.allStocks
+        let symbolPattern = "(?<![A-Za-z0-9/.-])(00\\d{2,4}[A-Za-z]?|[1-9]\\d{3}[A-Za-z]?)(?![A-Za-z0-9/.-])"
+        let regex = try? NSRegularExpression(pattern: symbolPattern)
+        
+        for (lineIdx, rawLine) in cleanLines.enumerated() {
+            if rawLine.contains("/") && !rawLine.contains("00") { continue }
+            
+            var foundSymbol: String? = nil
+            var foundName: String? = nil
+            
+            let nsStr = rawLine as NSString
+            let matches = regex?.matches(in: rawLine, range: NSRange(location: 0, length: nsStr.length)) ?? []
+            for m in matches {
+                let sym = nsStr.substring(with: m.range(at: 1)).uppercased()
+                if (sym == "2020" || sym == "2024" || sym == "2025" || sym == "2026") && !rawLine.contains("美亞") {
+                    continue
+                }
+                foundSymbol = sym
+                if let meta = allStocks.first(where: { $0.symbol == sym }) {
+                    foundName = meta.name
+                }
+                break
+            }
+            
             if foundSymbol == nil {
                 for stock in allStocks {
-                    if line.contains(stock.name) {
+                    if rawLine.contains(stock.name) {
                         foundSymbol = stock.symbol
                         foundName = stock.name
                         break
@@ -132,24 +255,32 @@ public final class StockOCRService {
                 }
             }
             
-            // 若在該行找到股票
             if let sym = foundSymbol, !detectedSymbols.contains(sym) {
                 detectedSymbols.insert(sym)
                 let meta = TaiwanStockDatabase.shared.find(symbol: sym)
-                let finalName = foundName ?? (meta?.name ?? sym)
+                var finalName = foundName ?? (meta?.name ?? sym)
                 
-                // 搜索上下文 (該行與往後 2 行) 提取數值：股數與價格
-                let searchScope = lines[lineIdx..<min(lineIdx + 3, lines.count)].joined(separator: " ")
-                let (shares, price) = extractSharesAndPrice(from: searchScope, referencePrice: meta?.referencePrice ?? 0.0)
+                // 搜索上下文 (該行與往後 1 行) 提取數值
+                let searchScope = cleanLines[lineIdx..<min(lineIdx + 2, cleanLines.count)].joined(separator: " ")
+                let (shares, price) = extractBestSharesAndPrice(from: searchScope, targetSymbol: sym, metaPrice: meta?.referencePrice ?? 0.0)
+                
+                var freq: FrequencyType = meta?.frequency ?? .annual
+                if sym == "00406A" || sym == "00406" || finalName.contains("中信台灣收益") || finalName.contains("掩護性買權") {
+                    freq = .monthly
+                } else if sym == "006208" || sym == "0050" {
+                    freq = .semiannual
+                } else if ["0056", "00878", "00919"].contains(sym) {
+                    freq = .quarterly
+                }
                 
                 let holding = StockHolding(
                     symbol: sym,
                     name: finalName,
-                    frequency: meta?.frequency ?? .quarterly,
+                    frequency: freq,
                     shares: shares,
                     averageCost: price > 0 ? price : (meta?.referencePrice ?? 10.0),
                     currentPrice: meta?.referencePrice ?? (price > 0 ? price : 10.0),
-                    stockType: meta?.stockType ?? .stock,
+                    stockType: sym.hasPrefix("00") ? .etf : (meta?.stockType ?? .stock),
                     brokerage: "照片智慧辨識"
                 )
                 holdings.append(holding)
@@ -159,50 +290,62 @@ public final class StockOCRService {
         return holdings
     }
     
-    // MARK: - 數值解析與推斷
-    private func extractSharesAndPrice(from text: String, referencePrice: Double) -> (shares: Int, price: Double) {
-        let cleaned = text.replacingOccurrences(of: ",", with: "")
+    // MARK: - 數值解析：結合券商欄位順序與 S * P ≈ C 數學交叉驗證
+    private func extractBestSharesAndPrice(from text: String, targetSymbol: String, metaPrice: Double) -> (shares: Int, price: Double) {
+        let cleaned = text.replacingOccurrences(of: ",", with: " ")
         let tokens = cleaned.components(separatedBy: CharacterSet.whitespacesAndNewlines)
         
         var numbers: [Double] = []
         for t in tokens {
-            // 過濾掉非數字詞與明顯不是金額或股數的代號
-            if let num = Double(t), num > 0 && num < 10000000 {
-                // 排除 4 碼可能為股票代號本身
-                if num >= 1000 && num <= 9999 && floor(num) == num {
-                    // 若剛好是代號則略過一次
-                    continue
-                }
+            if let num = Double(t), num > 0 && num < 100000000 {
+                // 排除當前標的本身的數字代號 (例如 7781 或 2330)
+                if t == targetSymbol { continue }
                 numbers.append(num)
             }
         }
         
-        var shares = 1000
-        var price = referencePrice > 0 ? referencePrice : 0.0
+        // 1. 候選整數 (即時庫存股數，台股常見 >= 1)
+        let integerCandidates = numbers.filter { floor($0) == $0 && $0 >= 1 }
+        // 2. 候選浮點數 (成本均價，通常帶有小數點或小於 3,000)
+        let floatCandidates = numbers.filter { floor($0) != $0 && $0 <= 3000 }
         
-        // 智慧推斷：通常股數為整數 (如 500, 1000, 2000, 3000, 10000)，價格通常有小數點或接近參考價
-        if numbers.count >= 2 {
-            // 找出最可能是股數的整數 (大於等於 100，或 1000 的倍數)
-            if let shareCandidate = numbers.first(where: { floor($0) == $0 && $0 >= 100 }) {
-                shares = Int(shareCandidate)
-                // 剩下數字中最接近參考價或帶小數點的作為成本
-                let remaining = numbers.filter { $0 != shareCandidate }
-                if let priceCandidate = remaining.first(where: { abs($0 - referencePrice) < referencePrice * 0.5 }) ?? remaining.first {
-                    price = priceCandidate
+        var bestShares = integerCandidates.first.map { Int($0) } ?? 1000
+        var bestPrice = floatCandidates.first ?? (metaPrice > 0 ? metaPrice : 10.0)
+        
+        // 3. 數學關係驗證：Shares * Price ≈ TotalCost (誤差在 2% 以內)
+        // 在券商損益表中，即時庫存通常位於前 3 個整數中
+        let candidateSharesToCheck = integerCandidates.prefix(4)
+        for s in candidateSharesToCheck {
+            for p in numbers where p > 0.1 && p <= 3000 && p != s {
+                let expectedC = s * p
+                for c in numbers where c > s && c > p && c >= 100 {
+                    let diff = abs(expectedC - c) / c
+                    if diff < 0.02 {
+                        // 完美匹配！直接採用數學驗證結果
+                        bestShares = Int(s)
+                        bestPrice = p
+                        return (bestShares, bestPrice)
+                    }
                 }
-            } else {
-                shares = Int(numbers[0])
-                price = numbers[1]
-            }
-        } else if numbers.count == 1 {
-            if numbers[0] >= 100 && floor(numbers[0]) == numbers[0] {
-                shares = Int(numbers[0])
-            } else {
-                price = numbers[0]
             }
         }
         
-        return (shares, price)
+        // 4. 若截圖未包含總成本欄位，依位置啟發：
+        // 股數：優先取 1000 的整數倍，或前段出現的第一個大整數
+        if let roundLot = integerCandidates.first(where: { Int($0) % 1000 == 0 && $0 >= 1000 }) {
+            bestShares = Int(roundLot)
+        } else if let firstInt = integerCandidates.first {
+            bestShares = Int(firstInt)
+        }
+        
+        // 均價：優先取帶有小數點且數值合理的浮點數
+        if let floatP = floatCandidates.first(where: { $0 > 0.5 && $0 < 3000 }) {
+            bestPrice = floatP
+        } else if metaPrice > 0 {
+            bestPrice = metaPrice
+        }
+        
+        return (bestShares, bestPrice)
     }
 }
 

@@ -148,8 +148,10 @@ public final class DividendSourceService {
         let sym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 1. 掩護性買權 (Covered Call) 標的辨識 (以 00406 或關鍵字為首)
-        if sym == "00406" ||
+        // 1. 掩護性買權 (Covered Call) 標的辨識 (以 00406A / 00406 或關鍵字為首)
+        if sym == "00406A" ||
+           sym == "00406" ||
+           cleanName.contains("中信台灣收益") ||
            cleanName.contains("掩護性買權") ||
            cleanName.contains("選擇權") ||
            cleanName.contains("Covered Call") ||
@@ -157,7 +159,7 @@ public final class DividendSourceService {
            cleanName.contains("CC") {
             return HoldingDividendProfile(
                 symbol: sym,
-                name: cleanName.isEmpty ? "掩護性買權科技ETF" : cleanName,
+                name: cleanName.isEmpty ? "主動中信台灣收益" : cleanName,
                 strategy: .coveredCall,
                 estimatedYield: 0.105, // 10.5% 年化殖利率 (權利金策略通常具高現金流)
                 ratio76: 0.65,         // 65% 賣出買權權利金收入 (76 財產交易所得)

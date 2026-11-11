@@ -85,7 +85,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "季配",
-    "referencePrice": 2235.0
+    "referencePrice": 2235
   },
   {
     "symbol": "2454",
@@ -93,7 +93,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "半年配",
-    "referencePrice": 3725.0
+    "referencePrice": 3725
   },
   {
     "symbol": "00400A",
@@ -141,14 +141,14 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 7.0
+    "referencePrice": 7
   },
   {
     "symbol": "00406A",
     "name": "主動中信台灣收益",
     "market": "上市",
     "stockType": "ETF指數型",
-    "frequency": "年配",
+    "frequency": "月配",
     "referencePrice": 7.32
   },
   {
@@ -277,7 +277,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 175.0
+    "referencePrice": 175
   },
   {
     "symbol": "006204",
@@ -317,7 +317,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "00631L",
@@ -437,7 +437,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "00645",
@@ -573,7 +573,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 82.0
+    "referencePrice": 82
   },
   {
     "symbol": "00664R",
@@ -661,7 +661,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 248.0
+    "referencePrice": 248
   },
   {
     "symbol": "00676R",
@@ -805,7 +805,7 @@
     "market": "上櫃",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 43.0
+    "referencePrice": 43
   },
   {
     "symbol": "00695B",
@@ -877,7 +877,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "00708L",
@@ -1053,7 +1053,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 85.0
+    "referencePrice": 85
   },
   {
     "symbol": "00736",
@@ -1141,7 +1141,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 23.0
+    "referencePrice": 23
   },
   {
     "symbol": "00753L",
@@ -1221,7 +1221,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 94.0
+    "referencePrice": 94
   },
   {
     "symbol": "00763U",
@@ -1389,7 +1389,7 @@
     "market": "上櫃",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 58.0
+    "referencePrice": 58
   },
   {
     "symbol": "00792B",
@@ -1485,7 +1485,7 @@
     "market": "上櫃",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 36.0
+    "referencePrice": 36
   },
   {
     "symbol": "00848B",
@@ -2053,7 +2053,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 26.0
+    "referencePrice": 26
   },
   {
     "symbol": "00941",
@@ -2813,7 +2813,7 @@
     "market": "上櫃",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 10.0
+    "referencePrice": 10
   },
   {
     "symbol": "00990A",
@@ -2965,7 +2965,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 10.0
+    "referencePrice": 10
   },
   {
     "symbol": "020000",
@@ -2981,7 +2981,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "020011",
@@ -2989,7 +2989,7 @@
     "market": "上市",
     "stockType": "ETF指數型",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "020012",
@@ -2997,7 +2997,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "02001L",
@@ -3061,7 +3061,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "020033",
@@ -3181,7 +3181,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 13.0
+    "referencePrice": 13
   },
   {
     "symbol": "1110",
@@ -3229,7 +3229,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 103.0
+    "referencePrice": 103
   },
   {
     "symbol": "1216",
@@ -3301,7 +3301,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 72.0
+    "referencePrice": 72
   },
   {
     "symbol": "1232",
@@ -3309,7 +3309,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 158.0
+    "referencePrice": 158
   },
   {
     "symbol": "1233",
@@ -3357,7 +3357,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 165.0
+    "referencePrice": 165
   },
   {
     "symbol": "1259",
@@ -3373,7 +3373,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 241.0
+    "referencePrice": 241
   },
   {
     "symbol": "1268",
@@ -3413,7 +3413,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 263.0
+    "referencePrice": 263
   },
   {
     "symbol": "1304",
@@ -3437,7 +3437,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 29.0
+    "referencePrice": 29
   },
   {
     "symbol": "1308",
@@ -3477,7 +3477,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "1313",
@@ -3501,7 +3501,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 70.0
+    "referencePrice": 70
   },
   {
     "symbol": "1316",
@@ -3573,7 +3573,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4.0
+    "referencePrice": 4
   },
   {
     "symbol": "1338",
@@ -3821,7 +3821,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 11.0
+    "referencePrice": 11
   },
   {
     "symbol": "1451",
@@ -3829,7 +3829,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 17.0
+    "referencePrice": 17
   },
   {
     "symbol": "1452",
@@ -3885,7 +3885,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 17.0
+    "referencePrice": 17
   },
   {
     "symbol": "1460",
@@ -3997,7 +3997,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 356.0
+    "referencePrice": 356
   },
   {
     "symbol": "1477",
@@ -4005,7 +4005,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 216.0
+    "referencePrice": 216
   },
   {
     "symbol": "1503",
@@ -4029,7 +4029,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 9.0
+    "referencePrice": 9
   },
   {
     "symbol": "1512",
@@ -4045,7 +4045,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 145.0
+    "referencePrice": 145
   },
   {
     "symbol": "1514",
@@ -4053,7 +4053,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 85.0
+    "referencePrice": 85
   },
   {
     "symbol": "1515",
@@ -4085,7 +4085,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 497.0
+    "referencePrice": 497
   },
   {
     "symbol": "1521",
@@ -4141,7 +4141,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 25.0
+    "referencePrice": 25
   },
   {
     "symbol": "1529",
@@ -4205,7 +4205,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 110.0
+    "referencePrice": 110
   },
   {
     "symbol": "1538",
@@ -4253,7 +4253,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 735.0
+    "referencePrice": 735
   },
   {
     "symbol": "1563",
@@ -4261,7 +4261,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 71.0
+    "referencePrice": 71
   },
   {
     "symbol": "1565",
@@ -4285,7 +4285,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 95.0
+    "referencePrice": 95
   },
   {
     "symbol": "1570",
@@ -4349,7 +4349,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1060.0
+    "referencePrice": 1060
   },
   {
     "symbol": "1591",
@@ -4397,7 +4397,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 22.0
+    "referencePrice": 22
   },
   {
     "symbol": "1603",
@@ -4405,7 +4405,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 28.0
+    "referencePrice": 28
   },
   {
     "symbol": "1604",
@@ -4477,7 +4477,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 16.0
+    "referencePrice": 16
   },
   {
     "symbol": "1617",
@@ -4501,7 +4501,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 167.0
+    "referencePrice": 167
   },
   {
     "symbol": "1626",
@@ -4533,7 +4533,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 46.0
+    "referencePrice": 46
   },
   {
     "symbol": "1709",
@@ -4637,7 +4637,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 31.0
+    "referencePrice": 31
   },
   {
     "symbol": "1726",
@@ -4757,7 +4757,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 150.0
+    "referencePrice": 150
   },
   {
     "symbol": "1776",
@@ -4805,7 +4805,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 47.0
+    "referencePrice": 47
   },
   {
     "symbol": "1785",
@@ -4829,7 +4829,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "1789",
@@ -4917,7 +4917,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "1815",
@@ -4925,7 +4925,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 128.0
+    "referencePrice": 128
   },
   {
     "symbol": "1817",
@@ -4941,7 +4941,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 46.0
+    "referencePrice": 46
   },
   {
     "symbol": "1904",
@@ -4997,7 +4997,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 37.0
+    "referencePrice": 37
   },
   {
     "symbol": "2006",
@@ -5117,7 +5117,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 11.0
+    "referencePrice": 11
   },
   {
     "symbol": "2027",
@@ -5157,7 +5157,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 43.0
+    "referencePrice": 43
   },
   {
     "symbol": "2032",
@@ -5189,7 +5189,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "2038",
@@ -5205,7 +5205,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 287.0
+    "referencePrice": 287
   },
   {
     "symbol": "2059",
@@ -5213,7 +5213,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 8010.0
+    "referencePrice": 8010
   },
   {
     "symbol": "2061",
@@ -5237,7 +5237,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 22.0
+    "referencePrice": 22
   },
   {
     "symbol": "2064",
@@ -5301,7 +5301,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "2101",
@@ -5333,7 +5333,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 10.0
+    "referencePrice": 10
   },
   {
     "symbol": "2105",
@@ -5421,7 +5421,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 533.0
+    "referencePrice": 533
   },
   {
     "symbol": "2208",
@@ -5445,7 +5445,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 152.0
+    "referencePrice": 152
   },
   {
     "symbol": "2227",
@@ -5453,7 +5453,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "2228",
@@ -5469,7 +5469,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 19.0
+    "referencePrice": 19
   },
   {
     "symbol": "2231",
@@ -5485,7 +5485,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 121.0
+    "referencePrice": 121
   },
   {
     "symbol": "2235",
@@ -5541,7 +5541,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 215.0
+    "referencePrice": 215
   },
   {
     "symbol": "2248",
@@ -5621,7 +5621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1160.0
+    "referencePrice": 1160
   },
   {
     "symbol": "2312",
@@ -5653,7 +5653,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 109.0
+    "referencePrice": 109
   },
   {
     "symbol": "2317",
@@ -5661,7 +5661,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 239.0
+    "referencePrice": 239
   },
   {
     "symbol": "2321",
@@ -5693,7 +5693,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 411.0
+    "referencePrice": 411
   },
   {
     "symbol": "2328",
@@ -5773,7 +5773,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1405.0
+    "referencePrice": 1405
   },
   {
     "symbol": "2347",
@@ -5797,7 +5797,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 37.0
+    "referencePrice": 37
   },
   {
     "symbol": "2349",
@@ -5813,7 +5813,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 137.0
+    "referencePrice": 137
   },
   {
     "symbol": "2352",
@@ -5861,7 +5861,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 860.0
+    "referencePrice": 860
   },
   {
     "symbol": "2359",
@@ -5877,7 +5877,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1250.0
+    "referencePrice": 1250
   },
   {
     "symbol": "2362",
@@ -5901,7 +5901,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 51.0
+    "referencePrice": 51
   },
   {
     "symbol": "2365",
@@ -5925,7 +5925,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 894.0
+    "referencePrice": 894
   },
   {
     "symbol": "2369",
@@ -5981,7 +5981,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 143.0
+    "referencePrice": 143
   },
   {
     "symbol": "2379",
@@ -5989,7 +5989,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 743.0
+    "referencePrice": 743
   },
   {
     "symbol": "2380",
@@ -6013,7 +6013,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4070.0
+    "referencePrice": 4070
   },
   {
     "symbol": "2385",
@@ -6021,7 +6021,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 88.0
+    "referencePrice": 88
   },
   {
     "symbol": "2387",
@@ -6061,7 +6061,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 62.0
+    "referencePrice": 62
   },
   {
     "symbol": "2395",
@@ -6069,7 +6069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 583.0
+    "referencePrice": 583
   },
   {
     "symbol": "2397",
@@ -6109,7 +6109,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 930.0
+    "referencePrice": 930
   },
   {
     "symbol": "2405",
@@ -6133,7 +6133,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 370.0
+    "referencePrice": 370
   },
   {
     "symbol": "2409",
@@ -6149,7 +6149,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 159.0
+    "referencePrice": 159
   },
   {
     "symbol": "2413",
@@ -6341,7 +6341,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 107.0
+    "referencePrice": 107
   },
   {
     "symbol": "2442",
@@ -6381,7 +6381,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 239.0
+    "referencePrice": 239
   },
   {
     "symbol": "2453",
@@ -6413,7 +6413,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 119.0
+    "referencePrice": 119
   },
   {
     "symbol": "2459",
@@ -6461,7 +6461,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 124.0
+    "referencePrice": 124
   },
   {
     "symbol": "2466",
@@ -6509,7 +6509,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 185.0
+    "referencePrice": 185
   },
   {
     "symbol": "2476",
@@ -6581,7 +6581,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 32.0
+    "referencePrice": 32
   },
   {
     "symbol": "2486",
@@ -6621,7 +6621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 284.0
+    "referencePrice": 284
   },
   {
     "symbol": "2493",
@@ -6629,7 +6629,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 146.0
+    "referencePrice": 146
   },
   {
     "symbol": "2495",
@@ -6653,7 +6653,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 37.0
+    "referencePrice": 37
   },
   {
     "symbol": "2498",
@@ -6685,7 +6685,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 17.0
+    "referencePrice": 17
   },
   {
     "symbol": "2506",
@@ -6781,7 +6781,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 15.0
+    "referencePrice": 15
   },
   {
     "symbol": "2535",
@@ -6893,7 +6893,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 160.0
+    "referencePrice": 160
   },
   {
     "symbol": "2601",
@@ -6997,7 +6997,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 107.0
+    "referencePrice": 107
   },
   {
     "symbol": "2616",
@@ -7013,7 +7013,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 30.0
+    "referencePrice": 30
   },
   {
     "symbol": "2618",
@@ -7045,7 +7045,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 54.0
+    "referencePrice": 54
   },
   {
     "symbol": "2636",
@@ -7093,7 +7093,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 65.0
+    "referencePrice": 65
   },
   {
     "symbol": "2645",
@@ -7101,7 +7101,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 155.0
+    "referencePrice": 155
   },
   {
     "symbol": "2646",
@@ -7149,7 +7149,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 12.0
+    "referencePrice": 12
   },
   {
     "symbol": "2707",
@@ -7157,7 +7157,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 172.0
+    "referencePrice": 172
   },
   {
     "symbol": "2712",
@@ -7221,7 +7221,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 224.0
+    "referencePrice": 224
   },
   {
     "symbol": "2729",
@@ -7229,7 +7229,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 156.0
+    "referencePrice": 156
   },
   {
     "symbol": "2731",
@@ -7237,7 +7237,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 135.0
+    "referencePrice": 135
   },
   {
     "symbol": "2732",
@@ -7245,7 +7245,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 60.0
+    "referencePrice": 60
   },
   {
     "symbol": "2734",
@@ -7317,7 +7317,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 180.0
+    "referencePrice": 180
   },
   {
     "symbol": "2753",
@@ -7341,7 +7341,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 88.0
+    "referencePrice": 88
   },
   {
     "symbol": "2756",
@@ -7357,7 +7357,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 76.0
+    "referencePrice": 76
   },
   {
     "symbol": "2801",
@@ -7437,7 +7437,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 52.0
+    "referencePrice": 52
   },
   {
     "symbol": "2845",
@@ -7461,7 +7461,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 158.0
+    "referencePrice": 158
   },
   {
     "symbol": "2851",
@@ -7509,7 +7509,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 61.0
+    "referencePrice": 61
   },
   {
     "symbol": "2881B",
@@ -7533,7 +7533,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 111.0
+    "referencePrice": 111
   },
   {
     "symbol": "2882A",
@@ -7541,7 +7541,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 60.0
+    "referencePrice": 60
   },
   {
     "symbol": "2882B",
@@ -7549,7 +7549,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 59.0
+    "referencePrice": 59
   },
   {
     "symbol": "2883",
@@ -7621,7 +7621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 44.0
+    "referencePrice": 44
   },
   {
     "symbol": "2887H",
@@ -7861,7 +7861,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 24.0
+    "referencePrice": 24
   },
   {
     "symbol": "2941",
@@ -7877,7 +7877,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 38.0
+    "referencePrice": 38
   },
   {
     "symbol": "2947",
@@ -7901,7 +7901,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 64.0
+    "referencePrice": 64
   },
   {
     "symbol": "3002",
@@ -7925,7 +7925,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 119.0
+    "referencePrice": 119
   },
   {
     "symbol": "3005",
@@ -7941,7 +7941,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 228.0
+    "referencePrice": 228
   },
   {
     "symbol": "3008",
@@ -7949,7 +7949,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4925.0
+    "referencePrice": 4925
   },
   {
     "symbol": "3010",
@@ -7957,7 +7957,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 118.0
+    "referencePrice": 118
   },
   {
     "symbol": "3011",
@@ -7981,7 +7981,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 130.0
+    "referencePrice": 130
   },
   {
     "symbol": "3015",
@@ -7997,7 +7997,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 107.0
+    "referencePrice": 107
   },
   {
     "symbol": "3017",
@@ -8005,7 +8005,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 2540.0
+    "referencePrice": 2540
   },
   {
     "symbol": "3018",
@@ -8021,7 +8021,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 132.0
+    "referencePrice": 132
   },
   {
     "symbol": "3021",
@@ -8069,7 +8069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 499.0
+    "referencePrice": 499
   },
   {
     "symbol": "3027",
@@ -8093,7 +8093,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 114.0
+    "referencePrice": 114
   },
   {
     "symbol": "3030",
@@ -8101,7 +8101,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 221.0
+    "referencePrice": 221
   },
   {
     "symbol": "3031",
@@ -8141,7 +8141,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 172.0
+    "referencePrice": 172
   },
   {
     "symbol": "3036",
@@ -8157,7 +8157,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 757.0
+    "referencePrice": 757
   },
   {
     "symbol": "3038",
@@ -8189,7 +8189,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 135.0
+    "referencePrice": 135
   },
   {
     "symbol": "3043",
@@ -8213,7 +8213,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 131.0
+    "referencePrice": 131
   },
   {
     "symbol": "3046",
@@ -8341,7 +8341,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3066",
@@ -8357,7 +8357,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3071",
@@ -8381,7 +8381,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "3081",
@@ -8389,7 +8389,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 2115.0
+    "referencePrice": 2115
   },
   {
     "symbol": "3083",
@@ -8405,7 +8405,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3086",
@@ -8421,7 +8421,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 109.0
+    "referencePrice": 109
   },
   {
     "symbol": "3090",
@@ -8437,7 +8437,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 20.0
+    "referencePrice": 20
   },
   {
     "symbol": "3093",
@@ -8477,7 +8477,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 34.0
+    "referencePrice": 34
   },
   {
     "symbol": "3115",
@@ -8525,7 +8525,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1705.0
+    "referencePrice": 1705
   },
   {
     "symbol": "3135",
@@ -8557,7 +8557,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 351.0
+    "referencePrice": 351
   },
   {
     "symbol": "3149",
@@ -8581,7 +8581,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 194.0
+    "referencePrice": 194
   },
   {
     "symbol": "3158",
@@ -8621,7 +8621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 739.0
+    "referencePrice": 739
   },
   {
     "symbol": "3168",
@@ -8629,7 +8629,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 41.0
+    "referencePrice": 41
   },
   {
     "symbol": "3169",
@@ -8645,7 +8645,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 56.0
+    "referencePrice": 56
   },
   {
     "symbol": "3176",
@@ -8677,7 +8677,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 690.0
+    "referencePrice": 690
   },
   {
     "symbol": "3191",
@@ -8733,7 +8733,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 117.0
+    "referencePrice": 117
   },
   {
     "symbol": "3217",
@@ -8749,7 +8749,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 126.0
+    "referencePrice": 126
   },
   {
     "symbol": "3219",
@@ -8757,7 +8757,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 109.0
+    "referencePrice": 109
   },
   {
     "symbol": "3221",
@@ -8781,7 +8781,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3227",
@@ -8789,7 +8789,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 178.0
+    "referencePrice": 178
   },
   {
     "symbol": "3228",
@@ -8797,7 +8797,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 120.0
+    "referencePrice": 120
   },
   {
     "symbol": "3229",
@@ -8861,7 +8861,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 41.0
+    "referencePrice": 41
   },
   {
     "symbol": "3259",
@@ -8885,7 +8885,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 192.0
+    "referencePrice": 192
   },
   {
     "symbol": "3265",
@@ -8933,7 +8933,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 17.0
+    "referencePrice": 17
   },
   {
     "symbol": "3285",
@@ -8965,7 +8965,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 118.0
+    "referencePrice": 118
   },
   {
     "symbol": "3290",
@@ -8981,7 +8981,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 771.0
+    "referencePrice": 771
   },
   {
     "symbol": "3294",
@@ -9109,7 +9109,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1235.0
+    "referencePrice": 1235
   },
   {
     "symbol": "3325",
@@ -9197,7 +9197,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 124.0
+    "referencePrice": 124
   },
   {
     "symbol": "3363",
@@ -9205,7 +9205,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 411.0
+    "referencePrice": 411
   },
   {
     "symbol": "3372",
@@ -9237,7 +9237,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 116.0
+    "referencePrice": 116
   },
   {
     "symbol": "3379",
@@ -9245,7 +9245,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 30.0
+    "referencePrice": 30
   },
   {
     "symbol": "3380",
@@ -9277,7 +9277,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 112.0
+    "referencePrice": 112
   },
   {
     "symbol": "3406",
@@ -9285,7 +9285,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 841.0
+    "referencePrice": 841
   },
   {
     "symbol": "3413",
@@ -9293,7 +9293,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 255.0
+    "referencePrice": 255
   },
   {
     "symbol": "3416",
@@ -9301,7 +9301,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 152.0
+    "referencePrice": 152
   },
   {
     "symbol": "3419",
@@ -9357,7 +9357,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 175.0
+    "referencePrice": 175
   },
   {
     "symbol": "3443",
@@ -9365,7 +9365,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 6705.0
+    "referencePrice": 6705
   },
   {
     "symbol": "3444",
@@ -9485,7 +9485,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1305.0
+    "referencePrice": 1305
   },
   {
     "symbol": "3492",
@@ -9613,7 +9613,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3526",
@@ -9645,7 +9645,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 2215.0
+    "referencePrice": 2215
   },
   {
     "symbol": "3530",
@@ -9669,7 +9669,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 282.0
+    "referencePrice": 282
   },
   {
     "symbol": "3533",
@@ -9677,7 +9677,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1705.0
+    "referencePrice": 1705
   },
   {
     "symbol": "3535",
@@ -9757,7 +9757,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 165.0
+    "referencePrice": 165
   },
   {
     "symbol": "3552",
@@ -9773,7 +9773,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 126.0
+    "referencePrice": 126
   },
   {
     "symbol": "3556",
@@ -9797,7 +9797,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 105.0
+    "referencePrice": 105
   },
   {
     "symbol": "3563",
@@ -9805,7 +9805,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 595.0
+    "referencePrice": 595
   },
   {
     "symbol": "3564",
@@ -9821,7 +9821,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 24.0
+    "referencePrice": 24
   },
   {
     "symbol": "3570",
@@ -9869,7 +9869,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 460.0
+    "referencePrice": 460
   },
   {
     "symbol": "3587",
@@ -9877,7 +9877,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 193.0
+    "referencePrice": 193
   },
   {
     "symbol": "3588",
@@ -9901,7 +9901,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 225.0
+    "referencePrice": 225
   },
   {
     "symbol": "3593",
@@ -9925,7 +9925,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 138.0
+    "referencePrice": 138
   },
   {
     "symbol": "3597",
@@ -9965,7 +9965,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 177.0
+    "referencePrice": 177
   },
   {
     "symbol": "3615",
@@ -9981,7 +9981,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 234.0
+    "referencePrice": 234
   },
   {
     "symbol": "3622",
@@ -10005,7 +10005,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 108.0
+    "referencePrice": 108
   },
   {
     "symbol": "3625",
@@ -10053,7 +10053,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3645",
@@ -10069,7 +10069,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 25.0
+    "referencePrice": 25
   },
   {
     "symbol": "3652",
@@ -10085,7 +10085,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 5635.0
+    "referencePrice": 5635
   },
   {
     "symbol": "3661",
@@ -10093,7 +10093,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 3110.0
+    "referencePrice": 3110
   },
   {
     "symbol": "3663",
@@ -10109,7 +10109,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "3665",
@@ -10117,7 +10117,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1420.0
+    "referencePrice": 1420
   },
   {
     "symbol": "3666",
@@ -10149,7 +10149,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 61.0
+    "referencePrice": 61
   },
   {
     "symbol": "3675",
@@ -10165,7 +10165,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 104.0
+    "referencePrice": 104
   },
   {
     "symbol": "3680",
@@ -10173,7 +10173,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 421.0
+    "referencePrice": 421
   },
   {
     "symbol": "3684",
@@ -10221,7 +10221,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 146.0
+    "referencePrice": 146
   },
   {
     "symbol": "3693",
@@ -10229,7 +10229,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 620.0
+    "referencePrice": 620
   },
   {
     "symbol": "3694",
@@ -10325,7 +10325,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 561.0
+    "referencePrice": 561
   },
   {
     "symbol": "3712",
@@ -10341,7 +10341,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 14.0
+    "referencePrice": 14
   },
   {
     "symbol": "3715",
@@ -10389,7 +10389,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 72.0
+    "referencePrice": 72
   },
   {
     "symbol": "4105",
@@ -10413,7 +10413,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 106.0
+    "referencePrice": 106
   },
   {
     "symbol": "4108",
@@ -10677,7 +10677,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 19.0
+    "referencePrice": 19
   },
   {
     "symbol": "4168",
@@ -10693,7 +10693,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "4171",
@@ -10717,7 +10717,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 55.0
+    "referencePrice": 55
   },
   {
     "symbol": "4175",
@@ -10805,7 +10805,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 27.0
+    "referencePrice": 27
   },
   {
     "symbol": "4304",
@@ -10821,7 +10821,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "4306",
@@ -10853,7 +10853,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "4413",
@@ -10965,7 +10965,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 167.0
+    "referencePrice": 167
   },
   {
     "symbol": "4442",
@@ -11013,7 +11013,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 15.0
+    "referencePrice": 15
   },
   {
     "symbol": "4523",
@@ -11101,7 +11101,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 16.0
+    "referencePrice": 16
   },
   {
     "symbol": "4540",
@@ -11197,7 +11197,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 99.0
+    "referencePrice": 99
   },
   {
     "symbol": "4557",
@@ -11253,7 +11253,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 14.0
+    "referencePrice": 14
   },
   {
     "symbol": "4566",
@@ -11285,7 +11285,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 151.0
+    "referencePrice": 151
   },
   {
     "symbol": "4572",
@@ -11309,7 +11309,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "4580",
@@ -11341,7 +11341,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 340.0
+    "referencePrice": 340
   },
   {
     "symbol": "4584",
@@ -11381,7 +11381,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "4702",
@@ -11397,7 +11397,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 42.0
+    "referencePrice": 42
   },
   {
     "symbol": "4707",
@@ -11429,7 +11429,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 17.0
+    "referencePrice": 17
   },
   {
     "symbol": "4720",
@@ -11453,7 +11453,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 135.0
+    "referencePrice": 135
   },
   {
     "symbol": "4726",
@@ -11461,7 +11461,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 23.0
+    "referencePrice": 23
   },
   {
     "symbol": "4728",
@@ -11469,7 +11469,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 388.0
+    "referencePrice": 388
   },
   {
     "symbol": "4729",
@@ -11493,7 +11493,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 128.0
+    "referencePrice": 128
   },
   {
     "symbol": "4737",
@@ -11565,7 +11565,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 663.0
+    "referencePrice": 663
   },
   {
     "symbol": "4754",
@@ -11589,7 +11589,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 260.0
+    "referencePrice": 260
   },
   {
     "symbol": "4763",
@@ -11605,7 +11605,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 124.0
+    "referencePrice": 124
   },
   {
     "symbol": "4766",
@@ -11613,7 +11613,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 348.0
+    "referencePrice": 348
   },
   {
     "symbol": "4767",
@@ -11629,7 +11629,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 295.0
+    "referencePrice": 295
   },
   {
     "symbol": "4770",
@@ -11637,7 +11637,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 286.0
+    "referencePrice": 286
   },
   {
     "symbol": "4771",
@@ -11645,7 +11645,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 180.0
+    "referencePrice": 180
   },
   {
     "symbol": "4772",
@@ -11669,7 +11669,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 29.0
+    "referencePrice": 29
   },
   {
     "symbol": "4903",
@@ -11685,7 +11685,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 106.0
+    "referencePrice": 106
   },
   {
     "symbol": "4905",
@@ -11709,7 +11709,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "4908",
@@ -11725,7 +11725,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 30.0
+    "referencePrice": 30
   },
   {
     "symbol": "4911",
@@ -11821,7 +11821,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 13.0
+    "referencePrice": 13
   },
   {
     "symbol": "4935",
@@ -11853,7 +11853,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 31.0
+    "referencePrice": 31
   },
   {
     "symbol": "4943",
@@ -11925,7 +11925,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 398.0
+    "referencePrice": 398
   },
   {
     "symbol": "4960",
@@ -11957,7 +11957,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 263.0
+    "referencePrice": 263
   },
   {
     "symbol": "4968",
@@ -11973,7 +11973,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 389.0
+    "referencePrice": 389
   },
   {
     "symbol": "4972",
@@ -11989,7 +11989,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 117.0
+    "referencePrice": 117
   },
   {
     "symbol": "4974",
@@ -12013,7 +12013,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 178.0
+    "referencePrice": 178
   },
   {
     "symbol": "4979",
@@ -12021,7 +12021,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 383.0
+    "referencePrice": 383
   },
   {
     "symbol": "4989",
@@ -12037,7 +12037,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 352.0
+    "referencePrice": 352
   },
   {
     "symbol": "4994",
@@ -12117,7 +12117,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 25.0
+    "referencePrice": 25
   },
   {
     "symbol": "5201",
@@ -12269,7 +12269,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 263.0
+    "referencePrice": 263
   },
   {
     "symbol": "5236",
@@ -12277,7 +12277,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 113.0
+    "referencePrice": 113
   },
   {
     "symbol": "5243",
@@ -12333,7 +12333,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1250.0
+    "referencePrice": 1250
   },
   {
     "symbol": "5272",
@@ -12349,7 +12349,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 11935.0
+    "referencePrice": 11935
   },
   {
     "symbol": "5276",
@@ -12397,7 +12397,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "5288",
@@ -12405,7 +12405,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 167.0
+    "referencePrice": 167
   },
   {
     "symbol": "5289",
@@ -12413,7 +12413,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 978.0
+    "referencePrice": 978
   },
   {
     "symbol": "5291",
@@ -12549,7 +12549,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 19.0
+    "referencePrice": 19
   },
   {
     "symbol": "5347",
@@ -12685,7 +12685,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 161.0
+    "referencePrice": 161
   },
   {
     "symbol": "5434",
@@ -12693,7 +12693,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 472.0
+    "referencePrice": 472
   },
   {
     "symbol": "5438",
@@ -12741,7 +12741,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "5457",
@@ -12765,7 +12765,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 47.0
+    "referencePrice": 47
   },
   {
     "symbol": "5465",
@@ -12789,7 +12789,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 70.0
+    "referencePrice": 70
   },
   {
     "symbol": "5471",
@@ -13037,7 +13037,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 723.0
+    "referencePrice": 723
   },
   {
     "symbol": "5538",
@@ -13053,7 +13053,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 26.0
+    "referencePrice": 26
   },
   {
     "symbol": "5546",
@@ -13117,7 +13117,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 16.0
+    "referencePrice": 16
   },
   {
     "symbol": "5609",
@@ -13173,7 +13173,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 103.0
+    "referencePrice": 103
   },
   {
     "symbol": "5871A",
@@ -13197,7 +13197,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 35.0
+    "referencePrice": 35
   },
   {
     "symbol": "5880",
@@ -13221,7 +13221,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 184.0
+    "referencePrice": 184
   },
   {
     "symbol": "5904",
@@ -13245,7 +13245,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "5907",
@@ -13309,7 +13309,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 57.0
+    "referencePrice": 57
   },
   {
     "symbol": "6026",
@@ -13325,7 +13325,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 113.0
+    "referencePrice": 113
   },
   {
     "symbol": "6101",
@@ -13421,7 +13421,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 59.0
+    "referencePrice": 59
   },
   {
     "symbol": "6118",
@@ -13445,7 +13445,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 315.0
+    "referencePrice": 315
   },
   {
     "symbol": "6122",
@@ -13549,7 +13549,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 216.0
+    "referencePrice": 216
   },
   {
     "symbol": "6139",
@@ -13557,7 +13557,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 588.0
+    "referencePrice": 588
   },
   {
     "symbol": "6140",
@@ -13605,7 +13605,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 175.0
+    "referencePrice": 175
   },
   {
     "symbol": "6147",
@@ -13629,7 +13629,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 70.0
+    "referencePrice": 70
   },
   {
     "symbol": "6151",
@@ -13757,7 +13757,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 11.0
+    "referencePrice": 11
   },
   {
     "symbol": "6170",
@@ -13781,7 +13781,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 208.0
+    "referencePrice": 208
   },
   {
     "symbol": "6174",
@@ -13877,7 +13877,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1025.0
+    "referencePrice": 1025
   },
   {
     "symbol": "6188",
@@ -13893,7 +13893,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 45.0
+    "referencePrice": 45
   },
   {
     "symbol": "6190",
@@ -14013,7 +14013,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 117.0
+    "referencePrice": 117
   },
   {
     "symbol": "6207",
@@ -14053,7 +14053,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6213",
@@ -14061,7 +14061,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 531.0
+    "referencePrice": 531
   },
   {
     "symbol": "6214",
@@ -14069,7 +14069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 179.0
+    "referencePrice": 179
   },
   {
     "symbol": "6215",
@@ -14077,7 +14077,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 77.0
+    "referencePrice": 77
   },
   {
     "symbol": "6216",
@@ -14085,7 +14085,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 19.0
+    "referencePrice": 19
   },
   {
     "symbol": "6217",
@@ -14133,7 +14133,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6223",
@@ -14141,7 +14141,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4075.0
+    "referencePrice": 4075
   },
   {
     "symbol": "6224",
@@ -14205,7 +14205,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 194.0
+    "referencePrice": 194
   },
   {
     "symbol": "6233",
@@ -14237,7 +14237,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6237",
@@ -14325,7 +14325,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 167.0
+    "referencePrice": 167
   },
   {
     "symbol": "6259",
@@ -14397,7 +14397,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 185.0
+    "referencePrice": 185
   },
   {
     "symbol": "6272",
@@ -14413,7 +14413,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 982.0
+    "referencePrice": 982
   },
   {
     "symbol": "6275",
@@ -14453,7 +14453,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 100.0
+    "referencePrice": 100
   },
   {
     "symbol": "6281",
@@ -14461,7 +14461,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 50.0
+    "referencePrice": 50
   },
   {
     "symbol": "6282",
@@ -14509,7 +14509,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 305.0
+    "referencePrice": 305
   },
   {
     "symbol": "6292",
@@ -14541,7 +14541,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 829.0
+    "referencePrice": 829
   },
   {
     "symbol": "6411",
@@ -14565,7 +14565,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 335.0
+    "referencePrice": 335
   },
   {
     "symbol": "6415",
@@ -14605,7 +14605,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 120.0
+    "referencePrice": 120
   },
   {
     "symbol": "6423",
@@ -14629,7 +14629,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 242.0
+    "referencePrice": 242
   },
   {
     "symbol": "6431",
@@ -14645,7 +14645,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 47.0
+    "referencePrice": 47
   },
   {
     "symbol": "6435",
@@ -14661,7 +14661,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 139.0
+    "referencePrice": 139
   },
   {
     "symbol": "6441",
@@ -14677,7 +14677,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1105.0
+    "referencePrice": 1105
   },
   {
     "symbol": "6443",
@@ -14685,7 +14685,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 27.0
+    "referencePrice": 27
   },
   {
     "symbol": "6446",
@@ -14693,7 +14693,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1370.0
+    "referencePrice": 1370
   },
   {
     "symbol": "6449",
@@ -14701,7 +14701,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 160.0
+    "referencePrice": 160
   },
   {
     "symbol": "6451",
@@ -14709,7 +14709,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 267.0
+    "referencePrice": 267
   },
   {
     "symbol": "6456",
@@ -14757,7 +14757,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 248.0
+    "referencePrice": 248
   },
   {
     "symbol": "6469",
@@ -14781,7 +14781,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 409.0
+    "referencePrice": 409
   },
   {
     "symbol": "6474",
@@ -14813,7 +14813,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 60.0
+    "referencePrice": 60
   },
   {
     "symbol": "6486",
@@ -14829,7 +14829,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 612.0
+    "referencePrice": 612
   },
   {
     "symbol": "6491",
@@ -14837,7 +14837,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 383.0
+    "referencePrice": 383
   },
   {
     "symbol": "6492",
@@ -14909,7 +14909,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 27.0
+    "referencePrice": 27
   },
   {
     "symbol": "6509",
@@ -14925,7 +14925,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 2785.0
+    "referencePrice": 2785
   },
   {
     "symbol": "6512",
@@ -14941,7 +14941,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 3495.0
+    "referencePrice": 3495
   },
   {
     "symbol": "6516",
@@ -14981,7 +14981,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 666.0
+    "referencePrice": 666
   },
   {
     "symbol": "6527",
@@ -15005,7 +15005,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 668.0
+    "referencePrice": 668
   },
   {
     "symbol": "6532",
@@ -15013,7 +15013,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 100.0
+    "referencePrice": 100
   },
   {
     "symbol": "6533",
@@ -15021,7 +15021,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 217.0
+    "referencePrice": 217
   },
   {
     "symbol": "6534",
@@ -15069,7 +15069,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 54.0
+    "referencePrice": 54
   },
   {
     "symbol": "6547",
@@ -15133,7 +15133,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 334.0
+    "referencePrice": 334
   },
   {
     "symbol": "6568",
@@ -15141,7 +15141,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 108.0
+    "referencePrice": 108
   },
   {
     "symbol": "6569",
@@ -15213,7 +15213,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 108.0
+    "referencePrice": 108
   },
   {
     "symbol": "6582",
@@ -15245,7 +15245,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 77.0
+    "referencePrice": 77
   },
   {
     "symbol": "6589",
@@ -15261,7 +15261,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 75.0
+    "referencePrice": 75
   },
   {
     "symbol": "6591",
@@ -15277,7 +15277,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 56.0
+    "referencePrice": 56
   },
   {
     "symbol": "6592A",
@@ -15293,7 +15293,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 94.0
+    "referencePrice": 94
   },
   {
     "symbol": "6593",
@@ -15301,7 +15301,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6596",
@@ -15333,7 +15333,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 23.0
+    "referencePrice": 23
   },
   {
     "symbol": "6604",
@@ -15461,7 +15461,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 825.0
+    "referencePrice": 825
   },
   {
     "symbol": "6641",
@@ -15477,7 +15477,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 63.0
+    "referencePrice": 63
   },
   {
     "symbol": "6643",
@@ -15501,7 +15501,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6651",
@@ -15509,7 +15509,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "6654",
@@ -15517,7 +15517,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 174.0
+    "referencePrice": 174
   },
   {
     "symbol": "6655",
@@ -15525,7 +15525,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 131.0
+    "referencePrice": 131
   },
   {
     "symbol": "6657",
@@ -15549,7 +15549,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6662",
@@ -15565,7 +15565,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 286.0
+    "referencePrice": 286
   },
   {
     "symbol": "6666",
@@ -15573,7 +15573,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 41.0
+    "referencePrice": 41
   },
   {
     "symbol": "6667",
@@ -15581,7 +15581,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 236.0
+    "referencePrice": 236
   },
   {
     "symbol": "6668",
@@ -15597,7 +15597,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1645.0
+    "referencePrice": 1645
   },
   {
     "symbol": "6670",
@@ -15605,7 +15605,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 260.0
+    "referencePrice": 260
   },
   {
     "symbol": "6671",
@@ -15621,7 +15621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 493.0
+    "referencePrice": 493
   },
   {
     "symbol": "6674",
@@ -15637,7 +15637,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 158.0
+    "referencePrice": 158
   },
   {
     "symbol": "6680",
@@ -15653,7 +15653,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 932.0
+    "referencePrice": 932
   },
   {
     "symbol": "6684",
@@ -15677,7 +15677,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 188.0
+    "referencePrice": 188
   },
   {
     "symbol": "6691",
@@ -15685,7 +15685,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 554.0
+    "referencePrice": 554
   },
   {
     "symbol": "6692",
@@ -15701,7 +15701,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 138.0
+    "referencePrice": 138
   },
   {
     "symbol": "6695",
@@ -15733,7 +15733,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 94.0
+    "referencePrice": 94
   },
   {
     "symbol": "6706",
@@ -15765,7 +15765,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 375.0
+    "referencePrice": 375
   },
   {
     "symbol": "6716",
@@ -15789,7 +15789,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 101.0
+    "referencePrice": 101
   },
   {
     "symbol": "6721",
@@ -15813,7 +15813,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 156.0
+    "referencePrice": 156
   },
   {
     "symbol": "6727",
@@ -15845,7 +15845,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 121.0
+    "referencePrice": 121
   },
   {
     "symbol": "6733",
@@ -15869,7 +15869,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 781.0
+    "referencePrice": 781
   },
   {
     "symbol": "6741",
@@ -15885,7 +15885,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 51.0
+    "referencePrice": 51
   },
   {
     "symbol": "6743",
@@ -15917,7 +15917,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 114.0
+    "referencePrice": 114
   },
   {
     "symbol": "6754",
@@ -15957,7 +15957,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 147.0
+    "referencePrice": 147
   },
   {
     "symbol": "6763",
@@ -16013,7 +16013,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 736.0
+    "referencePrice": 736
   },
   {
     "symbol": "6782",
@@ -16037,7 +16037,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 316.0
+    "referencePrice": 316
   },
   {
     "symbol": "6789",
@@ -16061,7 +16061,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6792",
@@ -16069,7 +16069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 53.0
+    "referencePrice": 53
   },
   {
     "symbol": "6794",
@@ -16077,7 +16077,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 65.0
+    "referencePrice": 65
   },
   {
     "symbol": "6796",
@@ -16117,7 +16117,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1855.0
+    "referencePrice": 1855
   },
   {
     "symbol": "6807",
@@ -16133,7 +16133,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 240.0
+    "referencePrice": 240
   },
   {
     "symbol": "6821",
@@ -16157,7 +16157,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 22.0
+    "referencePrice": 22
   },
   {
     "symbol": "6829",
@@ -16173,7 +16173,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 459.0
+    "referencePrice": 459
   },
   {
     "symbol": "6831",
@@ -16245,7 +16245,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 49.0
+    "referencePrice": 49
   },
   {
     "symbol": "6854",
@@ -16261,7 +16261,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 110.0
+    "referencePrice": 110
   },
   {
     "symbol": "6856",
@@ -16269,7 +16269,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 41.0
+    "referencePrice": 41
   },
   {
     "symbol": "6859",
@@ -16277,7 +16277,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 103.0
+    "referencePrice": 103
   },
   {
     "symbol": "6861",
@@ -16293,7 +16293,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 121.0
+    "referencePrice": 121
   },
   {
     "symbol": "6863",
@@ -16325,7 +16325,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 449.0
+    "referencePrice": 449
   },
   {
     "symbol": "6872",
@@ -16341,7 +16341,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 52.0
+    "referencePrice": 52
   },
   {
     "symbol": "6874",
@@ -16349,7 +16349,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 68.0
+    "referencePrice": 68
   },
   {
     "symbol": "6875",
@@ -16373,7 +16373,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 215.0
+    "referencePrice": 215
   },
   {
     "symbol": "6884",
@@ -16405,7 +16405,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 142.0
+    "referencePrice": 142
   },
   {
     "symbol": "6894",
@@ -16413,7 +16413,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 347.0
+    "referencePrice": 347
   },
   {
     "symbol": "6895",
@@ -16421,7 +16421,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 123.0
+    "referencePrice": 123
   },
   {
     "symbol": "6898",
@@ -16461,7 +16461,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 275.0
+    "referencePrice": 275
   },
   {
     "symbol": "6904",
@@ -16469,7 +16469,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 123.0
+    "referencePrice": 123
   },
   {
     "symbol": "6906",
@@ -16477,7 +16477,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 69.0
+    "referencePrice": 69
   },
   {
     "symbol": "6907",
@@ -16485,7 +16485,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 122.0
+    "referencePrice": 122
   },
   {
     "symbol": "6908",
@@ -16525,7 +16525,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 109.0
+    "referencePrice": 109
   },
   {
     "symbol": "6916",
@@ -16565,7 +16565,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 177.0
+    "referencePrice": 177
   },
   {
     "symbol": "6923",
@@ -16661,7 +16661,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 608.0
+    "referencePrice": 608
   },
   {
     "symbol": "6945",
@@ -16669,7 +16669,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 115.0
+    "referencePrice": 115
   },
   {
     "symbol": "6947",
@@ -16725,7 +16725,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 460.0
+    "referencePrice": 460
   },
   {
     "symbol": "6958",
@@ -16741,7 +16741,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "6961",
@@ -16789,7 +16789,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 25.0
+    "referencePrice": 25
   },
   {
     "symbol": "6971",
@@ -16837,7 +16837,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 21.0
+    "referencePrice": 21
   },
   {
     "symbol": "6996",
@@ -16845,7 +16845,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 144.0
+    "referencePrice": 144
   },
   {
     "symbol": "6997",
@@ -16893,7 +16893,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1235.0
+    "referencePrice": 1235
   },
   {
     "symbol": "7631",
@@ -16925,7 +16925,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 155.0
+    "referencePrice": 155
   },
   {
     "symbol": "7704",
@@ -16933,7 +16933,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 80.0
+    "referencePrice": 80
   },
   {
     "symbol": "7705",
@@ -16949,7 +16949,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 90.0
+    "referencePrice": 90
   },
   {
     "symbol": "7709",
@@ -16965,7 +16965,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 125.0
+    "referencePrice": 125
   },
   {
     "symbol": "7711",
@@ -16973,7 +16973,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 526.0
+    "referencePrice": 526
   },
   {
     "symbol": "7712",
@@ -16981,7 +16981,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 134.0
+    "referencePrice": 134
   },
   {
     "symbol": "7713",
@@ -16989,7 +16989,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "7714",
@@ -16997,7 +16997,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 141.0
+    "referencePrice": 141
   },
   {
     "symbol": "7715",
@@ -17021,7 +17021,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 391.0
+    "referencePrice": 391
   },
   {
     "symbol": "7718",
@@ -17061,7 +17061,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 496.0
+    "referencePrice": 496
   },
   {
     "symbol": "7730",
@@ -17069,7 +17069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 173.0
+    "referencePrice": 173
   },
   {
     "symbol": "7732",
@@ -17085,7 +17085,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1785.0
+    "referencePrice": 1785
   },
   {
     "symbol": "7736",
@@ -17101,7 +17101,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 159.0
+    "referencePrice": 159
   },
   {
     "symbol": "7740",
@@ -17125,7 +17125,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 442.0
+    "referencePrice": 442
   },
   {
     "symbol": "7747",
@@ -17133,7 +17133,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 107.0
+    "referencePrice": 107
   },
   {
     "symbol": "7749",
@@ -17149,7 +17149,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1510.0
+    "referencePrice": 1510
   },
   {
     "symbol": "7751",
@@ -17157,7 +17157,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1135.0
+    "referencePrice": 1135
   },
   {
     "symbol": "7753",
@@ -17181,7 +17181,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 32.0
+    "referencePrice": 32
   },
   {
     "symbol": "7765",
@@ -17189,7 +17189,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 236.0
+    "referencePrice": 236
   },
   {
     "symbol": "7767",
@@ -17205,7 +17205,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 219.0
+    "referencePrice": 219
   },
   {
     "symbol": "7769",
@@ -17213,7 +17213,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4040.0
+    "referencePrice": 4040
   },
   {
     "symbol": "7770",
@@ -17221,7 +17221,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "7772",
@@ -17269,7 +17269,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 209.0
+    "referencePrice": 209
   },
   {
     "symbol": "7791",
@@ -17285,7 +17285,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 288.0
+    "referencePrice": 288
   },
   {
     "symbol": "7794",
@@ -17341,7 +17341,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 197.0
+    "referencePrice": 197
   },
   {
     "symbol": "7811",
@@ -17349,7 +17349,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 72.0
+    "referencePrice": 72
   },
   {
     "symbol": "7812",
@@ -17405,7 +17405,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 610.0
+    "referencePrice": 610
   },
   {
     "symbol": "7823",
@@ -17429,7 +17429,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 120.0
+    "referencePrice": 120
   },
   {
     "symbol": "7828",
@@ -17437,7 +17437,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1270.0
+    "referencePrice": 1270
   },
   {
     "symbol": "7835",
@@ -17477,7 +17477,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 2505.0
+    "referencePrice": 2505
   },
   {
     "symbol": "7867",
@@ -17509,7 +17509,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 339.0
+    "referencePrice": 339
   },
   {
     "symbol": "8024",
@@ -17525,7 +17525,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 144.0
+    "referencePrice": 144
   },
   {
     "symbol": "8028",
@@ -17533,7 +17533,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 196.0
+    "referencePrice": 196
   },
   {
     "symbol": "8032",
@@ -17549,7 +17549,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 139.0
+    "referencePrice": 139
   },
   {
     "symbol": "8034",
@@ -17573,7 +17573,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 208.0
+    "referencePrice": 208
   },
   {
     "symbol": "8040",
@@ -17589,7 +17589,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 127.0
+    "referencePrice": 127
   },
   {
     "symbol": "8043",
@@ -17621,7 +17621,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 933.0
+    "referencePrice": 933
   },
   {
     "symbol": "8047",
@@ -17629,7 +17629,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "8048",
@@ -17653,7 +17653,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 51.0
+    "referencePrice": 51
   },
   {
     "symbol": "8054",
@@ -17709,7 +17709,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 142.0
+    "referencePrice": 142
   },
   {
     "symbol": "8070",
@@ -17757,7 +17757,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "8080",
@@ -17765,7 +17765,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "8081",
@@ -17837,7 +17837,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 171.0
+    "referencePrice": 171
   },
   {
     "symbol": "8092",
@@ -17877,7 +17877,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 137.0
+    "referencePrice": 137
   },
   {
     "symbol": "8101",
@@ -17893,7 +17893,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 0.0
+    "referencePrice": 0
   },
   {
     "symbol": "8103",
@@ -17949,7 +17949,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 79.0
+    "referencePrice": 79
   },
   {
     "symbol": "8112",
@@ -17973,7 +17973,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 152.0
+    "referencePrice": 152
   },
   {
     "symbol": "8121",
@@ -18013,7 +18013,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 253.0
+    "referencePrice": 253
   },
   {
     "symbol": "8162",
@@ -18069,7 +18069,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 574.0
+    "referencePrice": 574
   },
   {
     "symbol": "8213",
@@ -18101,7 +18101,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 213.0
+    "referencePrice": 213
   },
   {
     "symbol": "8234",
@@ -18189,7 +18189,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "8291",
@@ -18197,7 +18197,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 26.0
+    "referencePrice": 26
   },
   {
     "symbol": "8299",
@@ -18205,7 +18205,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1675.0
+    "referencePrice": 1675
   },
   {
     "symbol": "8341",
@@ -18221,7 +18221,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 85.0
+    "referencePrice": 85
   },
   {
     "symbol": "8349",
@@ -18253,7 +18253,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 366.0
+    "referencePrice": 366
   },
   {
     "symbol": "8367",
@@ -18261,7 +18261,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "8374",
@@ -18277,7 +18277,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 63.0
+    "referencePrice": 63
   },
   {
     "symbol": "8390",
@@ -18349,7 +18349,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 170.0
+    "referencePrice": 170
   },
   {
     "symbol": "8421",
@@ -18493,7 +18493,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 85.0
+    "referencePrice": 85
   },
   {
     "symbol": "8450",
@@ -18525,7 +18525,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 150.0
+    "referencePrice": 150
   },
   {
     "symbol": "8463",
@@ -18541,7 +18541,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 348.0
+    "referencePrice": 348
   },
   {
     "symbol": "8466",
@@ -18597,7 +18597,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 126.0
+    "referencePrice": 126
   },
   {
     "symbol": "8481",
@@ -18605,7 +18605,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 40.0
+    "referencePrice": 40
   },
   {
     "symbol": "8482",
@@ -18645,7 +18645,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 206.0
+    "referencePrice": 206
   },
   {
     "symbol": "8905",
@@ -18749,7 +18749,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 29.0
+    "referencePrice": 29
   },
   {
     "symbol": "8931",
@@ -18773,7 +18773,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 4.0
+    "referencePrice": 4
   },
   {
     "symbol": "8935",
@@ -18805,7 +18805,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 47.0
+    "referencePrice": 47
   },
   {
     "symbol": "8940",
@@ -18837,7 +18837,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 1280.0
+    "referencePrice": 1280
   },
   {
     "symbol": "9103",
@@ -18925,7 +18925,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 63.0
+    "referencePrice": 63
   },
   {
     "symbol": "9902",
@@ -18965,7 +18965,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 14.0
+    "referencePrice": 14
   },
   {
     "symbol": "9908",
@@ -19029,7 +19029,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 13.0
+    "referencePrice": 13
   },
   {
     "symbol": "9921",
@@ -19149,7 +19149,7 @@
     "market": "上市",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 118.0
+    "referencePrice": 118
   },
   {
     "symbol": "9940",
@@ -19261,7 +19261,7 @@
     "market": "上櫃",
     "stockType": "一般個股",
     "frequency": "年配",
-    "referencePrice": 41.0
+    "referencePrice": 41
   },
   {
     "symbol": "9962",
@@ -19270,5 +19270,13 @@
     "stockType": "一般個股",
     "frequency": "年配",
     "referencePrice": 9.89
+  },
+  {
+    "symbol": "7781",
+    "name": "昕力資",
+    "market": "興櫃",
+    "stockType": "一般個股",
+    "frequency": "年配",
+    "referencePrice": 19.9
   }
 ]
