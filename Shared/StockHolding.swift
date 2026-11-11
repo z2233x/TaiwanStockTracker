@@ -39,6 +39,7 @@ public struct PopularStockPreset: Identifiable, Equatable {
     public let defaultPrice: Double
     
     public static let allPresets: [PopularStockPreset] = [
+        PopularStockPreset(symbol: "00406", name: "富邦科技高息(掩護性買權)", frequency: .monthly, stockType: .etf, defaultPrice: 15.0),
         PopularStockPreset(symbol: "0056", name: "元大高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 37.5),
         PopularStockPreset(symbol: "00878", name: "國泰永續高股息", frequency: .quarterly, stockType: .etf, defaultPrice: 22.8),
         PopularStockPreset(symbol: "00919", name: "群益台灣精選高息", frequency: .quarterly, stockType: .etf, defaultPrice: 24.2),

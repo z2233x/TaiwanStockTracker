@@ -519,7 +519,8 @@
   let journals = JSON.parse(localStorage.getItem('twstock_user_journals_v4')) || [];
   let isPrivacyMasked = localStorage.getItem('twstock_masked') === 'true';
   let isNotificationEnabled = localStorage.getItem('twstock_notif') === 'true';
-  let targetMonthlyIncome = 30000;
+  let targetMonthlyIncome = Number(localStorage.getItem('twstock_target_income')) || 30000;
+  let isShowingSourceDetails = false;
   let currentTab = 2; // 預設第 3 個：投資總覽
   let expandedHoldings = new Set();
 
@@ -571,9 +572,12 @@
     const totalDividends = holdings.reduce((s, h) => s + h.totalDividends, 0);
     const totalCount = holdings.reduce((s, h) => s + h.count, 0);
 
-    const estMonthlyDiv = (totalMarketValue * 0.075) / 12;
-    const goalPct = Math.min(100, Math.round((estMonthlyDiv / targetMonthlyIncome) * 100));
-    const principalGap = Math.max(0, (targetMonthlyIncome * 12 / 0.075) - totalMarketValue);
+    // 依持有現股逐檔智慧推算股息與來源 (不再死板乘以 0.075)
+    const divSummary = analyzePortfolioDividendSources(holdings);
+    const estMonthlyDiv = divSummary.totalMonthlyDividend;
+    const effectiveYield = totalMarketValue > 0 ? (divSummary.totalAnnualDividend / totalMarketValue) : 0.075;
+    const goalPct = targetMonthlyIncome > 0 ? Math.min(100, Math.round((estMonthlyDiv / targetMonthlyIncome) * 100)) : 0;
+    const principalGap = effectiveYield > 0 ? Math.max(0, (targetMonthlyIncome * 12 / effectiveYield) - totalMarketValue) : 0;
 
     // 計算配息頻率數量
     const freqCount = { '月配': 0, '雙月配': 0, '季配': 0, '半年配': 0, '年配': 0 };
@@ -786,6 +790,8 @@
     }
     return items.map(h => {
       const isExpanded = expandedHoldings.has(h.symbol);
+      const hProfile = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
+      const hMonthlyDiv = (h.shares * h.currentPrice * hProfile.yield) / 12;
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
@@ -798,6 +804,7 @@
               <span style="font-size: 16px; font-weight: 800;">${h.symbol}</span>
               <span class="badge ${h.frequency === '月配' ? 'badge-monthly' : 'badge-quarterly'}">${h.frequency}</span>
               <span style="font-size: 10px; background: #E5E5EA; color: #555; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${brokerageTag}</span>
+              <span style="font-size: 9px; background: ${hProfile.color}22; color: ${hProfile.color}; padding: 2px 5px; border-radius: 4px; font-weight: 700;">${hProfile.strategy}</span>
             </div>
             <span style="cursor: pointer; color: #8E8E93; font-size: 12px;" onclick="toggleExpand('${h.symbol}')">
               ${isExpanded ? '▲ 收合' : '▼ 展開'}
@@ -1336,8 +1343,159 @@
     renderApp();
   }
 
+  
+  // ==================== 股息四大來源與掩護性買權 (Covered Call) 分析引擎 ====================
+  function getHoldingDividendProfile(symbol, name = '', stockType = 'ETF指數型') {
+    const sym = (symbol || '').trim().toUpperCase();
+    const cleanName = (name || '').trim();
+
+    // 1. 掩護性買權 (Covered Call) 標的 (以 00406 或關鍵字為首)
+    if (sym === '00406' || cleanName.includes('掩護性買權') || cleanName.includes('選擇權') || cleanName.includes('Covered Call') || cleanName.includes('權利金') || cleanName.includes('CC')) {
+      return {
+        strategy: '掩護性買權 (Covered Call)',
+        color: '#AF52DE',
+        yield: 0.105,
+        ratio76: 0.65,
+        ratio54C: 0.15,
+        ratioReserve: 0.18,
+        ratioSurplus: 0.02,
+        notes: '賣出選擇權 (Covered Call) 權利金收入佔 65%，屬 76 國內財產交易所得，停徵所得稅且免扣二代健保！'
+      };
+    }
+
+    // 2. 主流高股息 ETF
+    const highDivProfiles = {
+      '00919': { yield: 0.102, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅' },
+      '00929': { yield: 0.082, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '科技優息月月配，平準金機制穩定配息' },
+      '0056':  { yield: 0.085, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '老牌高股息，資本利得與平準金合計免稅達 65%' },
+      '00878': { yield: 0.078, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: 'ESG 穩健息收與平準金保護' },
+      '00915': { yield: 0.095, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: '高資本利得成分，免稅比重高' },
+      '00713': { yield: 0.072, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '低波動防禦型，配息平準金兼備' },
+      '00940': { yield: 0.065, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '價值選股月配' },
+      '00939': { yield: 0.062, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: '動能選股月配' }
+    };
+    if (highDivProfiles[sym]) {
+      const p = highDivProfiles[sym];
+      return {
+        strategy: '高股息 (含平準金)',
+        color: '#FF9500',
+        yield: p.yield,
+        ratio76: p.ratio76,
+        ratio54C: p.ratio54C,
+        ratioReserve: p.ratioReserve,
+        ratioSurplus: p.ratioSurplus,
+        notes: p.notes
+      };
+    }
+
+    // 3. 市值型 ETF
+    if (['0050', '006208', '00692', '00850'].includes(sym)) {
+      return {
+        strategy: '市值指數型',
+        color: '#007AFF',
+        yield: 0.035,
+        ratio76: 0.08,
+        ratio54C: 0.90,
+        ratioReserve: 0.0,
+        ratioSurplus: 0.02,
+        notes: '以成分股現股現金股利 (54C) 為主要收益來源'
+      };
+    }
+
+    // 4. 一般個股
+    if (stockType === '一般個股' || (!sym.startsWith('00') && sym.length === 4)) {
+      let estYield = 0.045;
+      if (sym.startsWith('28')) estYield = 0.048;
+      else if (sym === '2330') estYield = 0.018;
+      else if (sym === '2454') estYield = 0.042;
+      return {
+        strategy: '一般現股 (100% 54C)',
+        color: '#5856D6',
+        yield: estYield,
+        ratio76: 0.0,
+        ratio54C: 1.0,
+        ratioReserve: 0.0,
+        ratioSurplus: 0.0,
+        notes: '個別上市公司現金股利，100% 全額屬 54C 股利所得'
+      };
+    }
+
+    return {
+      strategy: 'ETF指數型',
+      color: '#34C759',
+      yield: 0.070,
+      ratio76: 0.20,
+      ratio54C: 0.45,
+      ratioReserve: 0.33,
+      ratioSurplus: 0.02,
+      notes: 'ETF 綜合收益分配 (含 54C 股利、平準金與資本利得)'
+    };
+  }
+
+  function analyzePortfolioDividendSources(items) {
+    const calcs = items.map(h => {
+      const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
+      const val = h.shares * h.currentPrice;
+      const annual = val * p.yield;
+      const monthly = annual / 12;
+      return {
+        holding: h,
+        profile: p,
+        annual,
+        monthly,
+        amt76: monthly * p.ratio76,
+        amt54C: monthly * p.ratio54C,
+        amtReserve: monthly * p.ratioReserve,
+        amtSurplus: monthly * p.ratioSurplus,
+        exemptPct: (p.ratio76 + p.ratioReserve + p.ratioSurplus) * 100
+      };
+    });
+
+    const totalMonthly = calcs.reduce((s, c) => s + c.monthly, 0);
+    const totalAnnual = totalMonthly * 12;
+    const total76 = calcs.reduce((s, c) => s + c.amt76, 0);
+    const total54C = calcs.reduce((s, c) => s + c.amt54C, 0);
+    const totalReserve = calcs.reduce((s, c) => s + c.amtReserve, 0);
+    const totalSurplus = calcs.reduce((s, c) => s + c.amtSurplus, 0);
+
+    const pct76 = totalMonthly > 0 ? (total76 / totalMonthly) * 100 : 0;
+    const pct54C = totalMonthly > 0 ? (total54C / totalMonthly) * 100 : 0;
+    const pctReserve = totalMonthly > 0 ? (totalReserve / totalMonthly) * 100 : 0;
+    const pctSurplus = totalMonthly > 0 ? (totalSurplus / totalMonthly) * 100 : 0;
+    const taxExemptPct = pct76 + pctReserve + pctSurplus;
+
+    const hasCoveredCall = calcs.some(c => c.profile.strategy.includes('Covered Call') || c.profile.strategy.includes('掩護性買權'));
+    const annualNhiSaved = (total76 + totalReserve + totalSurplus) * 12 * 0.0211;
+
+    return {
+      totalMonthly,
+      totalAnnual,
+      total76, total54C, totalReserve, totalSurplus,
+      pct76, pct54C, pctReserve, pctSurplus,
+      taxExemptPct,
+      hasCoveredCall,
+      annualNhiSaved,
+      calcs
+    };
+  }
+
+  function updateTargetMonthlyIncome(val) {
+    const num = Number(val);
+    if (num > 0) {
+      targetMonthlyIncome = num;
+      localStorage.setItem('twstock_target_income', targetMonthlyIncome);
+      renderApp();
+    }
+  }
+
+  function toggleSourceDetails() {
+    isShowingSourceDetails = !isShowingSourceDetails;
+    renderApp();
+  }
+
   function setGoal(amt) {
-    targetMonthlyIncome = amt;
+    targetMonthlyIncome = Number(amt) || 30000;
+    localStorage.setItem('twstock_target_income', targetMonthlyIncome);
     renderApp();
   }
 

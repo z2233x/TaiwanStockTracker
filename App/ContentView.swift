@@ -103,9 +103,9 @@ struct DashboardView: View {
     @State private var refreshMessage = ""
     @State private var lastRefreshedTime = ""
     
-    // 存股被動收入目標計算機 State
-    @State private var targetMonthlyIncome: Double = 30000 // 目標月領 3 萬元
-    @State private var expectedYield: Double = 0.075       // 預期平均殖利率 7.5%
+    // 存股被動收入目標計算機 State (支援手動輸入與持久化儲存)
+    @State private var targetMonthlyIncome: Double = StorageService.shared.loadTargetMonthlyIncome()
+    @State private var targetMonthlyIncomeInput: String = "\(Int(StorageService.shared.loadTargetMonthlyIncome()))"
     @State private var monthlyDCAAmount: Double = 20000     // 每月定期定額 2 萬元
     
     var totalMarketValue: Double { holdings.reduce(0) { $0 + $1.marketValue } }
@@ -115,14 +115,26 @@ struct DashboardView: View {
     var totalDividendCount: Int { holdings.reduce(0) { $0 + $1.dividendCount } }
     var frequencyDict: [FrequencyType: Int] { StorageService.shared.getFrequencyDistribution(holdings: holdings) }
     
-    // 當前推算年化股息與月均股息
-    var estimatedAnnualDividend: Double { totalMarketValue * expectedYield }
-    var currentMonthlyDividend: Double { estimatedAnnualDividend / 12.0 }
+    // 智慧持股股息來源與掩護性買權分析 (逐檔對應推算)
+    var dividendSourceSummary: PortfolioDividendSourceSummary {
+        DividendSourceService.shared.analyzePortfolio(holdings: holdings)
+    }
+    
+    // 當前推算年化股息與月均股息 (按持有現股逐檔智慧推算加總，不再單純乘以 7.5%)
+    var currentMonthlyDividend: Double {
+        dividendSourceSummary.totalMonthlyDividend
+    }
+    var estimatedAnnualDividend: Double {
+        dividendSourceSummary.totalAnnualDividend
+    }
+    var effectivePortfolioYield: Double {
+        totalMarketValue > 0 ? (estimatedAnnualDividend / totalMarketValue) : 0.075
+    }
     var goalProgress: Double {
         targetMonthlyIncome > 0 ? min(1.0, currentMonthlyDividend / targetMonthlyIncome) : 0
     }
     var neededPrincipal: Double {
-        expectedYield > 0 ? (targetMonthlyIncome * 12.0) / expectedYield : 0
+        effectivePortfolioYield > 0 ? (targetMonthlyIncome * 12.0) / effectivePortfolioYield : 0
     }
     var principalGap: Double { max(0, neededPrincipal - totalMarketValue) }
     var yearsToGoal: Double {
@@ -247,7 +259,7 @@ struct DashboardView: View {
                         .shadow(color: Color(hex: "#1D58BD").opacity(0.28), radius: 12, x: 0, y: 6)
                     }
                     
-                    // 2. 存股被動收入目標計算機 (進階功能)
+                    // 2. 存股被動收入目標計算機 (支援手動輸入與快選)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Label("存股被動收入目標", systemImage: "target")
@@ -256,6 +268,42 @@ struct DashboardView: View {
                             Text("達成率 \(String(format: "%.1f", goalProgress * 100))%")
                                 .font(.subheadline.bold())
                                 .foregroundColor(Color(hex: "#007AFF"))
+                        }
+                        
+                        // 手動輸入框 (直接鍵入自訂月領金額)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("自訂目標月領金額 (點擊直接手動輸入)：")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                            
+                            HStack(spacing: 6) {
+                                Text("$")
+                                    .font(.headline.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                                
+                                TextField("例: 30000", text: $targetMonthlyIncomeInput)
+                                    .keyboardType(.numberPad)
+                                    .font(.headline.bold())
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 10)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(hex: "#007AFF").opacity(0.4), lineWidth: 1)
+                                    )
+                                    .onChange(of: targetMonthlyIncomeInput) { newVal in
+                                        let filtered = newVal.filter { "0123456789".contains($0) }
+                                        if let val = Double(filtered), val > 0 {
+                                            targetMonthlyIncome = val
+                                            StorageService.shared.saveTargetMonthlyIncome(val)
+                                        }
+                                    }
+                                
+                                Text("元 / 月")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         
                         // 進度條
@@ -279,10 +327,22 @@ struct DashboardView: View {
                         
                         // 目標快選按鈕
                         HStack(spacing: 8) {
-                            GoalChipButton(title: "月領1萬", target: 10000, current: $targetMonthlyIncome)
-                            GoalChipButton(title: "月領3萬", target: 30000, current: $targetMonthlyIncome)
-                            GoalChipButton(title: "月領5萬", target: 50000, current: $targetMonthlyIncome)
-                            GoalChipButton(title: "月領10萬", target: 100000, current: $targetMonthlyIncome)
+                            GoalChipButton(title: "月領1萬", target: 10000, current: $targetMonthlyIncome) {
+                                targetMonthlyIncomeInput = "10000"
+                                StorageService.shared.saveTargetMonthlyIncome(10000)
+                            }
+                            GoalChipButton(title: "月領3萬", target: 30000, current: $targetMonthlyIncome) {
+                                targetMonthlyIncomeInput = "30000"
+                                StorageService.shared.saveTargetMonthlyIncome(30000)
+                            }
+                            GoalChipButton(title: "月領5萬", target: 50000, current: $targetMonthlyIncome) {
+                                targetMonthlyIncomeInput = "50000"
+                                StorageService.shared.saveTargetMonthlyIncome(50000)
+                            }
+                            GoalChipButton(title: "月領10萬", target: 100000, current: $targetMonthlyIncome) {
+                                targetMonthlyIncomeInput = "100000"
+                                StorageService.shared.saveTargetMonthlyIncome(100000)
+                            }
                         }
                         
                         Divider().padding(.vertical, 2)
@@ -311,6 +371,11 @@ struct DashboardView: View {
                         }
                     }
                     .padding(16)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
+                    // 2.5 股息來源結構與掩護性買權 (Covered Call) 分析模組
+                    DividendSourceBreakdownCard(summary: dividendSourceSummary)
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(16)
                     
@@ -468,16 +533,260 @@ struct DashboardView: View {
     }
 }
 
+// MARK: - 股息來源結構與掩護性買權 (Covered Call) 分析卡片
+struct DividendSourceBreakdownCard: View {
+    let summary: PortfolioDividendSourceSummary
+    @State private var isShowingDetails = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // 卡片表頭
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "chart.pie.fill")
+                        .foregroundColor(Color(hex: "#AF52DE"))
+                    Text("股息來源結構與節稅分析")
+                        .font(.headline.bold())
+                }
+                Spacer()
+                if summary.hasCoveredCallHoldings {
+                    Text("含Covered Call")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#AF52DE").opacity(0.15))
+                        .foregroundColor(Color(hex: "#AF52DE"))
+                        .cornerRadius(6)
+                }
+            }
+            
+            // 股息總覽金額
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("持股逐檔推算月被動現金流")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("$\(Int(summary.totalMonthlyDividend).formatted())")
+                            .font(.system(size: 26, weight: .heavy, design: .rounded))
+                            .foregroundColor(Color(hex: "#007AFF"))
+                        Text("/ 月")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("推算年領股息")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("$\(Int(summary.totalAnnualDividend).formatted())")
+                        .font(.subheadline.bold())
+                }
+            }
+            
+            // 四色股息來源比例長條圖
+            if summary.totalMonthlyDividend > 0 {
+                VStack(spacing: 6) {
+                    GeometryReader { geo in
+                        HStack(spacing: 2) {
+                            if summary.total76Percent > 0 {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color(hex: "#AF52DE"))
+                                    .frame(width: max(4, geo.size.width * CGFloat(summary.total76Percent / 100.0)))
+                            }
+                            if summary.total54CPercent > 0 {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color(hex: "#007AFF"))
+                                    .frame(width: max(4, geo.size.width * CGFloat(summary.total54CPercent / 100.0)))
+                            }
+                            if summary.totalReservePercent > 0 {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color(hex: "#FF9500"))
+                                    .frame(width: max(4, geo.size.width * CGFloat(summary.totalReservePercent / 100.0)))
+                            }
+                            if summary.totalSurplusPercent > 0 {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color(hex: "#34C759"))
+                                    .frame(width: max(4, geo.size.width * CGFloat(summary.totalSurplusPercent / 100.0)))
+                            }
+                        }
+                    }
+                    .frame(height: 10)
+                    
+                    // 四大來源圖例與佔比
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        SourceLegendItem(
+                            colorHex: "#AF52DE",
+                            title: "76 選擇權權利金/財產交易",
+                            amount: summary.total76Amount,
+                            percentage: summary.total76Percent,
+                            note: "免綜所稅・免二代健保"
+                        )
+                        SourceLegendItem(
+                            colorHex: "#007AFF",
+                            title: "54C 股利所得 (現股股息)",
+                            amount: summary.total54CAmount,
+                            percentage: summary.total54CPercent,
+                            note: "計入綜所稅・單筆滿2萬扣2.11%"
+                        )
+                        SourceLegendItem(
+                            colorHex: "#FF9500",
+                            title: "收益平準金 (本金返還)",
+                            amount: summary.totalReserveAmount,
+                            percentage: summary.totalReservePercent,
+                            note: "免納所得稅・免二代健保"
+                        )
+                        SourceLegendItem(
+                            colorHex: "#34C759",
+                            title: "資本公積",
+                            amount: summary.totalSurplusAmount,
+                            percentage: summary.totalSurplusPercent,
+                            note: "免稅所得・免二代健保"
+                        )
+                    }
+                }
+            } else {
+                Text("尚無持股資料，匯入或新增現股後將自動精算股息來源結構")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Divider().padding(.vertical, 2)
+            
+            // 💡 節稅效益與健保免扣重點說明
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .foregroundColor(.green)
+                    Text("實質領息與節稅優勢")
+                        .font(.caption.bold())
+                    Spacer()
+                    Text("免稅免健保佔 \(String(format: "%.1f", summary.taxExemptPercent))%")
+                        .font(.caption.bold())
+                        .foregroundColor(.green)
+                }
+                
+                Text("• 掩護性買權策略 (如 00406) 之收益主要來自「賣出選擇權權利金」，屬國內財產交易所得，停徵所得稅且完全免扣 2.11% 二代健保補充保費！\n• 預估整體組合每年可為您免除約 $\(Int(summary.estimatedAnnualNhiSaved).formatted()) 之二代健保潛在負擔。")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+            }
+            .padding(10)
+            .background(Color.green.opacity(0.08))
+            .cornerRadius(10)
+            
+            // 點開查看各檔持股股息來源明細
+            if !summary.holdingsCalculations.isEmpty {
+                Button {
+                    isShowingDetails.toggle()
+                } label: {
+                    HStack {
+                        Text(isShowingDetails ? "收合各檔持股股息拆解" : "查看各檔持股股息來源對應 (\(summary.holdingsCalculations.count) 檔)")
+                            .font(.caption.bold())
+                        Spacer()
+                        Image(systemName: isShowingDetails ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                    }
+                    .foregroundColor(Color(hex: "#007AFF"))
+                }
+                
+                if isShowingDetails {
+                    VStack(spacing: 8) {
+                        ForEach(summary.holdingsCalculations) { c in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(c.holding.symbol)
+                                            .font(.caption.bold())
+                                        Text(c.holding.name)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(c.profile.strategy.rawValue)
+                                            .font(.system(size: 9, weight: .bold))
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(Color(hex: c.profile.strategy.badgeColorHex).opacity(0.12))
+                                            .foregroundColor(Color(hex: c.profile.strategy.badgeColorHex))
+                                            .cornerRadius(4)
+                                    }
+                                    Text(c.profile.notes)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("約 $\(Int(c.monthlyDividend).formatted()) /月")
+                                        .font(.caption.bold())
+                                        .foregroundColor(Color(hex: "#007AFF"))
+                                    Text("免稅比例 \(String(format: "%.0f", c.taxExemptPercentage))%")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(c.taxExemptPercentage >= 60 ? .green : .secondary)
+                                }
+                            }
+                            .padding(8)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+    }
+}
+
+// 股息來源圖例小卡片
+struct SourceLegendItem: View {
+    let colorHex: String
+    let title: String
+    let amount: Double
+    let percentage: Double
+    let note: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Circle()
+                .fill(Color(hex: colorHex))
+                .frame(width: 8, height: 8)
+                .padding(.top, 4)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                HStack(spacing: 4) {
+                    Text("$\(Int(amount).formatted()) /月")
+                        .font(.system(size: 12, weight: .heavy))
+                    Text("(\(String(format: "%.1f", percentage))%)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Text(note)
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(8)
+    }
+}
+
 struct GoalChipButton: View {
     let title: String
     let target: Double
     @Binding var current: Double
+    var onSelect: (() -> Void)? = nil
     
     var isSelected: Bool { Int(current) == Int(target) }
     
     var body: some View {
         Button {
             current = target
+            onSelect?()
         } label: {
             Text(title)
                 .font(.caption.bold())
@@ -1006,7 +1315,7 @@ struct StockHoldingRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                // 標的代號 + 頻率Badge + 券商Badge
+                // 標的代號 + 頻率Badge + 股息策略Badge + 券商Badge
                 HStack(spacing: 6) {
                     Text(item.symbol)
                         .font(.headline.bold())
@@ -1017,6 +1326,15 @@ struct StockHoldingRowView: View {
                         .padding(.vertical, 2)
                         .background(Color(hex: item.frequency.badgeColorHex).opacity(0.15))
                         .foregroundColor(Color(hex: item.frequency.badgeColorHex))
+                        .cornerRadius(4)
+                    
+                    let profile = DividendSourceService.shared.getProfile(for: item.symbol, name: item.name, stockType: item.stockType)
+                    Text(profile.strategy.rawValue)
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: profile.strategy.badgeColorHex).opacity(0.15))
+                        .foregroundColor(Color(hex: profile.strategy.badgeColorHex))
                         .cornerRadius(4)
                     
                     if !item.brokerage.isEmpty {
@@ -1101,6 +1419,51 @@ struct StockHoldingRowView: View {
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    
+                    // 股息來源與掩護性買權推算
+                    let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.profile.estimatedYield * 100))%)")
+                                .font(.caption.bold())
+                                .foregroundColor(Color(hex: "#007AFF"))
+                            Spacer()
+                            Text("免稅比 \(String(format: "%.0f", calc.taxExemptPercentage))%")
+                                .font(.caption.bold())
+                                .foregroundColor(.green)
+                        }
+                        
+                        // 來源百分比拆解
+                        HStack(spacing: 8) {
+                            if calc.profile.ratio76 > 0 {
+                                Text("76權利金 \(Int(calc.profile.ratio76 * 100))%")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "#AF52DE"))
+                            }
+                            if calc.profile.ratio54C > 0 {
+                                Text("54C股利 \(Int(calc.profile.ratio54C * 100))%")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                            }
+                            if calc.profile.ratioReserve > 0 {
+                                Text("平準金 \(Int(calc.profile.ratioReserve * 100))%")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "#FF9500"))
+                            }
+                            if calc.profile.ratioSurplus > 0 {
+                                Text("公積 \(Int(calc.profile.ratioSurplus * 100))%")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "#34C759"))
+                            }
+                        }
+                        
+                        Text(calc.profile.notes)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
                     
                     // 操作按鈕組
                     HStack(spacing: 8) {

@@ -61,6 +61,16 @@ public final class StorageService {
     private let clearMockKey = "has_cleared_mock_data_v4"
     private let seededKey = "has_seeded_sample_data_v3"
     private let widgetSummaryKey = "widget_summary_data"
+    private let targetMonthlyIncomeKey = "saved_target_monthly_income_v1"
+    
+    public func saveTargetMonthlyIncome(_ amount: Double) {
+        userDefaults?.set(amount, forKey: targetMonthlyIncomeKey)
+    }
+    
+    public func loadTargetMonthlyIncome() -> Double {
+        let val = userDefaults?.double(forKey: targetMonthlyIncomeKey) ?? 0.0
+        return val > 0 ? val : 30000.0
+    }
     
     private init() {
         if !UserDefaults.standard.bool(forKey: clearMockKey) {
