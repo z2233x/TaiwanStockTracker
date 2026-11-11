@@ -881,6 +881,12 @@
         <input type="checkbox" ${isNotificationEnabled ? 'checked' : ''} onchange="toggleNotification(this.checked)" style="transform: scale(1.2); cursor: pointer;">
       </div>
 
+      <!-- 檢視模式切換：月曆顯示 vs 倒數清單 -->
+      <div class="seg-control" style="margin: 0 16px 8px 16px;">
+        <button class="seg-btn ${calendarMode === 0 ? 'active' : ''}" onclick="setCalendarMode(0)">📅 月曆顯示</button>
+        <button class="seg-btn ${calendarMode === 1 ? 'active' : ''}" onclick="setCalendarMode(1)">⏳ 倒數清單</button>
+      </div>
+
       <!-- 分類篩選 Chip 列 -->
       <div style="display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 8px 16px;">
         ${cats.map(c => `
@@ -890,10 +896,51 @@
         `).join('')}
       </div>
 
-      <!-- 下方重大行事曆清單 (依剩餘天數倒數排序) -->
-      <div style="padding: 0 16px;">
-        ${renderSimEventCards(filtered.slice().sort((a,b) => a.days - b.days), heldSyms)}
-      </div>
+      ${calendarMode === 0 ? `
+        <!-- 互動式月曆面板 -->
+        <div class="card" style="margin: 0 16px 10px 16px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <button class="nav-btn" onclick="changeSimMonth(-1)">‹</button>
+            <div style="font-weight: 800; font-size: 14px;">${simCurrentYear}年 ${simCurrentMonth}月</div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button class="sim-btn" style="padding: 2px 8px; font-size: 10px; background: #E5E5EA;" onclick="jumpToSimToday()">今天</button>
+              <button class="nav-btn" onclick="changeSimMonth(1)">›</button>
+            </div>
+          </div>
+
+          <!-- 星期表頭 -->
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 700; color: #8E8E93; margin-bottom: 6px;">
+            <span style="color: #FF9500;">日</span>
+            <span>一</span>
+            <span>二</span>
+            <span>三</span>
+            <span>四</span>
+            <span>五</span>
+            <span style="color: #FF9500;">六</span>
+          </div>
+
+          <!-- 7 欄日曆網格 -->
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
+            ${renderSimCalendarDays(simCurrentYear, simCurrentMonth, filtered)}
+          </div>
+        </div>
+
+        <!-- 選定日期/當月行事曆清單 (支援滑動刪除) -->
+        <div style="padding: 0 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="font-size: 12px; font-weight: 700; color: #8E8E93;">
+              ${eventsOnSelected.length > 0 ? `📅 ${simSelectedDateStr} 重大行事曆 (${eventsOnSelected.length} 筆)` : `📅 ${simCurrentMonth}月份重大行事曆 (${displayEvents.length} 筆)`}
+            </div>
+            ${eventsOnSelected.length > 0 ? `<button class="sim-btn" style="padding: 2px 6px; font-size: 10px;" onclick="selectSimDate('')">看當月全數</button>` : ''}
+          </div>
+          ${renderSimEventCards(displayEvents.slice().sort((a,b) => a.days - b.days), heldSyms)}
+        </div>
+      ` : `
+        <!-- 下方重大行事曆清單 (依剩餘天數倒數排序) -->
+        <div style="padding: 0 16px;">
+          ${renderSimEventCards(filtered.slice().sort((a,b) => a.days - b.days), heldSyms)}
+        </div>
+      `}
     `;
   }
 

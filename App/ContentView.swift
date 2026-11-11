@@ -1589,6 +1589,9 @@ struct DividendCalendarTabView: View {
     @State private var showNotificationToast = false
     @State private var syncAlertMessage = ""
     @State private var showSyncAlert = false
+    @State private var selectedViewMode: Int = 0 // 0: 📅 月曆顯示, 1: ⏳ 倒數清單
+    @State private var selectedDate: Date = Date()
+    @State private var currentMonth: Date = Date()
     
     var heldSymbols: Set<String> {
         Set(holdings.map { $0.symbol })
@@ -1651,7 +1654,17 @@ struct DividendCalendarTabView: View {
                 .padding(.vertical, 8)
                 .background(Color(.secondarySystemBackground))
                 
-                // 2. 重大行事曆分類篩選 Chip
+                // 2. 檢視模式切換：月曆顯示 vs 倒數清單
+                Picker("檢視模式", selection: $selectedViewMode) {
+                    Text("📅 月曆顯示").tag(0)
+                    Text("⏳ 倒數清單").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+                
+                // 3. 重大行事曆分類篩選 Chip
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(categoryOptions, id: \.self) { cat in
@@ -1669,19 +1682,33 @@ struct DividendCalendarTabView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                 }
                 
-                // 3. 重大行事曆清單 (依剩餘天數倒數排序，支援滑動刪除)
-                TaiwanStockCountdownListView(
-                    events: filteredEvents,
-                    heldSymbols: heldSymbols,
-                    onDelete: { eventToDelete in
-                        StorageService.shared.deleteEvent(id: eventToDelete.id)
-                        events = StorageService.shared.loadEvents()
-                        NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
-                    }
-                )
+                // 4. 主要顯示內容 (月曆顯示 vs 剩餘天數倒數清單，均支援滑動刪除)
+                if selectedViewMode == 0 {
+                    TaiwanStockCalendarMonthView(
+                        events: filteredEvents,
+                        heldSymbols: heldSymbols,
+                        selectedDate: $selectedDate,
+                        currentMonth: $currentMonth,
+                        onDelete: { eventToDelete in
+                            StorageService.shared.deleteEvent(id: eventToDelete.id)
+                            events = StorageService.shared.loadEvents()
+                            NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
+                        }
+                    )
+                } else {
+                    TaiwanStockCountdownListView(
+                        events: filteredEvents,
+                        heldSymbols: heldSymbols,
+                        onDelete: { eventToDelete in
+                            StorageService.shared.deleteEvent(id: eventToDelete.id)
+                            events = StorageService.shared.loadEvents()
+                            NotificationService.shared.syncDividendReminders(events: events, holdings: holdings)
+                        }
+                    )
+                }
             }
             .navigationTitle("台股日曆")
             .navigationBarTitleDisplayMode(.inline)
@@ -1867,6 +1894,7 @@ struct TaiwanStockCalendarMonthView: View {
     let heldSymbols: Set<String>
     @Binding var selectedDate: Date
     @Binding var currentMonth: Date
+    var onDelete: ((DividendEvent) -> Void)? = nil
     
     private let calendar = Calendar.current
     private let weekDays = ["日", "一", "二", "三", "四", "五", "六"]
@@ -2014,6 +2042,13 @@ struct TaiwanStockCalendarMonthView: View {
                     } else {
                         ForEach(displayList) { ev in
                             StockEventRowView(event: ev, isHeld: heldSymbols.contains(ev.symbol))
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        onDelete?(ev)
+                                    } label: {
+                                        Label("刪除", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
                 }
