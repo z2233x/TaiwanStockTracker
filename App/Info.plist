@@ -40,5 +40,9 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>需要相機權限以拍攝券商庫存明細或對帳單自動識別存股</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>需要相簿權限以選取券商庫存截圖自動識別存股</string>
 </dict>
 </plist>

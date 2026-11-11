@@ -1,6 +1,8 @@
 import SwiftUI
 import UserNotifications
 import UniformTypeIdentifiers
+import PhotosUI
+import Vision
 
 // MARK: - 官方 App 圖示與頭像視圖
 struct AppIconAvatarView: View {
@@ -1166,6 +1168,7 @@ struct HoldingsListView: View {
     @State private var holdingToDelete: StockHolding? = nil
     @State private var isShowingAdd = false
     @State private var isShowingBrokerageSync = false
+    @State private var isShowingPhotoOCR = false
     @State private var searchText = ""
     @State private var isRefreshing = false
     
@@ -1189,25 +1192,42 @@ struct HoldingsListView: View {
                             .foregroundColor(.secondary)
                         Text("尚未建立或匯入持股")
                             .font(.headline)
-                        Text("APP 僅會顯示您自己匯入的持股資料。\n您可以點擊下方按鈕對接券商/匯入對帳單，或點擊右上角「➕」新增！")
+                        Text("APP 僅會顯示您自己匯入的持股資料。\n您可以拍照或截圖自動辨識，也可以對接券商/對帳單，或點擊右上角「➕」手動新增！")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                         
-                        Button {
-                            isShowingBrokerageSync = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "building.columns.fill")
-                                Text("對接券商 / 匯入對帳單")
+                        HStack(spacing: 12) {
+                            Button {
+                                isShowingPhotoOCR = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "camera.fill")
+                                    Text("拍照 / 截圖自動辨識")
+                                }
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#FF9500"))
+                                .cornerRadius(12)
                             }
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color(hex: "#007AFF"))
-                            .cornerRadius(12)
+                            
+                            Button {
+                                isShowingBrokerageSync = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "building.columns.fill")
+                                    Text("對接券商 / 對帳單")
+                                }
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#007AFF"))
+                                .cornerRadius(12)
+                            }
                         }
                         .padding(.top, 8)
                         
@@ -1253,6 +1273,13 @@ struct HoldingsListView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 14) {
+                        Button {
+                            isShowingPhotoOCR = true
+                        } label: {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        
                         Button {
                             isShowingBrokerageSync = true
                         } label: {
@@ -1303,6 +1330,11 @@ struct HoldingsListView: View {
             }
             .sheet(isPresented: $isShowingBrokerageSync) {
                 BrokerageSyncSheet {
+                    holdings = StorageService.shared.loadHoldings()
+                }
+            }
+            .sheet(isPresented: $isShowingPhotoOCR) {
+                PhotoOCRScannerSheet { _ in
                     holdings = StorageService.shared.loadHoldings()
                 }
             }
@@ -2548,14 +2580,20 @@ struct BrokerageSyncSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 Picker("對接模式", selection: $selectedTab) {
+                    Text("📸 拍照辨識").tag(3)
                     Text("對帳單匯入").tag(1)
-                    Text("已支援券商").tag(0)
                     Text("永豐 API").tag(2)
+                    Text("已支援券商").tag(0)
                 }
                 .pickerStyle(.segmented)
                 .padding()
                 
-                if selectedTab == 1 {
+                if selectedTab == 3 {
+                    PhotoOCRScannerViewContent(onImportCompleted: { _ in
+                        onSyncCompleted()
+                        dismiss()
+                    })
+                } else if selectedTab == 1 {
                     // 對帳單 / 庫存文字快速解析匯入
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -2893,6 +2931,290 @@ struct BrokerageSyncSheet: View {
                     shioajiStatusMessage = "✅ 成功匯入 CA 憑證：\(fileName)"
                 case .failure(let error):
                     shioajiStatusMessage = "選取憑證失敗：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+}
+
+// MARK: ==========================================
+// MARK: 📸 照片/截圖 OCR 智慧辨識 (Apple Vision 引擎)
+// MARK: ==========================================
+
+struct CameraView: UIViewControllerRepresentable {
+    @Environment(\.dismiss) var dismiss
+    var onImageCaptured: (UIImage) -> Void
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+        } else {
+            picker.sourceType = .photoLibrary
+        }
+        picker.delegate = context.coordinator
+        picker.allowsEditing = false
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraView
+        init(_ parent: CameraView) { self.parent = parent }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onImageCaptured(image)
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
+
+struct PhotoOCRScannerViewContent: View {
+    var onImportCompleted: ([StockHolding]) -> Void
+    
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var pickedImage: UIImage? = nil
+    @State private var isShowingCamera = false
+    @State private var isRecognizing = false
+    @State private var recognizedHoldings: [StockHolding] = []
+    @State private var statusMessage = ""
+    @State private var showCameraUnavailableAlert = false
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // 頂部選擇區塊
+                HStack(spacing: 12) {
+                    Button {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            isShowingCamera = true
+                        } else {
+                            showCameraUnavailableAlert = true
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "camera.fill")
+                            Text("立即拍照")
+                        }
+                        .font(.headline.bold())
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(hex: "#FF9500"))
+                        .cornerRadius(12)
+                    }
+                    
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle.angled")
+                            Text("相簿選取截圖")
+                        }
+                        .font(.headline.bold())
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(hex: "#007AFF"))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal)
+                
+                Text("💡 支援永豐大戶投、元大、國泰、富邦等各大券商之「庫存損益」截圖或對帳單相片，Apple Vision 本機神經網路毫秒級離線自動識別！")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                
+                // 影像預覽區
+                if let image = pickedImage {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("影像預覽")
+                                .font(.subheadline.bold())
+                            Spacer()
+                            if isRecognizing {
+                                HStack(spacing: 6) {
+                                    ProgressView().scaleEffect(0.8)
+                                    Text("Vision 智慧辨識中...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 180)
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // 辨識結果確認與校對清單
+                if !recognizedHoldings.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("已識別 \(recognizedHoldings.count) 檔真實持股")
+                                .font(.headline.bold())
+                            Spacer()
+                            Text("可直接修改股數與均價")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        ForEach($recognizedHoldings) { $h in
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(h.symbol).font(.headline.bold())
+                                        Text(h.name).font(.subheadline).foregroundColor(.secondary)
+                                    }
+                                    Text(h.frequency.rawValue)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Color(hex: h.frequency.badgeColorHex).opacity(0.15))
+                                        .foregroundColor(Color(hex: h.frequency.badgeColorHex))
+                                        .cornerRadius(4)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text("股數:").font(.caption).foregroundColor(.secondary)
+                                        TextField("股數", value: $h.shares, formatter: NumberFormatter())
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(width: 75)
+                                            .keyboardType(.numberPad)
+                                            .multilineTextAlignment(.trailing)
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text("均價:").font(.caption).foregroundColor(.secondary)
+                                        TextField("均價", value: $h.averageCost, format: .number)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(width: 75)
+                                            .keyboardType(.decimalPad)
+                                            .multilineTextAlignment(.trailing)
+                                    }
+                                }
+                                
+                                Button {
+                                    recognizedHoldings.removeAll { $0.id == h.id }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                        .font(.body)
+                                }
+                            }
+                            .padding(10)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(10)
+                        }
+                        
+                        // 一鍵確認匯入按鈕
+                        Button {
+                            _ = StorageService.shared.batchImportHoldings(recognizedHoldings)
+                            onImportCompleted(recognizedHoldings)
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("確認匯入 \(recognizedHoldings.count) 檔持股至持有現股")
+                            }
+                            .font(.headline.bold())
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#34C759"))
+                            .cornerRadius(12)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.horizontal)
+                } else if pickedImage != nil && !isRecognizing {
+                    VStack(spacing: 8) {
+                        Text("⚠️ 未能在該相片中識別出明確的台股代號")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.orange)
+                        Text("建議請近距離拍攝清楚的股票代號（例如 2330、0056）與股數數字。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                }
+            }
+            .padding(.vertical)
+        }
+        .onChange(of: selectedPhotoItem) { newItem in
+            guard let newItem = newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    await MainActor.run {
+                        processImage(uiImage)
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $isShowingCamera) {
+            CameraView { capturedImage in
+                processImage(capturedImage)
+            }
+        }
+        .alert("無法啟動相機", isPresented: $showCameraUnavailableAlert) {
+            Button("確定") {}
+        } message: {
+            Text("此裝置未具備相機硬體，請改用「相簿選取截圖」功能！")
+        }
+    }
+    
+    private func processImage(_ image: UIImage) {
+        pickedImage = image
+        isRecognizing = true
+        recognizedHoldings = []
+        
+        StockOCRService.shared.recognizeStocks(from: image) { result in
+            DispatchQueue.main.async {
+                isRecognizing = false
+                switch result {
+                case .success(let items):
+                    recognizedHoldings = items
+                case .failure(let error):
+                    statusMessage = "辨識失敗：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+}
+
+struct PhotoOCRScannerSheet: View {
+    @Environment(\.dismiss) var dismiss
+    var onImportCompleted: ([StockHolding]) -> Void
+    
+    var body: some View {
+        NavigationStack {
+            PhotoOCRScannerViewContent { holdings in
+                onImportCompleted(holdings)
+                dismiss()
+            }
+            .navigationTitle("📸 拍照 / 截圖自動辨識")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("關閉") { dismiss() }
                 }
             }
         }
