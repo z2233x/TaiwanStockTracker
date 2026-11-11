@@ -1690,22 +1690,42 @@
       ` : `
         <div>
           <div style="font-size: 13px; font-weight: 700; margin-bottom: 4px;">永豐金證券 Shioaji API 即時連線</div>
-          <div style="font-size: 11px; color: #8E8E93; margin-bottom: 12px;">永豐金是目前台灣唯一開放個人量化交易與庫存查詢 API 的券商。</div>
-          <div class="form-group"><label>API Key</label><input class="form-input" placeholder="輸入永豐 API Key" value="API_KEY_DEMO_2026"></div>
-          <div class="form-group"><label>Secret Key</label><input class="form-input" type="password" placeholder="輸入 Secret Key" value="********"></div>
-          <div class="form-group">
-            <label>CA 憑證檔案 (.pfx)</label>
-            <div style="display: flex; gap: 8px;">
-              <input class="form-input" id="shioajiCertPath" placeholder="請選擇手機或本機憑證檔案" value="Sinopac.pfx" readonly style="flex: 1; background: #F2F2F7;">
-              <label class="sim-btn" style="cursor: pointer; padding: 0 12px; font-size: 12px; background: #007AFF; color: #FFF; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-                📂 選擇檔案
-                <input type="file" accept=".pfx,.cer,.crt" style="display: none;" onchange="handleCertFileSelect(this)">
-              </label>
+          <div style="font-size: 11px; color: #8E8E93; margin-bottom: 12px;">永豐官方 Shioaji 為 Python SDK。可透過電腦端中繼伺服器 (shioaji_bridge.py) 自動抓取，或直接貼上大戶投 App 庫存明細！</div>
+          
+          <!-- 方式 A: 中繼伺服器 -->
+          <div style="background: #F9F9FB; padding: 10px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #E5E5EA;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--ios-orange); margin-bottom: 6px;">【方式 A】Python 中繼伺服器直連 (自動化)</div>
+            <div class="form-group"><label>中繼伺服器網址 (Bridge URL)</label><input class="form-input" id="shioajiBridgeUrl" placeholder="例: http://127.0.0.1:8000" value="http://127.0.0.1:8000"></div>
+            <div class="form-group"><label>API Key</label><input class="form-input" id="shioajiApiKey" placeholder="輸入永豐 API Key" value=""></div>
+            <div class="form-group"><label>Secret Key</label><input class="form-input" id="shioajiSecretKey" type="password" placeholder="輸入 Secret Key" value=""></div>
+            <div class="form-group">
+              <label>CA 憑證檔案 (.pfx)</label>
+              <div style="display: flex; gap: 8px;">
+                <input class="form-input" id="shioajiCertPath" placeholder="請選擇憑證檔案" value="" readonly style="flex: 1; background: #F2F2F7;">
+                <label class="sim-btn" style="cursor: pointer; padding: 0 12px; font-size: 12px; background: #007AFF; color: #FFF; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                  📂 選擇檔案
+                  <input type="file" accept=".pfx,.cer,.crt" style="display: none;" onchange="handleCertFileSelect(this)">
+                </label>
+              </div>
             </div>
-            <div id="shioajiCertTip" style="font-size: 11px; color: #34C759; margin-top: 4px;">✔ 支援本機或手機「檔案」App / iCloud 選擇 .pfx 憑證</div>
+            <button class="sim-btn" style="width: 100%; justify-content: center; padding: 10px; background: var(--ios-orange); color: #FFF; font-weight: 700;" onclick="syncShioajiFromBridge()">
+              🔗 連線中繼伺服器並同步真實持股
+            </button>
           </div>
-          <button class="sim-btn" style="width: 100%; justify-content: center; padding: 12px; background: var(--ios-orange); color: #FFF; font-weight: 700;" onclick="simulateShioajiSync()">
-            🔗 驗證金鑰並即時同步永豐持股
+
+          <!-- 方式 B: 大戶投庫存直接貼上 -->
+          <div style="background: #F9F9FB; padding: 10px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #E5E5EA;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--ios-blue); margin-bottom: 4px;">【方式 B】大戶投庫存一鍵貼上 (免跑伺服器)</div>
+            <div style="font-size: 10px; color: #8E8E93; margin-bottom: 6px;">至永豐大戶投 App「未實現損益」全選複製文字貼於此：</div>
+            <textarea class="form-input" id="sinopacDirectText" rows="3" placeholder="支援格式 (代號 股數 價格)：&#10;2330 1000 1050&#10;0056 3000 37.84"></textarea>
+            <button class="sim-btn" style="width: 100%; justify-content: center; padding: 10px; background: var(--ios-blue); color: #FFF; font-weight: 700; margin-top: 6px;" onclick="importSinopacDirectText()">
+              📥 匯入本人真實永豐持股
+            </button>
+          </div>
+
+          <!-- 輔助清理 -->
+          <button class="sim-btn" style="width: 100%; justify-content: center; padding: 8px; color: #FF3B30; background: rgba(255,59,48,0.1); font-size: 12px;" onclick="cleanSinopacHoldings()">
+            🗑️ 一鍵清除先前誤匯入的永豐持股
           </button>
         </div>
       `)}
@@ -1816,52 +1836,151 @@
     }
   }
 
-  function simulateShioajiSync() {
-    closeSheet();
-    triggerNotification('⚡ Shioaji API 連線中', '正在安全連線永豐金證券伺服器...');
-    setTimeout(() => {
-      // 模擬匯入永豐金持股
-      const shioajiItems = [
-        { symbol: '2330', name: '台積電', shares: 1000, price: 1050, freq: '季配' },
-        { symbol: '0050', name: '元大台灣50', shares: 2000, price: 195, freq: '半年配' }
-      ];
-      shioajiItems.forEach(item => {
-        const exist = holdings.find(h => h.symbol === item.symbol);
+  async function syncShioajiFromBridge() {
+    const bridge = (document.getElementById('shioajiBridgeUrl').value || '').trim();
+    const apiKey = (document.getElementById('shioajiApiKey').value || '').trim();
+    const secretKey = (document.getElementById('shioajiSecretKey').value || '').trim();
+    const certPath = (document.getElementById('shioajiCertPath').value || '').trim();
+
+    if (!bridge) {
+      alert('請輸入中繼伺服器網址 (例: http://127.0.0.1:8000) 或改用【方式 B】直接貼上庫存！');
+      return;
+    }
+
+    triggerNotification('⚡ 正在連線中繼伺服器', `目標: ${bridge}...`);
+    try {
+      const resp = await fetch(`${bridge.replace(/\/$/, '')}/api/sync_positions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, ca_cert_path: certPath })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || '伺服器回應錯誤');
+      
+      const positions = data.positions || [];
+      if (positions.length === 0) {
+        alert('連線成功，但您的永豐帳戶目前無證券庫存持股。');
+        return;
+      }
+
+      positions.forEach(p => {
+        const exist = holdings.find(h => h.symbol === p.symbol);
         if (exist) {
-          exist.shares += item.shares;
-          exist.currentPrice = item.price;
-          exist.brokerage = '永豐金證券 (大戶投)';
+          exist.shares = p.shares;
+          exist.averageCost = p.average_cost;
+          exist.currentPrice = p.average_cost;
+          exist.brokerage = '永豐金證券 (Shioaji API)';
         } else {
           holdings.push({
             id: Date.now().toString() + Math.random(),
-            symbol: item.symbol,
-            name: item.name,
-            frequency: item.freq,
-            shares: item.shares,
-            averageCost: item.price,
-            currentPrice: item.price,
+            symbol: p.symbol,
+            name: p.name || p.symbol,
+            frequency: '季配',
+            shares: p.shares,
+            averageCost: p.average_cost,
+            currentPrice: p.average_cost,
             totalDividends: 0,
             count: 0,
-            brokerage: '永豐金證券 (大戶投)'
+            brokerage: '永豐金證券 (Shioaji API)'
           });
-          // 連動日記流水
           journals.unshift({
             id: Date.now().toString() + Math.random(),
-            symbol: item.symbol,
-            name: item.name,
+            symbol: p.symbol,
+            name: p.name || p.symbol,
             type: '買',
             date: new Date().toISOString().substring(0, 10),
-            price: item.price,
-            shares: item.shares,
-            note: '永豐 Shioaji 對接匯入'
+            price: p.average_cost,
+            shares: p.shares,
+            note: '永豐 Shioaji 真實同步'
           });
         }
       });
-      syncHoldingEventsSim();
       saveState();
+      closeSheet();
       renderApp();
-      triggerNotification('✅ Shioaji 同步成功', '已自永豐金證券帳戶即時同步 2 筆持股並連動日記與行事曆！');
-    }, 1200);
+      triggerNotification('✅ Shioaji 同步成功', `已成功自永豐帳戶同步 ${positions.length} 筆真實個人持股！`);
+    } catch (err) {
+      alert(`連線失敗: ${err.message}\n請確認電腦已啟動 shioaji_bridge.py，或改用【方式 B】直接貼上大戶投文字！`);
+    }
+  }
+
+  function importSinopacDirectText() {
+    const raw = (document.getElementById('sinopacDirectText').value || '').trim();
+    if (!raw) {
+      alert('請先貼上永豐大戶投的持股明細文字！');
+      return;
+    }
+    const lines = raw.split('\n');
+    let count = 0;
+    lines.forEach(l => {
+      const parts = l.replace(/,/g, ' ').replace(/\t/g, ' ').split(/\s+/).filter(Boolean);
+      if (parts.length < 2) return;
+      const sym = parts[0].toUpperCase();
+      let name = sym;
+      let shares = 1000;
+      let price = 10.0;
+      const match = typeof allTaiwanStocks !== 'undefined' ? allTaiwanStocks.find(s => s.symbol === sym) : null;
+      if (match) { name = match.name; price = match.referencePrice || 10.0; }
+      if (parts.length >= 4) {
+        name = parts[1];
+        shares = parseInt(parts[2]) || 1000;
+        price = parseFloat(parts[3]) || price;
+      } else if (parts.length === 3) {
+        shares = parseInt(parts[1]) || 1000;
+        price = parseFloat(parts[2]) || price;
+      } else if (parts.length === 2) {
+        shares = parseInt(parts[1]) || 1000;
+      }
+      const exist = holdings.find(h => h.symbol === sym);
+      if (exist) {
+        exist.shares = shares;
+        exist.averageCost = price;
+        exist.currentPrice = price;
+        exist.brokerage = '永豐金證券 (大戶投)';
+      } else {
+        holdings.push({
+          id: Date.now().toString() + Math.random(),
+          symbol: sym,
+          name: name,
+          frequency: match ? match.frequency : '季配',
+          shares: shares,
+          averageCost: price,
+          currentPrice: price,
+          totalDividends: 0,
+          count: 0,
+          brokerage: '永豐金證券 (大戶投)'
+        });
+        journals.unshift({
+          id: Date.now().toString() + Math.random(),
+          symbol: sym,
+          name: name,
+          type: '買',
+          date: new Date().toISOString().substring(0, 10),
+          price: price,
+          shares: shares,
+          note: '大戶投直接匯入'
+        });
+      }
+      count++;
+    });
+    saveState();
+    closeSheet();
+    renderApp();
+    triggerNotification('✅ 大戶投持股匯入完成', `已成功匯入 ${count} 筆真實永豐持股！`);
+  }
+
+  function cleanSinopacHoldings() {
+    if (confirm('確定要清除所有標記為永豐金證券的持股與日記嗎？')) {
+      const toRemove = holdings.filter(h => (h.brokerage || '').includes('永豐'));
+      const toRemoveSyms = new Set(toRemove.map(h => h.symbol));
+      holdings = holdings.filter(h => !(h.brokerage || '').includes('永豐'));
+      journals = journals.filter(j => !toRemoveSyms.has(j.symbol));
+      events = events.filter(e => !toRemoveSyms.has(e.symbol));
+      saveState();
+      closeSheet();
+      renderApp();
+      triggerNotification('🗑️ 永豐持股已清理', '已清空先前誤匯入的永豐持股與流水。');
+    }
   }
 
   function renderModalStockItems(items) {

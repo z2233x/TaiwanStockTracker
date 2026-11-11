@@ -2541,6 +2541,8 @@ struct BrokerageSyncSheet: View {
     @State private var selectedCertFileName = ""
     @State private var isConnectingShioaji = false
     @State private var shioajiStatusMessage = ""
+    @State private var bridgeServerURL = ""
+    @State private var sinopacDirectText = ""
     
     var body: some View {
         NavigationStack {
@@ -2688,82 +2690,171 @@ struct BrokerageSyncSheet: View {
                                     .font(.headline)
                             }
                             
-                            Text("永豐金證券是目前全台灣唯一開放官方量化交易與持股查詢 API 的券商。填入您的 API 金鑰即可實現即時庫存直連！")
+                            Text("永豐 Shioaji 官方為 Python SDK。您可透過電腦端中繼服務 (shioaji_bridge.py) 自動抓取，或直接貼上大戶投 App 庫存明細！")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            VStack(spacing: 12) {
+                            // 方式 A: Python 中繼服務直連
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("【方式 A】Python 中繼伺服器直連 (自動化)")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Color(hex: "#FF9500"))
+                                
+                                TextField("中繼伺服器網址 (例: http://192.168.1.100:8000)", text: $bridgeServerURL)
+                                    .textFieldStyle(.roundedBorder)
+                                    .keyboardType(.URL)
+                                    .textInputAutocapitalization(.never)
+                                
                                 TextField("Shioaji API Key", text: $apiKey)
                                     .textFieldStyle(.roundedBorder)
                                 SecureField("Secret Key", text: $secretKey)
                                     .textFieldStyle(.roundedBorder)
                                 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 8) {
-                                        TextField("CA 憑證路徑 / 檔案 (選填)", text: $certPath)
-                                            .textFieldStyle(.roundedBorder)
-                                        
-                                        Button {
-                                            isShowingCertPicker = true
-                                        } label: {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "folder.badge.plus")
-                                                Text("選擇檔案")
-                                            }
-                                            .font(.system(size: 13, weight: .bold))
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 8)
-                                            .background(Color(hex: "#007AFF"))
-                                            .foregroundColor(.white)
-                                            .cornerRadius(8)
-                                        }
-                                    }
+                                HStack(spacing: 8) {
+                                    TextField("CA 憑證路徑 / 檔案 (選填)", text: $certPath)
+                                        .textFieldStyle(.roundedBorder)
                                     
-                                    if !selectedCertFileName.isEmpty {
+                                    Button {
+                                        isShowingCertPicker = true
+                                    } label: {
                                         HStack(spacing: 4) {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(Color(hex: "#34C759"))
-                                            Text("已載入憑證：\(selectedCertFileName)")
-                                                .font(.caption2.bold())
-                                                .foregroundColor(Color(hex: "#34C759"))
+                                            Image(systemName: "folder.badge.plus")
+                                            Text("選擇檔案")
                                         }
+                                        .font(.system(size: 13, weight: .bold))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 8)
+                                        .background(Color(hex: "#007AFF"))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(8)
                                     }
                                 }
+                                
+                                if !selectedCertFileName.isEmpty {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Color(hex: "#34C759"))
+                                        Text("已載入憑證：\(selectedCertFileName)")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(Color(hex: "#34C759"))
+                                    }
+                                }
+                                
+                                Button {
+                                    guard !bridgeServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                                        shioajiStatusMessage = "⚠️ 請填寫中繼伺服器網址 (例: http://192.168.1.100:8000)，或改用下方方式 B 直接貼上！"
+                                        return
+                                    }
+                                    isConnectingShioaji = true
+                                    shioajiStatusMessage = "連線中繼伺服器中..."
+                                    BrokerageService.shared.fetchPositionsFromShioajiBridge(
+                                        bridgeURL: bridgeServerURL,
+                                        apiKey: apiKey,
+                                        secretKey: secretKey,
+                                        certPath: certPath
+                                    ) { result in
+                                        DispatchQueue.main.async {
+                                            isConnectingShioaji = false
+                                            switch result {
+                                            case .success(let holdings):
+                                                if holdings.isEmpty {
+                                                    shioajiStatusMessage = "連線成功，但您的永豐帳戶目前無證券庫存持股。"
+                                                } else {
+                                                    let count = StorageService.shared.batchImportHoldings(holdings)
+                                                    shioajiStatusMessage = "✅ 成功自永豐 Shioaji 同步 \(count) 筆真實個人持股！"
+                                                    onSyncCompleted()
+                                                }
+                                            case .failure(let error):
+                                                shioajiStatusMessage = "❌ 連線失敗：\(error.localizedDescription)\n請確認電腦已啟動 shioaji_bridge.py 且位於相同區網。"
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        if isConnectingShioaji {
+                                            ProgressView().tint(.white)
+                                        } else {
+                                            Image(systemName: "link")
+                                        }
+                                        Text("連線中繼伺服器並同步真實持股")
+                                    }
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "#FF9500"))
+                                    .cornerRadius(10)
+                                }
                             }
+                            .padding()
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(12)
+                            
+                            // 方式 B: 大戶投庫存文字直接貼上
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("【方式 B】大戶投庫存一鍵貼上 (免跑伺服器、手機最快)")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                                
+                                Text("至永豐「大戶投 App」→「未實現損益」全選複製文字貼於此：")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                TextEditor(text: $sinopacDirectText)
+                                    .frame(height: 100)
+                                    .padding(6)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(8)
+                                
+                                Button {
+                                    let parsed = BrokerageService.shared.parseBrokerageText(sinopacDirectText, brokerageName: "永豐金證券 (大戶投)")
+                                    if !parsed.isEmpty {
+                                        let count = StorageService.shared.batchImportHoldings(parsed)
+                                        shioajiStatusMessage = "✅ 已成功匯入 \(count) 筆您本人的永豐大戶投持股！"
+                                        sinopacDirectText = ""
+                                        onSyncCompleted()
+                                    } else {
+                                        shioajiStatusMessage = "⚠️ 解析失敗，請確認已貼上正確的股票代號與股數。"
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "arrow.down.doc.fill")
+                                        Text("匯入本人真實永豐持股")
+                                    }
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(sinopacDirectText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color(hex: "#007AFF"))
+                                    .cornerRadius(10)
+                                }
+                                .disabled(sinopacDirectText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                            .padding()
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(12)
                             
                             if !shioajiStatusMessage.isEmpty {
                                 Text(shioajiStatusMessage)
                                     .font(.caption.bold())
-                                    .foregroundColor(Color(hex: "#34C759"))
+                                    .foregroundColor(shioajiStatusMessage.contains("✅") ? Color(hex: "#34C759") : Color(hex: "#FF3B30"))
+                                    .padding(.horizontal, 4)
                             }
                             
-                            Button {
-                                isConnectingShioaji = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                    isConnectingShioaji = false
-                                    shioajiStatusMessage = "✅ 成功連線永豐金證券伺服器！已自動同步 2 筆持股。"
-                                    let sampleShioaji = [
-                                        StockHolding(symbol: "2330", name: "台積電", frequency: .quarterly, shares: 1000, averageCost: 1050, currentPrice: 1050, stockType: .stock, brokerage: "永豐金證券 (大戶投)"),
-                                        StockHolding(symbol: "0050", name: "元大台灣50", frequency: .semiannual, shares: 2000, averageCost: 195, currentPrice: 195, stockType: .etf, brokerage: "永豐金證券 (大戶投)")
-                                    ]
-                                    StorageService.shared.batchImportHoldings(sampleShioaji)
-                                    onSyncCompleted()
-                                }
+                            // 輔助按鈕：清除先前誤匯的永豐持股
+                            Button(role: .destructive) {
+                                StorageService.shared.deleteHoldings(forBrokerage: "永豐金證券")
+                                shioajiStatusMessage = "🗑️ 已清空先前建立的永豐金證券持股。"
+                                onSyncCompleted()
                             } label: {
                                 HStack {
-                                    if isConnectingShioaji {
-                                        ProgressView().tint(.white)
-                                    } else {
-                                        Image(systemName: "link")
-                                    }
-                                    Text("驗證金鑰並同步持股")
+                                    Image(systemName: "trash")
+                                    Text("一鍵清除先前誤匯入的永豐持股")
                                 }
-                                .font(.headline.bold())
-                                .foregroundColor(.white)
+                                .font(.caption.bold())
+                                .foregroundColor(.red)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Color(hex: "#FF9500"))
-                                .cornerRadius(12)
+                                .padding(.vertical, 8)
                             }
                         }
                         .padding()

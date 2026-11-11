@@ -149,6 +149,17 @@ public final class StorageService {
         deleteJournals(for: symbol)
     }
     
+    // 清除特定券商名稱之持股 (例如一鍵清理永豐持股)
+    public func deleteHoldings(forBrokerage brokerageName: String) {
+        var current = loadHoldings()
+        let toRemove = current.filter { $0.brokerage.contains(brokerageName) }
+        current.removeAll { $0.brokerage.contains(brokerageName) }
+        saveHoldings(current)
+        for item in toRemove {
+            deleteJournals(for: item.symbol)
+        }
+    }
+    
     public func deleteJournals(for symbol: String) {
         var journals = loadJournals()
         journals.removeAll { $0.symbol == symbol }

@@ -83,4 +83,84 @@ public final class BrokerageService {
         
         return parsedList
     }
+    
+    // 透過本機/私有雲 Python Shioaji Bridge 查詢即時真實庫存
+    public func fetchPositionsFromShioajiBridge(
+        bridgeURL: String,
+        apiKey: String,
+        secretKey: String,
+        certPath: String,
+        completion: @escaping (Result<[StockHolding], Error>) -> Void
+    ) {
+        var cleanURL = bridgeURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanURL.hasPrefix("http://") && !cleanURL.hasPrefix("https://") {
+            cleanURL = "http://" + cleanURL
+        }
+        if cleanURL.hasSuffix("/") {
+            cleanURL = String(cleanURL.dropLast())
+        }
+        
+        guard let url = URL(string: "\(cleanURL)/api/sync_positions") else {
+            completion(.failure(NSError(domain: "ShioajiBridge", code: 400, userInfo: [NSLocalizedDescriptionKey: "中繼伺服器網址格式不正確"])))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 10
+        
+        let body: [String: Any] = [
+            "api_key": apiKey,
+            "secret_key": secretKey,
+            "ca_cert_path": certPath
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data else {
+                completion(.failure(NSError(domain: "ShioajiBridge", code: 500, userInfo: [NSLocalizedDescriptionKey: "未收到中繼伺服器回應"])))
+                return
+            }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if let detail = json["detail"] as? String {
+                        completion(.failure(NSError(domain: "ShioajiBridge", code: 500, userInfo: [NSLocalizedDescriptionKey: detail])))
+                        return
+                    }
+                    guard let positions = json["positions"] as? [[String: Any]] else {
+                        completion(.failure(NSError(domain: "ShioajiBridge", code: 500, userInfo: [NSLocalizedDescriptionKey: "回傳格式無效"])))
+                        return
+                    }
+                    
+                    var holdings: [StockHolding] = []
+                    for p in positions {
+                        guard let sym = p["symbol"] as? String, !sym.isEmpty else { continue }
+                        let shares = (p["shares"] as? Int) ?? 1000
+                        let cost = (p["average_cost"] as? Double) ?? 0.0
+                        let meta = TaiwanStockDatabase.shared.find(symbol: sym)
+                        let holding = StockHolding(
+                            symbol: sym,
+                            name: meta?.name ?? (p["name"] as? String ?? sym),
+                            frequency: meta?.frequency ?? .quarterly,
+                            shares: shares,
+                            averageCost: cost > 0 ? cost : (meta?.referencePrice ?? 10.0),
+                            currentPrice: meta?.referencePrice ?? (cost > 0 ? cost : 10.0),
+                            stockType: meta?.stockType ?? .stock,
+                            brokerage: "永豐金證券 (Shioaji API)"
+                        )
+                        holdings.append(holding)
+                    }
+                    completion(.success(holdings))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
 }
