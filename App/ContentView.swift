@@ -58,7 +58,7 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            // 分頁 2: 持有現股 + 交易日記 (合併視圖)
+            // 分頁 2: 持有現股 (清爽專注管理)
             HoldingsListView()
                 .tabItem {
                     Label("持有現股", systemImage: "briefcase.fill")
@@ -1527,9 +1527,15 @@ struct StockHoldingRowView: View {
                     let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.profile.estimatedYield * 100))%)")
-                                .font(.caption.bold())
-                                .foregroundColor(Color(hex: "#007AFF"))
+                            if let dps = calc.profile.defaultCashDividendPerShare {
+                                Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (每股 \(String(format: "%.3f", dps)) 元，年化 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                            } else {
+                                Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                            }
                             Spacer()
                             Text("免稅比 \(String(format: "%.0f", calc.taxExemptPercentage))%")
                                 .font(.caption.bold())
@@ -1628,8 +1634,6 @@ struct StockHoldingRowView: View {
 
 struct HoldingsListView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
-    @State private var journals: [JournalEntry] = StorageService.shared.loadJournals()
-    @State private var activeSubTab: Int = 0 // 0: 現有持股, 1: 交易日記
     
     // 現有持股狀態
     @State private var expandedSymbols: Set<String> = []
@@ -1641,10 +1645,6 @@ struct HoldingsListView: View {
     @State private var isShowingPhotoOCR = false
     @State private var searchText = ""
     @State private var isRefreshing = false
-    
-    // 交易日記狀態
-    @State private var selectedFilterSymbol: String = "全部"
-    @State private var isShowingAddJournal = false
     @State private var isShowingBackup = false
     @State private var isShowingRankSheet = false
     
@@ -1655,8 +1655,6 @@ struct HoldingsListView: View {
     var rankProgress: Double { InvestorRank.progress(for: totalMarketValue) }
     var remainingToNext: Double? { InvestorRank.remainingToNext(for: totalMarketValue) }
     
-    var heldSymbols: Set<String> { Set(holdings.map { $0.symbol }) }
-    
     var filteredHoldings: [StockHolding] {
         if searchText.isEmpty { return holdings }
         return holdings.filter {
@@ -1664,21 +1662,6 @@ struct HoldingsListView: View {
             $0.name.localizedCaseInsensitiveContains(searchText) ||
             $0.brokerage.localizedCaseInsensitiveContains(searchText)
         }
-    }
-    
-    var filteredJournals: [JournalEntry] {
-        let base = journals.filter { heldSymbols.contains($0.symbol) }
-        if selectedFilterSymbol == "全部" {
-            return base
-        }
-        return base.filter { $0.symbol == selectedFilterSymbol }
-    }
-    
-    var filterOptions: [String] {
-        let base = journals.filter { heldSymbols.contains($0.symbol) }
-        var set = Array(Set(base.map { $0.symbol })).sorted()
-        set.insert("全部", at: 0)
-        return set
     }
     
     var body: some View {
@@ -1762,20 +1745,9 @@ struct HoldingsListView: View {
                 .padding(.vertical, 10)
                 .background(Color(.secondarySystemBackground))
                 
-                // 2. 雙視圖切換器 (分段控制器)
-                Picker("持股與日記切換", selection: $activeSubTab) {
-                    Text("📦 現有持股 (\(holdings.count))").tag(0)
-                    Text("📝 交易日記 (\(filteredJournals.count))").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                
                 Divider()
                 
-                // 3. 主要內容區域
-                if activeSubTab == 0 {
-                    // ========== 子分頁 1: 現有持股清單 ==========
+                // 2. 現有持股主要清單
                     if holdings.isEmpty {
                         VStack(spacing: 16) {
                             Spacer()
@@ -1848,105 +1820,6 @@ struct HoldingsListView: View {
                         .listStyle(.insetGrouped)
                         .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
                     }
-                } else {
-                    // ========== 子分頁 2: 交易日記流水帳 ==========
-                    VStack(spacing: 0) {
-                        // 標的篩選列
-                        HStack {
-                            Text("篩選標的:")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Picker("選擇標的", selection: $selectedFilterSymbol) {
-                                ForEach(filterOptions, id: \.self) { opt in
-                                    Text(opt == "全部" ? "全部標的" : opt).tag(opt)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                            
-                            Spacer()
-                            
-                            Text("共 \(filteredJournals.count) 筆日記")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        
-                        Divider()
-                        
-                        if filteredJournals.isEmpty {
-                            VStack(spacing: 14) {
-                                Spacer()
-                                Image(systemName: "book.closed")
-                                    .font(.system(size: 44))
-                                    .foregroundColor(.secondary)
-                                Text("目前尚無符合之持股交易紀錄")
-                                    .font(.headline)
-                                Text("交易日記已與現有持股深度整合。\n當您新增持股或加碼時，系統將自動連動記錄流水帳；亦可點擊右上角「➕」直接記一筆！")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 32)
-                                Spacer()
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            List {
-                                ForEach(filteredJournals) { item in
-                                    HStack(spacing: 12) {
-                                        // 交易類型圓形 Badge
-                                        Text(item.type.rawValue)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(.white)
-                                            .frame(width: 32, height: 32)
-                                            .background(Color(hex: item.type.badgeColorHex))
-                                            .clipShape(Circle())
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Text(item.dateString)
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                                if !item.note.isEmpty {
-                                                    Text(item.note)
-                                                        .font(.caption2)
-                                                        .padding(.horizontal, 4)
-                                                        .padding(.vertical, 1)
-                                                        .background(Color(.systemGray5))
-                                                        .cornerRadius(4)
-                                                }
-                                            }
-                                            HStack(spacing: 6) {
-                                                Text(item.symbol)
-                                                    .font(.subheadline.bold())
-                                                Text(item.name)
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        VStack(alignment: .trailing, spacing: 2) {
-                                            Text("$\(Int(item.totalAmount).formatted())")
-                                                .font(.headline.bold())
-                                            Text("$\(String(format: "%.2f", item.price)) · \(item.lotsText)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                .onDelete(perform: deleteJournal)
-                            }
-                            .listStyle(.plain)
-                        }
-                    }
                 }
             }
             .refreshable {
@@ -1965,30 +1838,22 @@ struct HoldingsListView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if activeSubTab == 0 {
-                        HStack(spacing: 14) {
-                            Button {
-                                isShowingPhotoOCR = true
-                            } label: {
-                                Image(systemName: "camera.viewfinder")
-                                    .font(.system(size: 16, weight: .semibold))
-                            }
-                            
-                            Button {
-                                isShowingBrokerageSync = true
-                            } label: {
-                                Image(systemName: "building.columns")
-                            }
-                            
-                            Button {
-                                isShowingAdd = true
-                            } label: {
-                                Image(systemName: "plus")
-                            }
-                        }
-                    } else {
+                    HStack(spacing: 14) {
                         Button {
-                            isShowingAddJournal = true
+                            isShowingPhotoOCR = true
+                        } label: {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        
+                        Button {
+                            isShowingBrokerageSync = true
+                        } label: {
+                            Image(systemName: "building.columns")
+                        }
+                        
+                        Button {
+                            isShowingAdd = true
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -2039,13 +1904,6 @@ struct HoldingsListView: View {
                     reloadAllData()
                 }
             }
-            .sheet(isPresented: $isShowingAddJournal) {
-                AddJournalSheet(holdings: holdings) { newEntry in
-                    journals.insert(newEntry, at: 0)
-                    StorageService.shared.saveJournals(journals)
-                    reloadAllData()
-                }
-            }
             .sheet(isPresented: $isShowingBackup) {
                 DataBackupSheet {
                     reloadAllData()
@@ -2062,19 +1920,11 @@ struct HoldingsListView: View {
     
     private func reloadAllData() {
         holdings = StorageService.shared.loadHoldings()
-        journals = StorageService.shared.loadJournals()
     }
     
     private func deleteHolding(at offsets: IndexSet) {
         holdings.remove(atOffsets: offsets)
         StorageService.shared.saveHoldings(holdings)
-        reloadAllData()
-    }
-    
-    private func deleteJournal(at offsets: IndexSet) {
-        let targets = offsets.map { filteredJournals[$0].id }
-        journals.removeAll { targets.contains($0.id) }
-        StorageService.shared.saveJournals(journals)
         reloadAllData()
     }
     

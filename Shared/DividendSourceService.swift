@@ -70,7 +70,8 @@ public struct HoldingDividendProfile: Identifiable, Codable {
     public let symbol: String
     public let name: String
     public let strategy: DividendStrategyType
-    public let estimatedYield: Double // 年化預估殖利率 (如 0.105 代表 10.5%)
+    public let estimatedYield: Double // 年化預估殖利率 (如 0.22 代表 22%)
+    public let defaultCashDividendPerShare: Double? // 每股單次預估配息 (如 00406A 預設 0.138 元/股)
     public let ratio76: Double        // 選擇權權利金與財產交易 (76) 佔比 (0.0 ~ 1.0)
     public let ratio54C: Double       // 股利所得 (54C) 佔比
     public let ratioReserve: Double   // 收益平準金佔比
@@ -82,6 +83,7 @@ public struct HoldingDividendProfile: Identifiable, Codable {
         name: String,
         strategy: DividendStrategyType,
         estimatedYield: Double,
+        defaultCashDividendPerShare: Double? = nil,
         ratio76: Double,
         ratio54C: Double,
         ratioReserve: Double,
@@ -92,6 +94,7 @@ public struct HoldingDividendProfile: Identifiable, Codable {
         self.name = name
         self.strategy = strategy
         self.estimatedYield = estimatedYield
+        self.defaultCashDividendPerShare = defaultCashDividendPerShare
         self.ratio76 = ratio76
         self.ratio54C = ratio54C
         self.ratioReserve = ratioReserve
@@ -107,6 +110,7 @@ public struct HoldingDividendCalculation: Identifiable {
     public let profile: HoldingDividendProfile
     public let monthlyDividend: Double       // 該檔預估月股息
     public let annualDividend: Double        // 該檔預估年股息
+    public let effectiveAnnualYield: Double  // 實質年化殖利率
     public let amount76Monthly: Double       // 每月 76 權利金金額
     public let amount54CMonthly: Double      // 每月 54C 股利金額
     public let amountReserveMonthly: Double  // 每月平準金金額
@@ -161,37 +165,39 @@ public final class DividendSourceService {
                 symbol: sym,
                 name: cleanName.isEmpty ? "主動中信台灣收益" : cleanName,
                 strategy: .coveredCall,
-                estimatedYield: 0.105, // 10.5% 年化殖利率 (權利金策略通常具高現金流)
+                estimatedYield: 0.22, // 最新每股配息 0.138 元，年化殖利率約 22%
+                defaultCashDividendPerShare: 0.138, // 最新預計每股月配 0.138 元 (140,433 股約 19,380 元/月)
                 ratio76: 0.65,         // 65% 賣出買權權利金收入 (76 財產交易所得)
                 ratio54C: 0.15,        // 15% 傳統 54C 股票股利
                 ratioReserve: 0.18,    // 18% 收益平準金
                 ratioSurplus: 0.02,    // 2% 資本公積
-                notes: "賣出選擇權 (Covered Call) 權利金收入佔 65%，屬 76 國內財產交易所得，停徵所得稅且免扣二代健保！"
+                notes: "最新預計每股月配 0.138 元！賣出選擇權權利金收入佔 65%，屬 76 國內財產交易所得，停徵所得稅且免扣二代健保！"
             )
         }
         
-        // 2. 知名高股息 ETF (含收益平準金與資本利得拆解)
+        // 2. 知名高股息 ETF (含收益平準金與資本利得拆解，提供最新每股配息)
         switch sym {
         case "00919":
-            return HoldingDividendProfile(symbol: sym, name: "群益台灣精選高息", strategy: .highDividend, estimatedYield: 0.102, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅負擔")
+            return HoldingDividendProfile(symbol: sym, name: "群益台灣精選高息", strategy: .highDividend, estimatedYield: 0.102, defaultCashDividendPerShare: 0.72, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅負擔")
         case "00929":
-            return HoldingDividendProfile(symbol: sym, name: "復華台灣科技優息", strategy: .highDividend, estimatedYield: 0.082, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "月月配息，平準金機制平衡發放穩定度")
+            return HoldingDividendProfile(symbol: sym, name: "復華台灣科技優息", strategy: .highDividend, estimatedYield: 0.082, defaultCashDividendPerShare: 0.11, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "月月配息，平準金機制平衡發放穩定度")
         case "0056":
-            return HoldingDividendProfile(symbol: sym, name: "元大高股息", strategy: .highDividend, estimatedYield: 0.085, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "老牌高股息，資本利得與平準金合計免稅達 65%")
+            return HoldingDividendProfile(symbol: sym, name: "元大高股息", strategy: .highDividend, estimatedYield: 0.085, defaultCashDividendPerShare: 1.07, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "老牌高股息，資本利得與平準金合計免稅達 65%")
         case "00878":
-            return HoldingDividendProfile(symbol: sym, name: "國泰永續高股息", strategy: .highDividend, estimatedYield: 0.078, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: "ESG 兼顧穩健息收與平準金保護")
+            return HoldingDividendProfile(symbol: sym, name: "國泰永續高股息", strategy: .highDividend, estimatedYield: 0.078, defaultCashDividendPerShare: 0.55, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: "ESG 兼顧穩健息收與平準金保護")
         case "00915":
-            return HoldingDividendProfile(symbol: sym, name: "凱基優選高股息30", strategy: .highDividend, estimatedYield: 0.095, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: "高資本利得成分，免稅比重高")
+            return HoldingDividendProfile(symbol: sym, name: "凱基優選高股息30", strategy: .highDividend, estimatedYield: 0.095, defaultCashDividendPerShare: 0.82, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: "高資本利得成分，免稅比重高")
         case "00713":
-            return HoldingDividendProfile(symbol: sym, name: "元大台灣高息低波", strategy: .highDividend, estimatedYield: 0.072, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "低波動防禦型，配息平準金兼備")
+            return HoldingDividendProfile(symbol: sym, name: "元大台灣高息低波", strategy: .highDividend, estimatedYield: 0.072, defaultCashDividendPerShare: 1.50, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "低波動防禦型，配息平準金兼備")
         case "00940":
-            return HoldingDividendProfile(symbol: sym, name: "元大台灣價值高息", strategy: .highDividend, estimatedYield: 0.065, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "巴菲特價值選股月配")
+            return HoldingDividendProfile(symbol: sym, name: "元大台灣價值高息", strategy: .highDividend, estimatedYield: 0.065, defaultCashDividendPerShare: 0.04, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "巴菲特價值選股月配")
         case "00939":
-            return HoldingDividendProfile(symbol: sym, name: "統一台灣高息動能", strategy: .highDividend, estimatedYield: 0.062, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: "夏普值動能選股月配")
+            return HoldingDividendProfile(symbol: sym, name: "統一台灣高息動能", strategy: .highDividend, estimatedYield: 0.062, defaultCashDividendPerShare: 0.063, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: "夏普值動能選股月配")
             
         // 3. 市值型 ETF (如 0050, 006208)
         case "0050", "006208", "00692", "00850":
-            return HoldingDividendProfile(symbol: sym, name: cleanName.isEmpty ? "市值指數ETF" : cleanName, strategy: .marketWeight, estimatedYield: 0.035, ratio76: 0.08, ratio54C: 0.90, ratioReserve: 0.0, ratioSurplus: 0.02, notes: "以成分股現股現金股利 (54C) 為主要收益來源")
+            let dps: Double? = (sym == "006208" ? 0.783 : (sym == "0050" ? 1.0 : nil))
+            return HoldingDividendProfile(symbol: sym, name: cleanName.isEmpty ? "市值指數ETF" : cleanName, strategy: .marketWeight, estimatedYield: 0.035, defaultCashDividendPerShare: dps, ratio76: 0.08, ratio54C: 0.90, ratioReserve: 0.0, ratioSurplus: 0.02, notes: "以成分股現股現金股利 (54C) 為主要收益來源")
             
         default:
             // 4. 一般個股 / 金融股 / 科技股 (2330, 2454, 金融股等)
@@ -211,6 +217,7 @@ public final class DividendSourceService {
                     name: cleanName.isEmpty ? "上市櫃現股" : cleanName,
                     strategy: .equityStock,
                     estimatedYield: estYield,
+                    defaultCashDividendPerShare: nil,
                     ratio76: 0.0,
                     ratio54C: 1.0, // 個股 100% 均為 54C 股利所得
                     ratioReserve: 0.0,
@@ -224,6 +231,7 @@ public final class DividendSourceService {
                     name: cleanName.isEmpty ? "ETF" : cleanName,
                     strategy: .highDividend,
                     estimatedYield: 0.070,
+                    defaultCashDividendPerShare: nil,
                     ratio76: 0.20,
                     ratio54C: 0.45,
                     ratioReserve: 0.33,
@@ -234,13 +242,39 @@ public final class DividendSourceService {
         }
     }
     
-    /// 計算單一持股之預估股息與各項來源
+    /// 計算單一持股之預估股息與各項來源 (精準支援每股配息金額 dps)
     public func calculateHoldingDividend(holding: StockHolding) -> HoldingDividendCalculation {
         let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
         let totalVal = holding.marketValue
         
-        let annual = totalVal * profile.estimatedYield
-        let monthly = annual / 12.0
+        let annual: Double
+        let monthly: Double
+        
+        // 優先採用每股明確預估配息 (例如 00406A 最新預計月配 0.138 元/股)
+        if let dps = profile.defaultCashDividendPerShare, dps > 0 {
+            switch holding.frequency {
+            case .monthly:
+                monthly = Double(holding.shares) * dps
+                annual = monthly * 12.0
+            case .bimonthly:
+                annual = Double(holding.shares) * dps * 6.0
+                monthly = annual / 12.0
+            case .quarterly:
+                annual = Double(holding.shares) * dps * 4.0
+                monthly = annual / 12.0
+            case .semiannual:
+                annual = Double(holding.shares) * dps * 2.0
+                monthly = annual / 12.0
+            case .annual:
+                annual = Double(holding.shares) * dps
+                monthly = annual / 12.0
+            }
+        } else {
+            annual = totalVal * profile.estimatedYield
+            monthly = annual / 12.0
+        }
+        
+        let effYield = totalVal > 0 ? (annual / totalVal) : profile.estimatedYield
         
         let amt76 = monthly * profile.ratio76
         let amt54C = monthly * profile.ratio54C
@@ -266,6 +300,7 @@ public final class DividendSourceService {
             profile: profile,
             monthlyDividend: monthly,
             annualDividend: annual,
+            effectiveAnnualYield: effYield,
             amount76Monthly: amt76,
             amount54CMonthly: amt54C,
             amountReserveMonthly: amtReserve,

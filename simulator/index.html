@@ -752,7 +752,7 @@
     return `<svg width="160" height="160" viewBox="0 0 160 160">${paths}</svg>`;
   }
 
-  // ==================== 模組 2: 持有現股 + 交易日記 (深度整合) ====================
+  // ==================== 模組 2: 持有現股 (清爽專注管理) ====================
   function renderHoldingsTab() {
     const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
     const rank = getCurrentRank(totalMarketValue);
@@ -768,27 +768,15 @@
       gapText = `距晉升【${next.badge} ${next.title}】還需 $${Math.round(gap).toLocaleString()}`;
     }
 
-    // 連動真實持有現股之日記清單
-    const activeSymbols = new Set(holdings.map(h => h.symbol));
-    const allActiveJournals = journals.filter(j => activeSymbols.has(j.symbol));
-    const heldOptions = ['全部', ...Array.from(activeSymbols).sort()];
-    const filteredJournals = journalFilterSymbol === '全部'
-      ? allActiveJournals
-      : allActiveJournals.filter(j => j.symbol === journalFilterSymbol);
-
     return `
-      <!-- 頂部導航列 (依子分頁動態切換操作按鈕) -->
+      <!-- 頂部導航列 -->
       <div class="nav-bar">
         <button class="nav-btn" onclick="refreshQuotesSim()" title="更新即時報價">🔄</button>
         <h1>持有現股</h1>
         <div style="display: flex; gap: 6px;">
-          ${holdingsSubTab === 0 ? `
-            <button class="nav-btn" title="📸 拍照/截圖辨識" onclick="openPhotoOCRModal()">📸</button>
-            <button class="nav-btn" title="券商對接中心" onclick="openBrokerageModal()">🏦</button>
-            <button class="nav-btn" title="新增/加碼" onclick="openAddHoldingSheet()">➕</button>
-          ` : `
-            <button class="nav-btn" title="記一筆交易" onclick="openAddJournalSheet()">➕</button>
-          `}
+          <button class="nav-btn" title="📸 拍照/截圖辨識" onclick="openPhotoOCRModal()">📸</button>
+          <button class="nav-btn" title="券商對接中心" onclick="openBrokerageModal()">🏦</button>
+          <button class="nav-btn" title="新增/加碼" onclick="openAddHoldingSheet()">➕</button>
         </div>
       </div>
 
@@ -826,69 +814,13 @@
         </div>
       </div>
 
-      <!-- 2. iOS 分段控制切換器 (現有持股 vs 交易日記) -->
-      <div style="padding: 0 16px 10px 16px;">
-        <div style="display: flex; background: #E5E5EA; padding: 3px; border-radius: 9px;">
-          <button style="flex: 1; padding: 7px; border: none; border-radius: 7px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; ${holdingsSubTab === 0 ? 'background: #FFF; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.12);' : 'background: transparent; color: #8E8E93;'}" onclick="switchHoldingsSubTab(0)">
-            📦 現有持股 (${holdings.length})
-          </button>
-          <button style="flex: 1; padding: 7px; border: none; border-radius: 7px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; ${holdingsSubTab === 1 ? 'background: #FFF; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.12);' : 'background: transparent; color: #8E8E93;'}" onclick="switchHoldingsSubTab(1)">
-            📝 交易日記 (${allActiveJournals.length})
-          </button>
-        </div>
+      <!-- 2. 現有持股搜尋與清單 -->
+      <div style="padding: 0 16px 8px 16px;">
+        <input class="form-input" placeholder="🔍 搜尋代號、名稱或券商 (例: 0056, 台積電, 元大)" oninput="filterHoldings(this.value)">
       </div>
-
-      <!-- 3. 動態視圖切換區域 -->
-      ${holdingsSubTab === 0 ? `
-        <!-- 子分頁 1: 現有持股清單 -->
-        <div style="padding: 0 16px 8px 16px;">
-          <input class="form-input" placeholder="🔍 搜尋代號、名稱或券商 (例: 0056, 台積電, 元大)" oninput="filterHoldings(this.value)">
-        </div>
-        <div id="holdingsList">
-          ${renderHoldingsCards(holdings)}
-        </div>
-      ` : `
-        <!-- 子分頁 2: 交易日記流水帳 -->
-        <div style="padding: 0 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 12px; color: #8E8E93;">篩選標的:</span>
-              <select class="form-input" style="width: auto; padding: 3px 8px; font-size: 12px;" onchange="setJournalFilterSymbol(this.value)">
-                ${heldOptions.map(opt => `<option value="${opt}" ${opt === journalFilterSymbol ? 'selected' : ''}>${opt === '全部' ? '全部標的' : opt}</option>`).join('')}
-              </select>
-            </div>
-            <span style="font-size: 11px; color: #8E8E93;">共 ${filteredJournals.length} 筆日記</span>
-          </div>
-
-          ${filteredJournals.length === 0 ? `
-            <div class="card" style="text-align: center; padding: 36px 16px; margin: 12px 0;">
-              <div style="font-size: 36px; margin-bottom: 8px;">📝</div>
-              <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">尚無連動之交易日記</div>
-              <div style="font-size: 11px; color: #8E8E93; line-height: 1.4;">
-                交易日記已與現有持股深度整合。<br>當您在「現有持股」新增或匯入持股時，系統將自動連動流水帳；亦可點擊右上角「➕」直接記一筆！
-              </div>
-            </div>
-          ` : filteredJournals.map(j => `
-            <div class="card" style="margin: 8px 0; display: flex; align-items: center; gap: 12px;">
-              <div style="width: 32px; height: 32px; border-radius: 50%; background: ${j.type === '買' ? 'var(--ios-orange)' : (j.type === '賣' ? 'var(--ios-green)' : 'var(--ios-blue)')}; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0;">
-                ${j.type}
-              </div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="display: flex; gap: 6px; align-items: center;">
-                  <span style="font-weight: 800; font-size: 14px;">${j.symbol}</span>
-                  <span style="font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${j.name}</span>
-                  ${j.note ? `<span class="badge" style="background:#E5E5EA; color:#333; font-size: 9px;">${j.note}</span>` : ''}
-                </div>
-                <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${j.date} · $${j.price} · ${j.shares.toLocaleString()}股</div>
-              </div>
-              <div style="text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
-                <div style="font-size: 14px; font-weight: 800;">$${Math.round(j.price * j.shares).toLocaleString()}</div>
-                <button class="nav-btn" style="color: #FF3B30; padding: 2px 6px; font-size: 13px;" title="刪除日記" onclick="deleteJournalSim('${j.id}')">🗑️</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `}
+      <div id="holdingsList">
+        ${renderHoldingsCards(holdings)}
+      </div>
     `;
   }
 
@@ -918,7 +850,16 @@
     return items.map(h => {
       const isExpanded = expandedHoldings.has(h.symbol);
       const hProfile = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
-      const hMonthlyDiv = (h.shares * h.currentPrice * hProfile.yield) / 12;
+      let hMonthlyDiv;
+      if (hProfile.dps && hProfile.dps > 0) {
+        if (h.frequency === '月配') hMonthlyDiv = h.shares * hProfile.dps;
+        else if (h.frequency === '雙月配') hMonthlyDiv = (h.shares * hProfile.dps * 6) / 12;
+        else if (h.frequency === '季配') hMonthlyDiv = (h.shares * hProfile.dps * 4) / 12;
+        else if (h.frequency === '半年配') hMonthlyDiv = (h.shares * hProfile.dps * 2) / 12;
+        else hMonthlyDiv = (h.shares * hProfile.dps) / 12;
+      } else {
+        hMonthlyDiv = (h.shares * h.currentPrice * hProfile.yield) / 12;
+      }
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
@@ -956,10 +897,17 @@
 
           ${isExpanded ? `
             <div style="margin-top: 10px; border-top: 1px solid #EEE; padding-top: 8px;">
-              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8E8E93; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8E8E93; margin-bottom: 8px;">
                 <span>現值: $${Math.round(val).toLocaleString()}</span>
                 <span>均價: $${h.averageCost}</span>
                 <span>現價: $${h.currentPrice}</span>
+              </div>
+              <div style="background: #F2F2F7; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--ios-blue); margin-bottom: 4px;">
+                  <span>💡 預估月息: $${Math.round(hMonthlyDiv).toLocaleString()} ${hProfile.dps ? `(每股預估 $${hProfile.dps} 元/月)` : ''}</span>
+                  <span style="color: #34C759;">免稅比 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>
+                </div>
+                <div style="color: #666; font-size: 10px;">${hProfile.notes}</div>
               </div>
               <div style="display: flex; gap: 8px;">
                 <button class="sim-btn" style="flex: 1; padding: 6px; font-size: 11px; justify-content: center;" onclick="openDCA('${h.symbol}')">➕ 加碼存股</button>
@@ -1624,25 +1572,26 @@
       return {
         strategy: '掩護性買權 (Covered Call)',
         color: '#AF52DE',
-        yield: 0.105,
+        yield: 0.22,
+        dps: 0.138, // 最新預計每股月配 0.138 元 (140,433 股約 19,380 元/月)
         ratio76: 0.65,
         ratio54C: 0.15,
         ratioReserve: 0.18,
         ratioSurplus: 0.02,
-        notes: '賣出選擇權 (Covered Call) 權利金收入佔 65%，屬 76 國內財產交易所得，停徵所得稅且免扣二代健保！'
+        notes: '最新預計每股月配 0.138 元！賣出選擇權 (Covered Call) 權利金收入佔 65%，屬 76 國內財產交易所得，停徵所得稅且免扣二代健保！'
       };
     }
 
-    // 2. 主流高股息 ETF
+    // 2. 主流高股息 ETF (提供最新每股配息 dps)
     const highDivProfiles = {
-      '00919': { yield: 0.102, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅' },
-      '00929': { yield: 0.082, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '科技優息月月配，平準金機制穩定配息' },
-      '0056':  { yield: 0.085, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '老牌高股息，資本利得與平準金合計免稅達 65%' },
-      '00878': { yield: 0.078, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: 'ESG 穩健息收與平準金保護' },
-      '00915': { yield: 0.095, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: '高資本利得成分，免稅比重高' },
-      '00713': { yield: 0.072, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '低波動防禦型，配息平準金兼備' },
-      '00940': { yield: 0.065, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '價值選股月配' },
-      '00939': { yield: 0.062, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: '動能選股月配' }
+      '00919': { yield: 0.102, dps: 0.72,  ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅' },
+      '00929': { yield: 0.082, dps: 0.11,  ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '科技優息月月配，平準金機制穩定配息' },
+      '0056':  { yield: 0.085, dps: 1.07,  ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '老牌高股息，資本利得與平準金合計免稅達 65%' },
+      '00878': { yield: 0.078, dps: 0.55,  ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: 'ESG 穩健息收與平準金保護' },
+      '00915': { yield: 0.095, dps: 0.82,  ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: '高資本利得成分，免稅比重高' },
+      '00713': { yield: 0.072, dps: 1.50,  ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '低波動防禦型，配息平準金兼備' },
+      '00940': { yield: 0.065, dps: 0.04,  ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '價值選股月配' },
+      '00939': { yield: 0.062, dps: 0.063, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: '動能選股月配' }
     };
     if (highDivProfiles[sym]) {
       const p = highDivProfiles[sym];
@@ -1650,6 +1599,7 @@
         strategy: '高股息 (含平準金)',
         color: '#FF9500',
         yield: p.yield,
+        dps: p.dps,
         ratio76: p.ratio76,
         ratio54C: p.ratio54C,
         ratioReserve: p.ratioReserve,
@@ -1660,10 +1610,12 @@
 
     // 3. 市值型 ETF
     if (['0050', '006208', '00692', '00850'].includes(sym)) {
+      const dps = sym === '006208' ? 0.783 : (sym === '0050' ? 1.0 : null);
       return {
         strategy: '市值指數型',
         color: '#007AFF',
         yield: 0.035,
+        dps: dps,
         ratio76: 0.08,
         ratio54C: 0.90,
         ratioReserve: 0.0,
@@ -1682,6 +1634,7 @@
         strategy: '一般現股 (100% 54C)',
         color: '#5856D6',
         yield: estYield,
+        dps: null,
         ratio76: 0.0,
         ratio54C: 1.0,
         ratioReserve: 0.0,
@@ -1694,6 +1647,7 @@
       strategy: 'ETF指數型',
       color: '#34C759',
       yield: 0.070,
+      dps: null,
       ratio76: 0.20,
       ratio54C: 0.45,
       ratioReserve: 0.33,
@@ -1706,13 +1660,35 @@
     const calcs = items.map(h => {
       const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
       const val = h.shares * h.currentPrice;
-      const annual = val * p.yield;
-      const monthly = annual / 12;
+      let annual, monthly;
+      if (p.dps && p.dps > 0) {
+        if (h.frequency === '月配') {
+          monthly = h.shares * p.dps;
+          annual = monthly * 12;
+        } else if (h.frequency === '雙月配') {
+          annual = h.shares * p.dps * 6;
+          monthly = annual / 12;
+        } else if (h.frequency === '季配') {
+          annual = h.shares * p.dps * 4;
+          monthly = annual / 12;
+        } else if (h.frequency === '半年配') {
+          annual = h.shares * p.dps * 2;
+          monthly = annual / 12;
+        } else {
+          annual = h.shares * p.dps;
+          monthly = annual / 12;
+        }
+      } else {
+        annual = val * p.yield;
+        monthly = annual / 12;
+      }
+      const effYield = val > 0 ? (annual / val) : p.yield;
       return {
         holding: h,
         profile: p,
         annual,
         monthly,
+        effectiveYield: effYield,
         amt76: monthly * p.ratio76,
         amt54C: monthly * p.ratio54C,
         amtReserve: monthly * p.ratioReserve,
@@ -1740,6 +1716,8 @@
     return {
       totalMonthly,
       totalAnnual,
+      totalMonthlyDividend: totalMonthly,
+      totalAnnualDividend: totalAnnual,
       total76, total54C, totalReserve, totalSurplus,
       pct76, pct54C, pctReserve, pctSurplus,
       taxExemptPct,
