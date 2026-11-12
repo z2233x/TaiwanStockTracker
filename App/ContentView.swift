@@ -1820,7 +1820,6 @@ struct HoldingsListView: View {
                         .listStyle(.insetGrouped)
                         .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
                     }
-                }
             }
             .refreshable {
                 await refreshQuotes()
