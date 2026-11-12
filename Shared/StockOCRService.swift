@@ -290,59 +290,139 @@ public final class StockOCRService {
         return holdings
     }
     
-    // MARK: - 數值解析：結合券商欄位順序與 S * P ≈ C 數學交叉驗證
+    // MARK: - 數值解析：結合千分位黏合、雙胞胎庫存整數與 S * P ≈ C 數學交叉驗證
     private func extractBestSharesAndPrice(from text: String, targetSymbol: String, metaPrice: Double) -> (shares: Int, price: Double) {
-        let cleaned = text.replacingOccurrences(of: ",", with: " ")
-        let tokens = cleaned.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+        // 1. 全形符號與百分比預處理
+        var processedText = text
+            .replacingOccurrences(of: "，", with: ",")
+            .replacingOccurrences(of: "、", with: ",")
+            .replacingOccurrences(of: "%", with: " ")
         
-        var numbers: [Double] = []
-        for t in tokens {
-            if let num = Double(t), num > 0 && num < 100000000 {
-                // 排除當前標的本身的數字代號 (例如 7781 或 2330)
-                if t == targetSymbol { continue }
-                numbers.append(num)
+        // 2. 正則黏合千分位逗號 (例如 140,433 或 140, 433 或 1,000 或 1,059,320)
+        // 重複兩次以覆蓋百萬級千分位
+        let commaRegex = try? NSRegularExpression(pattern: "(\\d+)\\s*,\\s*(\\d{3})(?!\\d)")
+        for _ in 0..<2 {
+            let nsText = processedText as NSString
+            processedText = commaRegex?.stringByReplacingMatches(
+                in: processedText,
+                options: [],
+                range: NSRange(location: 0, length: nsText.length),
+                withTemplate: "$1$2"
+            ) ?? processedText
+        }
+        
+        // 3. 提取所有有效數值 (整數或帶小數點浮點數)
+        let numRegex = try? NSRegularExpression(pattern: "\\d+(?:\\.\\d+)?")
+        let nsProcessed = processedText as NSString
+        let matches = numRegex?.matches(in: processedText, options: [], range: NSRange(location: 0, length: nsProcessed.length)) ?? []
+        
+        // 收集標的本身包含的純數字 (例如 7781，或 00406A 裡的 406)，避免將股票代號誤當成股數或成本
+        let symNumRegex = try? NSRegularExpression(pattern: "\\d+")
+        let nsSym = targetSymbol as NSString
+        let symMatches = symNumRegex?.matches(in: targetSymbol, range: NSRange(location: 0, length: nsSym.length)) ?? []
+        var excludedDigits = Set<String>()
+        for sm in symMatches {
+            let s = nsSym.substring(with: sm.range)
+            if s.count >= 3 {
+                excludedDigits.insert(s)
             }
         }
         
-        // 1. 候選整數 (即時庫存股數，台股常見 >= 1)
+        var numbers: [Double] = []
+        for m in matches {
+            let rawStr = nsProcessed.substring(with: m.range)
+            if excludedDigits.contains(rawStr) { continue }
+            if let val = Double(rawStr), val > 0 && val < 100000000 {
+                numbers.append(val)
+            }
+        }
+        
+        // 4. 整數候選群 (股數候選)
         let integerCandidates = numbers.filter { floor($0) == $0 && $0 >= 1 }
-        // 2. 候選浮點數 (成本均價，通常帶有小數點或小於 3,000)
-        let floatCandidates = numbers.filter { floor($0) != $0 && $0 <= 3000 }
         
-        var bestShares = integerCandidates.first.map { Int($0) } ?? 1000
-        var bestPrice = floatCandidates.first ?? (metaPrice > 0 ? metaPrice : 10.0)
+        // 5. 特徵 1: 券商表格雙胞胎整數判定 (即時庫存與昨日餘額常緊鄰且數值完全相等)
+        var twinShares: Int? = nil
+        if integerCandidates.count >= 2 {
+            for idx in 0..<min(4, integerCandidates.count - 1) {
+                if integerCandidates[idx] == integerCandidates[idx + 1] {
+                    twinShares = Int(integerCandidates[idx])
+                    break
+                }
+            }
+        }
         
-        // 3. 數學關係驗證：Shares * Price ≈ TotalCost (誤差在 2% 以內)
-        // 在券商損益表中，即時庫存通常位於前 3 個整數中
-        let candidateSharesToCheck = integerCandidates.prefix(4)
+        // 建立優先檢驗的股數清單
+        var candidateSharesToCheck: [Int] = []
+        if let twin = twinShares {
+            candidateSharesToCheck.append(twin)
+        }
+        for it in integerCandidates.prefix(4) {
+            let intVal = Int(it)
+            if !candidateSharesToCheck.contains(intVal) {
+                candidateSharesToCheck.append(intVal)
+            }
+        }
+        
+        // 6. 特徵 2: 數學關係高精度驗證 S * P ≈ C (股數 * 成本均價 ≈ 付出成本)
+        struct MathMatch {
+            let shares: Int
+            let price: Double
+            let cost: Double
+            let diff: Double
+            let priceIndex: Int
+        }
+        
+        var mathMatches: [MathMatch] = []
         for s in candidateSharesToCheck {
-            for p in numbers where p > 0.1 && p <= 3000 && p != s {
-                let expectedC = s * p
-                for c in numbers where c > s && c > p && c >= 100 {
+            guard s > 0 else { continue }
+            for (pIdx, p) in numbers.enumerated() {
+                guard p != Double(s), p >= 0.1, p <= 3500 else { continue }
+                let expectedC = Double(s) * p
+                for c in numbers where c > Double(s) && c > p && c >= 50 {
                     let diff = abs(expectedC - c) / c
-                    if diff < 0.02 {
-                        // 完美匹配！直接採用數學驗證結果
-                        bestShares = Int(s)
-                        bestPrice = p
-                        return (bestShares, bestPrice)
+                    if diff < 0.025 { // 誤差 2.5% 內 (包容券商手續費/稅差或四捨五入)
+                        mathMatches.append(MathMatch(shares: s, price: p, cost: c, diff: diff, priceIndex: pIdx))
                     }
                 }
             }
         }
         
-        // 4. 若截圖未包含總成本欄位，依位置啟發：
-        // 股數：優先取 1000 的整數倍，或前段出現的第一個大整數
-        if let roundLot = integerCandidates.first(where: { Int($0) % 1000 == 0 && $0 >= 1000 }) {
+        if !mathMatches.isEmpty {
+            // 排序策略：
+            // a. 優先取 diff 最小者 (S * 成本均價 ≈ 付出成本 的誤差通常 < 0.001)
+            // b. 若 diff 相當，優先取 priceIndex 較小者 (表頭中成本均價排在現價左側)
+            let best = mathMatches.sorted { (m1, m2) -> Bool in
+                let d1 = (m1.diff * 1000).rounded()
+                let d2 = (m2.diff * 1000).rounded()
+                if d1 != d2 {
+                    return d1 < d2
+                }
+                return m1.priceIndex < m2.priceIndex
+            }.first!
+            
+            return (best.shares, best.price)
+        }
+        
+        // 7. Fallback 啟發模式
+        let bestShares: Int
+        if let twin = twinShares {
+            bestShares = twin
+        } else if let roundLot = integerCandidates.first(where: { Int($0) % 1000 == 0 && $0 >= 1000 }) {
             bestShares = Int(roundLot)
         } else if let firstInt = integerCandidates.first {
             bestShares = Int(firstInt)
+        } else {
+            bestShares = 1000
         }
         
-        // 均價：優先取帶有小數點且數值合理的浮點數
-        if let floatP = floatCandidates.first(where: { $0 > 0.5 && $0 < 3000 }) {
+        let floatCandidates = numbers.filter { floor($0) != $0 && $0 > 0.5 && $0 <= 3500 }
+        let bestPrice: Double
+        if let floatP = floatCandidates.first {
             bestPrice = floatP
         } else if metaPrice > 0 {
             bestPrice = metaPrice
+        } else {
+            bestPrice = 10.0
         }
         
         return (bestShares, bestPrice)
