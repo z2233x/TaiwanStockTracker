@@ -47,7 +47,7 @@ struct AppIconAvatarView: View {
 
 // MARK: - 主應用程式五分頁 (對應截圖底部導航列)
 struct ContentView: View {
-    @State private var selectedTab: Int = 2 // 預設停在「投資總覽」
+    @State private var selectedTab: Int = 1 // 預設停在「持有現股」
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -58,7 +58,7 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            // 分頁 2: 持有現股 + 股息明細 (對應截圖 4)
+            // 分頁 2: 持有現股 + 交易日記 (合併視圖)
             HoldingsListView()
                 .tabItem {
                     Label("持有現股", systemImage: "briefcase.fill")
@@ -72,19 +72,12 @@ struct ContentView: View {
                 }
                 .tag(2)
             
-            // 分頁 4: 日記管理 (對應截圖 2)
-            JournalManagementView()
-                .tabItem {
-                    Label("日記管理", systemImage: "book.pages")
-                }
-                .tag(3)
-            
-            // 分頁 5: 股息歷程時間軸 (對應截圖 3)
+            // 分頁 4: 股息歷程時間軸 (對應截圖 3)
             DividendTimelineView()
                 .tabItem {
                     Label("股息歷程", systemImage: "clock.arrow.circlepath")
                 }
-                .tag(4)
+                .tag(3)
         }
         .tint(Color(hex: "#007AFF"))
     }
@@ -1635,6 +1628,10 @@ struct StockHoldingRowView: View {
 
 struct HoldingsListView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
+    @State private var journals: [JournalEntry] = StorageService.shared.loadJournals()
+    @State private var activeSubTab: Int = 0 // 0: 現有持股, 1: 交易日記
+    
+    // 現有持股狀態
     @State private var expandedSymbols: Set<String> = []
     @State private var selectedHoldingForDetail: StockHolding? = nil
     @State private var holdingToEdit: StockHolding? = nil
@@ -1645,6 +1642,21 @@ struct HoldingsListView: View {
     @State private var searchText = ""
     @State private var isRefreshing = false
     
+    // 交易日記狀態
+    @State private var selectedFilterSymbol: String = "全部"
+    @State private var isShowingAddJournal = false
+    @State private var isShowingBackup = false
+    @State private var isShowingRankSheet = false
+    
+    // 存股成就與市值統計
+    var totalMarketValue: Double { holdings.reduce(0) { $0 + $1.marketValue } }
+    var currentRank: InvestorRank { InvestorRank.currentRank(for: totalMarketValue) }
+    var nextRank: InvestorRank? { InvestorRank.nextRank(for: currentRank) }
+    var rankProgress: Double { InvestorRank.progress(for: totalMarketValue) }
+    var remainingToNext: Double? { InvestorRank.remainingToNext(for: totalMarketValue) }
+    
+    var heldSymbols: Set<String> { Set(holdings.map { $0.symbol }) }
+    
     var filteredHoldings: [StockHolding] {
         if searchText.isEmpty { return holdings }
         return holdings.filter {
@@ -1654,86 +1666,294 @@ struct HoldingsListView: View {
         }
     }
     
+    var filteredJournals: [JournalEntry] {
+        let base = journals.filter { heldSymbols.contains($0.symbol) }
+        if selectedFilterSymbol == "全部" {
+            return base
+        }
+        return base.filter { $0.symbol == selectedFilterSymbol }
+    }
+    
+    var filterOptions: [String] {
+        let base = journals.filter { heldSymbols.contains($0.symbol) }
+        var set = Array(Set(base.map { $0.symbol })).sorted()
+        set.insert("全部", at: 0)
+        return set
+    }
+    
     var body: some View {
         NavigationStack {
-            Group {
-                if holdings.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        Image(systemName: "briefcase")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary)
-                        Text("尚未建立或匯入持股")
-                            .font(.headline)
-                        Text("APP 僅會顯示您自己匯入的持股資料。\n您可以拍照或截圖自動辨識，也可以對接券商/對帳單，或點擊右上角「➕」手動新增！")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
+            VStack(spacing: 0) {
+                // 1. 頂部遊戲化存股等級個人卡 (成就門戶)
+                VStack(spacing: 10) {
+                    HStack(spacing: 12) {
+                        Button {
+                            isShowingRankSheet = true
+                        } label: {
+                            AppIconAvatarView(size: 44, badge: currentRank.badge)
+                        }
                         
-                        HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Button {
-                                isShowingPhotoOCR = true
+                                isShowingRankSheet = true
                             } label: {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "camera.fill")
-                                    Text("拍照 / 截圖自動辨識")
+                                    Text(currentRank.title)
+                                        .font(.headline.bold())
+                                        .foregroundColor(.primary)
+                                    Text("Lv.\(currentRank.level)")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color(hex: currentRank.colorHex).opacity(0.18))
+                                        .foregroundColor(Color(hex: currentRank.colorHex))
+                                        .clipShape(Capsule())
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2.bold())
+                                        .foregroundColor(.secondary)
                                 }
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#FF9500"))
-                                .cornerRadius(12)
                             }
                             
-                            Button {
-                                isShowingBrokerageSync = true
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "building.columns.fill")
-                                    Text("對接券商 / 對帳單")
-                                }
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#007AFF"))
-                                .cornerRadius(12)
-                            }
+                            Text("累積存股市值 $\(Int(totalMarketValue).formatted())")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .padding(.top, 8)
                         
                         Spacer()
+                        
+                        Button {
+                            isShowingBackup = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath.circle")
+                                Text("備份/還原")
+                            }
+                            .font(.caption.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(10)
+                        }
+                    }
+                    
+                    // 等級升級進度條
+                    VStack(spacing: 3) {
+                        ProgressView(value: rankProgress)
+                            .tint(Color(hex: currentRank.colorHex))
+                        
+                        HStack {
+                            if let next = nextRank, let rem = remainingToNext {
+                                Text("距晉升【\(next.badge) \(next.title)】還需 $\(Int(rem).formatted())")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("已達到最高存股傳奇境界！")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(Color(hex: "#FF2D55"))
+                            }
+                            Spacer()
+                            Text("\(Int(rankProgress * 100))%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Color(hex: currentRank.colorHex))
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemBackground))
+                
+                // 2. 雙視圖切換器 (分段控制器)
+                Picker("持股與日記切換", selection: $activeSubTab) {
+                    Text("📦 現有持股 (\(holdings.count))").tag(0)
+                    Text("📝 交易日記 (\(filteredJournals.count))").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                
+                Divider()
+                
+                // 3. 主要內容區域
+                if activeSubTab == 0 {
+                    // ========== 子分頁 1: 現有持股清單 ==========
+                    if holdings.isEmpty {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            Image(systemName: "briefcase")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("尚未建立或匯入持股")
+                                .font(.headline)
+                            Text("APP 僅會顯示您自己匯入的持股資料。\n您可以拍照或截圖自動辨識，也可以對接券商/對帳單，或點擊右上角「➕」手動新增！")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                            
+                            HStack(spacing: 12) {
+                                Button {
+                                    isShowingPhotoOCR = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "camera.fill")
+                                        Text("拍照 / 截圖自動辨識")
+                                    }
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "#FF9500"))
+                                    .cornerRadius(12)
+                                }
+                                
+                                Button {
+                                    isShowingBrokerageSync = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "building.columns.fill")
+                                        Text("對接券商 / 對帳單")
+                                    }
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "#007AFF"))
+                                    .cornerRadius(12)
+                                }
+                            }
+                            .padding(.top, 8)
+                            
+                            Spacer()
+                        }
+                    } else {
+                        List {
+                            ForEach(filteredHoldings) { item in
+                                StockHoldingRowView(
+                                    item: item,
+                                    isExpanded: expandedSymbols.contains(item.symbol),
+                                    onToggleExpand: {
+                                        if expandedSymbols.contains(item.symbol) {
+                                            expandedSymbols.remove(item.symbol)
+                                        } else {
+                                            expandedSymbols.insert(item.symbol)
+                                        }
+                                    },
+                                    onEdit: { holdingToEdit = item },
+                                    onShowDetail: { selectedHoldingForDetail = item },
+                                    onDelete: { holdingToDelete = item }
+                                )
+                            }
+                            .onDelete(perform: deleteHolding)
+                        }
+                        .listStyle(.insetGrouped)
+                        .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
                     }
                 } else {
-                    List {
-                        ForEach(filteredHoldings) { item in
-                            StockHoldingRowView(
-                                item: item,
-                                isExpanded: expandedSymbols.contains(item.symbol),
-                                onToggleExpand: {
-                                    if expandedSymbols.contains(item.symbol) {
-                                        expandedSymbols.remove(item.symbol)
-                                    } else {
-                                        expandedSymbols.insert(item.symbol)
-                                    }
-                                },
-                                onEdit: { holdingToEdit = item },
-                                onShowDetail: { selectedHoldingForDetail = item },
-                                onDelete: { holdingToDelete = item }
-                            )
+                    // ========== 子分頁 2: 交易日記流水帳 ==========
+                    VStack(spacing: 0) {
+                        // 標的篩選列
+                        HStack {
+                            Text("篩選標的:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Picker("選擇標的", selection: $selectedFilterSymbol) {
+                                ForEach(filterOptions, id: \.self) { opt in
+                                    Text(opt == "全部" ? "全部標的" : opt).tag(opt)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                            
+                            Spacer()
+                            
+                            Text("共 \(filteredJournals.count) 筆日記")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .onDelete(perform: deleteHolding)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        
+                        Divider()
+                        
+                        if filteredJournals.isEmpty {
+                            VStack(spacing: 14) {
+                                Spacer()
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 44))
+                                    .foregroundColor(.secondary)
+                                Text("目前尚無符合之持股交易紀錄")
+                                    .font(.headline)
+                                Text("交易日記已與現有持股深度整合。\n當您新增持股或加碼時，系統將自動連動記錄流水帳；亦可點擊右上角「➕」直接記一筆！")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            List {
+                                ForEach(filteredJournals) { item in
+                                    HStack(spacing: 12) {
+                                        // 交易類型圓形 Badge
+                                        Text(item.type.rawValue)
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(.white)
+                                            .frame(width: 32, height: 32)
+                                            .background(Color(hex: item.type.badgeColorHex))
+                                            .clipShape(Circle())
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Text(item.dateString)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                if !item.note.isEmpty {
+                                                    Text(item.note)
+                                                        .font(.caption2)
+                                                        .padding(.horizontal, 4)
+                                                        .padding(.vertical, 1)
+                                                        .background(Color(.systemGray5))
+                                                        .cornerRadius(4)
+                                                }
+                                            }
+                                            HStack(spacing: 6) {
+                                                Text(item.symbol)
+                                                    .font(.subheadline.bold())
+                                                Text(item.name)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text("$\(Int(item.totalAmount).formatted())")
+                                                .font(.headline.bold())
+                                            Text("$\(String(format: "%.2f", item.price)) · \(item.lotsText)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .onDelete(perform: deleteJournal)
+                            }
+                            .listStyle(.plain)
+                        }
                     }
-                    .listStyle(.insetGrouped)
-                    .searchable(text: $searchText, prompt: "搜尋代號或名稱 (例: 0056, 台積電)")
                 }
             }
             .refreshable {
                 await refreshQuotes()
             }
             .navigationTitle("持有現股")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -1745,22 +1965,30 @@ struct HoldingsListView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 14) {
-                        Button {
-                            isShowingPhotoOCR = true
-                        } label: {
-                            Image(systemName: "camera.viewfinder")
-                                .font(.system(size: 16, weight: .semibold))
+                    if activeSubTab == 0 {
+                        HStack(spacing: 14) {
+                            Button {
+                                isShowingPhotoOCR = true
+                            } label: {
+                                Image(systemName: "camera.viewfinder")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            
+                            Button {
+                                isShowingBrokerageSync = true
+                            } label: {
+                                Image(systemName: "building.columns")
+                            }
+                            
+                            Button {
+                                isShowingAdd = true
+                            } label: {
+                                Image(systemName: "plus")
+                            }
                         }
-                        
+                    } else {
                         Button {
-                            isShowingBrokerageSync = true
-                        } label: {
-                            Image(systemName: "building.columns")
-                        }
-                        
-                        Button {
-                            isShowingAdd = true
+                            isShowingAddJournal = true
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -1775,7 +2003,7 @@ struct HoldingsListView: View {
                 Button("刪除存股", role: .destructive) {
                     if let target = holdingToDelete {
                         StorageService.shared.deleteHolding(id: target.id)
-                        holdings = StorageService.shared.loadHoldings()
+                        reloadAllData()
                     }
                     holdingToDelete = nil
                 }
@@ -1789,43 +2017,71 @@ struct HoldingsListView: View {
             .sheet(item: $holdingToEdit) { h in
                 EditHoldingSheet(holding: h) { updated in
                     StorageService.shared.updateHolding(updated)
-                    holdings = StorageService.shared.loadHoldings()
+                    reloadAllData()
                 } onDelete: {
                     StorageService.shared.deleteHolding(id: h.id)
-                    holdings = StorageService.shared.loadHoldings()
+                    reloadAllData()
                 }
             }
             .sheet(isPresented: $isShowingAdd) {
                 AddHoldingSheet { newHolding, isDCA in
                     StorageService.shared.addOrUpdateHolding(newHolding, isDCA: isDCA, autoAddJournal: true)
-                    holdings = StorageService.shared.loadHoldings()
+                    reloadAllData()
                 }
             }
             .sheet(isPresented: $isShowingBrokerageSync) {
                 BrokerageSyncSheet {
-                    holdings = StorageService.shared.loadHoldings()
+                    reloadAllData()
                 }
             }
             .sheet(isPresented: $isShowingPhotoOCR) {
                 PhotoOCRScannerSheet { _ in
-                    holdings = StorageService.shared.loadHoldings()
+                    reloadAllData()
                 }
             }
+            .sheet(isPresented: $isShowingAddJournal) {
+                AddJournalSheet(holdings: holdings) { newEntry in
+                    journals.insert(newEntry, at: 0)
+                    StorageService.shared.saveJournals(journals)
+                    reloadAllData()
+                }
+            }
+            .sheet(isPresented: $isShowingBackup) {
+                DataBackupSheet {
+                    reloadAllData()
+                }
+            }
+            .sheet(isPresented: $isShowingRankSheet) {
+                InvestorRankSheet(currentAmount: totalMarketValue)
+            }
             .onAppear {
-                holdings = StorageService.shared.loadHoldings()
+                reloadAllData()
             }
         }
+    }
+    
+    private func reloadAllData() {
+        holdings = StorageService.shared.loadHoldings()
+        journals = StorageService.shared.loadJournals()
     }
     
     private func deleteHolding(at offsets: IndexSet) {
         holdings.remove(atOffsets: offsets)
         StorageService.shared.saveHoldings(holdings)
+        reloadAllData()
+    }
+    
+    private func deleteJournal(at offsets: IndexSet) {
+        let targets = offsets.map { filteredJournals[$0].id }
+        journals.removeAll { targets.contains($0.id) }
+        StorageService.shared.saveJournals(journals)
+        reloadAllData()
     }
     
     private func refreshQuotes() async {
         isRefreshing = true
         _ = await StorageService.shared.refreshAllStockQuotes()
-        holdings = StorageService.shared.loadHoldings()
+        reloadAllData()
         isRefreshing = false
     }
 }

@@ -420,25 +420,21 @@
         <!-- 內容由 JS 動態渲染五大模組 -->
       </div>
 
-      <!-- 底部 Tab Bar -->
+      <!-- 底部 Tab Bar (合併持股與日記，收斂為 4 大功能) -->
       <div class="tab-bar">
         <div class="tab-item" onclick="switchTab(0)" id="tab0">
           <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
           <span>台股日曆</span>
         </div>
-        <div class="tab-item" onclick="switchTab(1)" id="tab1">
+        <div class="tab-item active" onclick="switchTab(1)" id="tab1">
           <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
           <span>持有現股</span>
         </div>
-        <div class="tab-item active" onclick="switchTab(2)" id="tab2">
+        <div class="tab-item" onclick="switchTab(2)" id="tab2">
           <svg viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2 0v8.99H22c-.47-4.74-4.24-8.52-9-8.99zm0 11.01V22c4.76-.47 8.53-4.25 9-8.99H13z"/></svg>
           <span>投資總覽</span>
         </div>
         <div class="tab-item" onclick="switchTab(3)" id="tab3">
-          <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
-          <span>日記管理</span>
-        </div>
-        <div class="tab-item" onclick="switchTab(4)" id="tab4">
           <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
           <span>股息歷程</span>
         </div>
@@ -543,10 +539,24 @@
   setInterval(updateTime, 1000);
   updateTime();
 
-  // 切換 Tab
+  // 持有現股子視圖切換: 0: 現有持股, 1: 交易日記 (深度連動)
+  let holdingsSubTab = 0;
+  let journalFilterSymbol = '全部';
+
+  function switchHoldingsSubTab(idx) {
+    holdingsSubTab = idx;
+    renderApp();
+  }
+
+  function setJournalFilterSymbol(sym) {
+    journalFilterSymbol = sym;
+    renderApp();
+  }
+
+  // 切換 Tab (4大模組: 0:日曆, 1:持股與日記, 2:投資總覽, 3:股息歷程)
   function switchTab(index) {
     currentTab = index;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       const el = document.getElementById(`tab${i}`);
       if (el) el.classList.toggle('active', i === index);
     }
@@ -560,8 +570,7 @@
       case 0: container.innerHTML = renderCalendarTab(); break;
       case 1: container.innerHTML = renderHoldingsTab(); break;
       case 2: container.innerHTML = renderDashboardTab(); break;
-      case 3: container.innerHTML = renderJournalTab(); break;
-      case 4: container.innerHTML = renderTimelineTab(); break;
+      case 3: container.innerHTML = renderTimelineTab(); break;
     }
   }
 
@@ -743,26 +752,143 @@
     return `<svg width="160" height="160" viewBox="0 0 160 160">${paths}</svg>`;
   }
 
-  // ==================== 模組 2: 持有現股 + 股息明細 ====================
+  // ==================== 模組 2: 持有現股 + 交易日記 (深度整合) ====================
   function renderHoldingsTab() {
+    const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
+    const rank = getCurrentRank(totalMarketValue);
+    const next = getNextRank(rank);
+
+    let progressPct = 100;
+    let gapText = '🎉 已達到最高傳奇殿堂！';
+    if (next && isFinite(rank.max)) {
+      const curInTier = Math.max(0, totalMarketValue - rank.min);
+      const tierRange = rank.max - rank.min;
+      progressPct = Math.min(100, Math.round((curInTier / tierRange) * 100));
+      const gap = Math.max(0, rank.max - totalMarketValue);
+      gapText = `距晉升【${next.badge} ${next.title}】還需 $${Math.round(gap).toLocaleString()}`;
+    }
+
+    // 連動真實持有現股之日記清單
+    const activeSymbols = new Set(holdings.map(h => h.symbol));
+    const allActiveJournals = journals.filter(j => activeSymbols.has(j.symbol));
+    const heldOptions = ['全部', ...Array.from(activeSymbols).sort()];
+    const filteredJournals = journalFilterSymbol === '全部'
+      ? allActiveJournals
+      : allActiveJournals.filter(j => j.symbol === journalFilterSymbol);
+
     return `
+      <!-- 頂部導航列 (依子分頁動態切換操作按鈕) -->
       <div class="nav-bar">
-        <button class="nav-btn" onclick="refreshQuotesSim()">🔄</button>
+        <button class="nav-btn" onclick="refreshQuotesSim()" title="更新即時報價">🔄</button>
         <h1>持有現股</h1>
         <div style="display: flex; gap: 6px;">
-          <button class="nav-btn" title="📸 拍照/截圖辨識" onclick="openPhotoOCRModal()">📸</button>
-          <button class="nav-btn" title="券商對接中心" onclick="openBrokerageModal()">🏦</button>
-          <button class="nav-btn" title="新增/加碼" onclick="openAddHoldingSheet()">➕</button>
+          ${holdingsSubTab === 0 ? `
+            <button class="nav-btn" title="📸 拍照/截圖辨識" onclick="openPhotoOCRModal()">📸</button>
+            <button class="nav-btn" title="券商對接中心" onclick="openBrokerageModal()">🏦</button>
+            <button class="nav-btn" title="新增/加碼" onclick="openAddHoldingSheet()">➕</button>
+          ` : `
+            <button class="nav-btn" title="記一筆交易" onclick="openAddJournalSheet()">➕</button>
+          `}
         </div>
       </div>
 
-      <div style="padding: 0 16px 8px 16px;">
-        <input class="form-input" placeholder="🔍 搜尋代號、名稱或券商 (例: 0056, 台積電, 元大)" oninput="filterHoldings(this.value)">
+      <!-- 1. 遊戲化存股等級晉升卡片 (個人成就門戶) -->
+      <div style="padding: 12px 14px; background: #FFF; margin: 0 16px 10px 16px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer;" onclick="openRankModal()">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="position: relative; width: 44px; height: 44px; flex-shrink: 0;">
+              <img src="app_icon.png" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #FFF; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" alt="Avatar">
+              <div style="position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; background: #FFF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid #E5E5EA;">
+                ${rank.badge}
+              </div>
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 800; font-size: 15px; color: #1C1C1E;">${rank.title}</span>
+                <span style="font-size: 10px; font-weight: 700; background: ${rank.color}22; color: ${rank.color}; padding: 2px 6px; border-radius: 8px;">Lv.${rank.level}</span>
+                <span style="font-size: 12px; color: #8E8E93;">›</span>
+              </div>
+              <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">存股市值 $${Math.round(totalMarketValue).toLocaleString()}</div>
+            </div>
+          </div>
+          <button class="sim-btn" style="padding: 5px 9px; font-size: 11px;" onclick="event.stopPropagation(); exportJSON()">💾 備份</button>
+        </div>
+
+        <!-- 升級經驗條 -->
+        <div style="margin-top: 2px;">
+          <div style="background: #E5E5EA; height: 5px; border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
+            <div style="background: ${rank.color}; height: 100%; width: ${progressPct}%; border-radius: 3px; transition: width 0.3s;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span style="color: #8E8E93;">${gapText}</span>
+            <b style="color: ${rank.color};">${progressPct}%</b>
+          </div>
+        </div>
       </div>
 
-      <div id="holdingsList">
-        ${renderHoldingsCards(holdings)}
+      <!-- 2. iOS 分段控制切換器 (現有持股 vs 交易日記) -->
+      <div style="padding: 0 16px 10px 16px;">
+        <div style="display: flex; background: #E5E5EA; padding: 3px; border-radius: 9px;">
+          <button style="flex: 1; padding: 7px; border: none; border-radius: 7px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; ${holdingsSubTab === 0 ? 'background: #FFF; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.12);' : 'background: transparent; color: #8E8E93;'}" onclick="switchHoldingsSubTab(0)">
+            📦 現有持股 (${holdings.length})
+          </button>
+          <button style="flex: 1; padding: 7px; border: none; border-radius: 7px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; ${holdingsSubTab === 1 ? 'background: #FFF; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.12);' : 'background: transparent; color: #8E8E93;'}" onclick="switchHoldingsSubTab(1)">
+            📝 交易日記 (${allActiveJournals.length})
+          </button>
+        </div>
       </div>
+
+      <!-- 3. 動態視圖切換區域 -->
+      ${holdingsSubTab === 0 ? `
+        <!-- 子分頁 1: 現有持股清單 -->
+        <div style="padding: 0 16px 8px 16px;">
+          <input class="form-input" placeholder="🔍 搜尋代號、名稱或券商 (例: 0056, 台積電, 元大)" oninput="filterHoldings(this.value)">
+        </div>
+        <div id="holdingsList">
+          ${renderHoldingsCards(holdings)}
+        </div>
+      ` : `
+        <!-- 子分頁 2: 交易日記流水帳 -->
+        <div style="padding: 0 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 12px; color: #8E8E93;">篩選標的:</span>
+              <select class="form-input" style="width: auto; padding: 3px 8px; font-size: 12px;" onchange="setJournalFilterSymbol(this.value)">
+                ${heldOptions.map(opt => `<option value="${opt}" ${opt === journalFilterSymbol ? 'selected' : ''}>${opt === '全部' ? '全部標的' : opt}</option>`).join('')}
+              </select>
+            </div>
+            <span style="font-size: 11px; color: #8E8E93;">共 ${filteredJournals.length} 筆日記</span>
+          </div>
+
+          ${filteredJournals.length === 0 ? `
+            <div class="card" style="text-align: center; padding: 36px 16px; margin: 12px 0;">
+              <div style="font-size: 36px; margin-bottom: 8px;">📝</div>
+              <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">尚無連動之交易日記</div>
+              <div style="font-size: 11px; color: #8E8E93; line-height: 1.4;">
+                交易日記已與現有持股深度整合。<br>當您在「現有持股」新增或匯入持股時，系統將自動連動流水帳；亦可點擊右上角「➕」直接記一筆！
+              </div>
+            </div>
+          ` : filteredJournals.map(j => `
+            <div class="card" style="margin: 8px 0; display: flex; align-items: center; gap: 12px;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: ${j.type === '買' ? 'var(--ios-orange)' : (j.type === '賣' ? 'var(--ios-green)' : 'var(--ios-blue)')}; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0;">
+                ${j.type}
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <span style="font-weight: 800; font-size: 14px;">${j.symbol}</span>
+                  <span style="font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${j.name}</span>
+                  ${j.note ? `<span class="badge" style="background:#E5E5EA; color:#333; font-size: 9px;">${j.note}</span>` : ''}
+                </div>
+                <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${j.date} · $${j.price} · ${j.shares.toLocaleString()}股</div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 14px; font-weight: 800;">$${Math.round(j.price * j.shares).toLocaleString()}</div>
+                <button class="nav-btn" style="color: #FF3B30; padding: 2px 6px; font-size: 13px;" title="刪除日記" onclick="deleteJournalSim('${j.id}')">🗑️</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
     `;
   }
 
@@ -1179,97 +1305,23 @@
     triggerNotification('⚡ 行事曆同步完成', `已為持有現股自動導入 ${added} 筆重大行事曆（法說會、股東會、月營收）！`);
   }
 
-  // ==================== 模組 4: 日記管理 (遊戲化等級系統) ====================
-  function renderJournalTab() {
-    const totalMarketValue = holdings.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
-    const rank = getCurrentRank(totalMarketValue);
-    const next = getNextRank(rank);
-
-    let progressPct = 100;
-    let gapText = '🎉 已達到最高傳奇殿堂！';
-    if (next && isFinite(rank.max)) {
-      const curInTier = Math.max(0, totalMarketValue - rank.min);
-      const tierRange = rank.max - rank.min;
-      progressPct = Math.min(100, Math.round((curInTier / tierRange) * 100));
-      const gap = Math.max(0, rank.max - totalMarketValue);
-      gapText = `距晉升【${next.badge} ${next.title}】還需 $${Math.round(gap).toLocaleString()}`;
+  // 刪除交易日記
+  function deleteJournalSim(id) {
+    if (confirm('確定要刪除此筆交易日記嗎？')) {
+      journals = journals.filter(j => j.id !== id);
+      saveState();
+      renderApp();
+      triggerNotification('🗑️ 已刪除交易日記', '該筆日記紀錄已自清單中移除。');
     }
-
-    // 依據目前現有持股連動過濾日記（日記管理連動持股）
-    const activeSymbols = new Set(holdings.map(h => h.symbol));
-    const activeJournals = journals.filter(j => activeSymbols.has(j.symbol));
-
-    return `
-      <div class="nav-bar">
-        <div></div>
-        <h1>日記管理</h1>
-        <button class="nav-btn" onclick="openAddJournalSheet()">➕</button>
-      </div>
-
-      <!-- 遊戲化存股等級晉升卡片 (點擊查看天梯榮譽殿堂) -->
-      <div style="padding: 14px 16px; background: #FFF; margin: 0 16px 12px 16px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer;" onclick="openRankModal()">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="position: relative; width: 46px; height: 46px; flex-shrink: 0;">
-              <img src="app_icon.png" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid #FFF; box-shadow: 0 3px 8px rgba(0,0,0,0.15);" alt="Avatar">
-              <div style="position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; background: #FFF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; border: 1px solid #E5E5EA;">
-                ${rank.badge}
-              </div>
-            </div>
-            <div>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-weight: 800; font-size: 15px; color: #1C1C1E;">${rank.title}</span>
-                <span style="font-size: 10px; font-weight: 700; background: ${rank.color}22; color: ${rank.color}; padding: 2px 6px; border-radius: 10px;">Lv.${rank.level}</span>
-                <span style="font-size: 12px; color: #8E8E93;">›</span>
-              </div>
-              <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">存股市值 $${Math.round(totalMarketValue).toLocaleString()}</div>
-            </div>
-          </div>
-          <button class="sim-btn" style="padding: 5px 9px; font-size: 11px;" onclick="event.stopPropagation(); exportJSON()">💾 備份</button>
-        </div>
-
-        <!-- 升級經驗條 -->
-        <div style="margin-top: 4px;">
-          <div style="background: #E5E5EA; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
-            <div style="background: ${rank.color}; height: 100%; width: ${progressPct}%; border-radius: 3px; transition: width 0.3s;"></div>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 11px;">
-            <span style="color: #8E8E93;">${gapText}</span>
-            <b style="color: ${rank.color};">${progressPct}%</b>
-          </div>
-        </div>
-      </div>
-
-      <div style="padding: 0 16px;">
-        ${activeJournals.length === 0 ? `
-          <div class="card" style="text-align: center; padding: 36px 16px; margin: 12px 0;">
-            <div style="font-size: 36px; margin-bottom: 8px;">📝</div>
-            <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">尚無連動之交易日記</div>
-            <div style="font-size: 11px; color: #8E8E93; line-height: 1.4;">日記管理已連動持有現股。當您新增或匯入持股時，系統將自動記錄建倉流水；無持股時不顯示歷史紀錄。</div>
-          </div>
-        ` : activeJournals.map(j => `
-          <div class="card" style="margin: 8px 0; display: flex; align-items: center; gap: 12px;">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${j.type === '買' ? 'var(--ios-orange)' : 'var(--ios-green)'}; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;">
-              ${j.type}
-            </div>
-            <div style="flex: 1;">
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <span style="font-weight: 800; font-size: 14px;">${j.symbol}</span>
-                <span style="font-size: 11px; color: #666;">${j.name}</span>
-                ${j.note ? `<span class="badge" style="background:#E5E5EA; color:#333;">${j.note}</span>` : ''}
-              </div>
-              <div style="font-size: 11px; color: #8E8E93; margin-top: 2px;">${j.date} · $${j.price} · ${j.shares}股</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 14px; font-weight: 800;">$${Math.round(j.price * j.shares).toLocaleString()}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
   }
 
-  // ==================== 模組 5: 股息歷程 (連動真實持有現股) ====================
+  // ==================== 模組: 日記管理 (已併入持有現股中) ====================
+  function renderJournalTab() {
+    holdingsSubTab = 1;
+    return renderHoldingsTab();
+  }
+
+  // ==================== 模組 4: 股息歷程 (連動真實持有現股) ====================
   
   // ==================== 股息歷程：買入後起算配息、滑動刪除與加總 ====================
   function getMonthlyTimelineData() {
