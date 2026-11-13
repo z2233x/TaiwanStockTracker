@@ -355,6 +355,7 @@
     animation: coinFloatUp 0.9s ease-out forwards;
   }
   .pet-theme-default { background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FA 100%); color: #1C1C1E; border: 1px solid #E5E5EA; }
+  .pet-theme-fortune { background: linear-gradient(135deg, #991B1B 0%, #B91C1C 55%, #7F1D1D 100%); color: #FEF3C7; border: 1.5px solid #F59E0B; box-shadow: 0 6px 18px rgba(185, 28, 28, 0.25); }
   .pet-theme-obsidian { background: linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%); color: #FFFFFF; border: 1px solid #3A3A3C; }
   .pet-theme-sakura { background: linear-gradient(135deg, #FFF5F7 0%, #FCE7F3 100%); color: #1C1C1E; border: 1px solid #FBCFE8; }
 </style>
@@ -562,8 +563,8 @@
     spendableDP: 0,
     pendingFeedDP: 60,
     claimedRecordIDs: [],
-    unlockedThemes: ['default'],
-    activeTheme: 'default'
+    unlockedThemes: ['fortune', 'default'],
+    activeTheme: 'fortune'
   };
 
   function resolveStockName(h) {
@@ -678,163 +679,16 @@
     return auras;
   }
 
-  function renderPetSVG(species, stage, isDownMarket, size = 72) {
-    const hardHat = isDownMarket ? `
-      <g transform="translate(0, -2)">
-        <path d="M31 24 C31 12, 69 12, 69 24 Z" fill="#FACC15" stroke="#B45309" stroke-width="1.8"/>
-        <rect x="27" y="23" width="46" height="4.5" rx="2.2" fill="#F59E0B" stroke="#B45309" stroke-width="1.5"/>
-        <rect x="46" y="13.5" width="8" height="9" rx="2" fill="#FEF08A"/>
-      </g>
-    ` : '';
-
-    const stageHalo = stage >= 5 ? `
-      <circle cx="50" cy="54" r="42" fill="none" stroke="url(#goldGrad)" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.85"/>
-    ` : stage >= 4 ? `
-      <circle cx="50" cy="54" r="40" fill="none" stroke="#FBBF24" stroke-width="1.5" opacity="0.45"/>
-    ` : '';
-
-    const floatingCoins = stage >= 4 ? `
-      <g>
-        <circle cx="15" cy="36" r="6.5" fill="#FBBF24" stroke="#B45309" stroke-width="1.4"/>
-        <text x="15" y="38.8" text-anchor="middle" font-size="7" font-weight="800" fill="#92400E">$</text>
-        <circle cx="85" cy="34" r="6.5" fill="#FBBF24" stroke="#B45309" stroke-width="1.4"/>
-        <text x="85" y="36.8" text-anchor="middle" font-size="7" font-weight="800" fill="#92400E">息</text>
-      </g>
-    ` : '';
-
-    let body = '';
-    if (species === 'bird') {
-      // 貪錢鳥：圓潤幾何小肥鳥抱著金幣不放
-      const crown = stage >= 2 ? `
-        <path d="M46 18 L43 9 L50 14 L55 7 L56 18 Z" fill="#FBBF24" stroke="#B45309" stroke-width="1.4" stroke-linejoin="round"/>
-      ` : `<path d="M48 19 Q52 12 55 17" fill="none" stroke="#0284C7" stroke-width="2.6" stroke-linecap="round"/>`;
-      const monocle = stage >= 3 ? `
-        <circle cx="59" cy="40" r="6.2" fill="rgba(255,255,255,0.22)" stroke="#F59E0B" stroke-width="1.8"/>
-        <line x1="65" y1="42" x2="71" y2="51" stroke="#F59E0B" stroke-width="1.4"/>
-      ` : '';
-      const ingots = stage >= 4 ? `
-        <path d="M22 86 L34 86 L31 92 L25 92 Z" fill="#FBBF24" stroke="#B45309" stroke-width="1.3"/>
-        <path d="M66 86 L78 86 L75 92 L69 92 Z" fill="#FBBF24" stroke="#B45309" stroke-width="1.3"/>
-      ` : '';
-      body = `
-        ${ingots}
-        ${crown}
-        <ellipse cx="50" cy="87" rx="22" ry="4" fill="rgba(0,0,0,0.08)"/>
-        <!-- 主體圓滾身體 -->
-        <circle cx="50" cy="53" r="30" fill="#0EA5E9" stroke="#0369A1" stroke-width="2"/>
-        <ellipse cx="50" cy="60" rx="21" ry="20" fill="#E0F2FE"/>
-        <!-- 翅膀緊抱著中間金幣 -->
-        <path d="M22 50 C14 60, 22 72, 34 68" fill="#0284C7" stroke="#0369A1" stroke-width="1.8"/>
-        <path d="M78 50 C86 60, 78 72, 66 68" fill="#0284C7" stroke="#0369A1" stroke-width="1.8"/>
-        <!-- 眼睛與閃亮高光 -->
-        <circle cx="40" cy="40" r="3.6" fill="#0F172A"/><circle cx="38.8" cy="38.8" r="1.2" fill="#FFF"/>
-        <circle cx="60" cy="40" r="3.6" fill="#0F172A"/><circle cx="58.8" cy="38.8" r="1.2" fill="#FFF"/>
-        ${monocle}
-        <!-- 尖喙 -->
-        <polygon points="46,45 54,45 50,52" fill="#F59E0B" stroke="#B45309" stroke-width="1.3" stroke-linejoin="round"/>
-        <!-- 懷裡死抱著的大金幣 -->
-        <circle cx="50" cy="66" r="12.5" fill="url(#goldGrad)" stroke="#B45309" stroke-width="2"/>
-        <circle cx="50" cy="66" r="9.2" fill="none" stroke="#FEF3C7" stroke-width="1.1"/>
-        <text x="50" y="70" text-anchor="middle" font-size="11" font-weight="900" fill="#92400E">息</text>
-        <!-- 小腳 -->
-        <path d="M40 82 L38 87 M40 82 L42 87" stroke="#F59E0B" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M60 82 L58 87 M60 82 L62 87" stroke="#F59E0B" stroke-width="2.4" stroke-linecap="round"/>
-      `;
-    } else if (species === 'dog') {
-      // 財氣犬：赤柴焦糖橘＋奶油白＋咬金券
-      const coupon = stage >= 2 ? `
-        <g transform="translate(52, 54) rotate(8)">
-          <rect x="0" y="0" width="18" height="10" rx="2" fill="#FBBF24" stroke="#B45309" stroke-width="1.4"/>
-          <text x="9" y="7.5" text-anchor="middle" font-size="6.5" font-weight="900" fill="#92400E">股息</text>
-        </g>
-      ` : '';
-      const collarBell = stage >= 3 ? `
-        <circle cx="50" cy="70" r="4.5" fill="#FBBF24" stroke="#B45309" stroke-width="1.4"/>
-      ` : '';
-      body = `
-        <ellipse cx="50" cy="88" rx="23" ry="4" fill="rgba(0,0,0,0.08)"/>
-        <!-- 捲尾 -->
-        <path d="M72 68 C85 64, 86 50, 76 52" fill="none" stroke="#EA580C" stroke-width="6" stroke-linecap="round"/>
-        <!-- 身體 -->
-        <rect x="30" y="56" width="40" height="28" rx="14" fill="#F97316" stroke="#C2410C" stroke-width="2"/>
-        <ellipse cx="50" cy="72" rx="12" ry="11" fill="#FFF7ED"/>
-        <!-- 尖耳朵 -->
-        <polygon points="26,38 22,17 40,28" fill="#EA580C" stroke="#C2410C" stroke-width="1.8" stroke-linejoin="round"/>
-        <polygon points="27,34 25,22 36,29" fill="#FED7AA"/>
-        <polygon points="74,38 78,17 60,28" fill="#EA580C" stroke="#C2410C" stroke-width="1.8" stroke-linejoin="round"/>
-        <polygon points="73,34 75,22 64,29" fill="#FED7AA"/>
-        <!-- 柴犬臉龐 -->
-        <ellipse cx="50" cy="43" rx="25" ry="21" fill="#F97316" stroke="#C2410C" stroke-width="2"/>
-        <path d="M27 46 C33 38, 44 42, 50 42 C56 42, 67 38, 73 46 C73 57, 62 63, 50 63 C38 63, 27 57, 27 46 Z" fill="#FFF7ED"/>
-        <!-- 經典柴犬白眉點 -->
-        <ellipse cx="39" cy="34" rx="3.2" ry="2" fill="#FFF7ED"/>
-        <ellipse cx="61" cy="34" rx="3.2" ry="2" fill="#FFF7ED"/>
-        <!-- 眼睛與鼻嘴 -->
-        <circle cx="40" cy="41" r="3.1" fill="#1C1917"/><circle cx="39" cy="40" r="1" fill="#FFF"/>
-        <circle cx="60" cy="41" r="3.1" fill="#1C1917"/><circle cx="59" cy="40" r="1" fill="#FFF"/>
-        <ellipse cx="50" cy="48" rx="3.8" ry="2.6" fill="#1C1917"/>
-        <path d="M46 53 Q50 56 54 53" fill="none" stroke="#7C2D12" stroke-width="1.8" stroke-linecap="round"/>
-        <!-- 金融墨綠領巾 -->
-        <path d="M32 60 Q50 68 68 60 L64 67 Q50 73 36 67 Z" fill="#15803D" stroke="#14532D" stroke-width="1.4"/>
-        ${collarBell}
-        ${coupon}
-      `;
-    } else {
-      // 招財貓：極簡白瓷圓弧貓＋舉右手＋紅金鈴鐺＋小判金幣
-      const crown = stage >= 3 ? `
-        <path d="M41 21 L44 13 L50 18 L56 13 L59 21 Z" fill="#FBBF24" stroke="#B45309" stroke-width="1.5" stroke-linejoin="round"/>
-      ` : '';
-      const koban = stage >= 2 ? `
-        <rect x="42" y="66" width="16" height="20" rx="6" fill="url(#goldGrad)" stroke="#B45309" stroke-width="1.6"/>
-        <text x="50" y="79" text-anchor="middle" font-size="9" font-weight="900" fill="#92400E">息</text>
-      ` : '';
-      body = `
-        ${crown}
-        <ellipse cx="50" cy="88" rx="23" ry="4" fill="rgba(0,0,0,0.08)"/>
-        <!-- 身體 -->
-        <rect x="30" y="54" width="40" height="31" rx="16" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-        <!-- 舉起的招財右手 -->
-        <path d="M31 61 C18 54, 18 37, 27 36 C33 35, 34 45, 34 55" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-        <circle cx="26.5" cy="40" r="2.6" fill="#FDA4AF"/>
-        <!-- 尖貓耳 -->
-        <polygon points="27,36 25,16 42,26" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2" stroke-linejoin="round"/>
-        <polygon points="29,33 28,21 39,27" fill="#FDE68A"/>
-        <polygon points="73,36 75,16 58,26" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2" stroke-linejoin="round"/>
-        <polygon points="71,33 72,21 61,27" fill="#FDE68A"/>
-        <!-- 圓臉 -->
-        <ellipse cx="50" cy="41" rx="24" ry="20" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-        <!-- 招財彎眼 -->
-        <path d="M36 40 Q40 35 44 40" fill="none" stroke="#1E293B" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M56 40 Q60 35 64 40" fill="none" stroke="#1E293B" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="34" cy="46" r="3" fill="#FDA4AF" opacity="0.6"/>
-        <circle cx="66" cy="46" r="3" fill="#FDA4AF" opacity="0.6"/>
-        <!-- 鼻嘴與鬍鬚 -->
-        <polygon points="48,45 52,45 50,48" fill="#F43F5E"/>
-        <path d="M45 51 Q50 54 55 51" fill="none" stroke="#64748B" stroke-width="1.6" stroke-linecap="round"/>
-        <line x1="25" y1="44" x2="32" y2="45" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
-        <line x1="25" y1="49" x2="32" y2="49" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
-        <line x1="68" y1="45" x2="75" y2="44" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
-        <line x1="68" y1="49" x2="75" y2="49" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
-        <!-- 紅項圈 + 金鈴鐺 -->
-        <path d="M33 58 Q50 64 67 58" fill="none" stroke="#EF4444" stroke-width="4.5" stroke-linecap="round"/>
-        ${koban}
-        <circle cx="50" cy="62" r="4.5" fill="url(#goldGrad)" stroke="#B45309" stroke-width="1.4"/>
-      `;
-    }
-
+  function renderPetAvatar(species, stage, isDownMarket, size = 64) {
+    const safeSp = ['cat', 'bird', 'dog'].includes(species) ? species : 'cat';
+    const borderColor = stage >= 5 ? '#FDE047' : stage >= 3 ? '#F59E0B' : '#FBBF24';
+    const glow = stage >= 4 ? '0 0 14px rgba(245, 158, 11, 0.55)' : '0 4px 10px rgba(0, 0, 0, 0.16)';
     return `
-      <svg width="${size}" height="${size}" viewBox="0 0 100 100" style="overflow: visible;">
-        <defs>
-          <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#FDE047"/>
-            <stop offset="100%" stop-color="#F59E0B"/>
-          </linearGradient>
-        </defs>
-        ${stageHalo}
-        ${body}
-        ${floatingCoins}
-        ${hardHat}
-      </svg>
+      <div style="position: relative; width: ${size}px; height: ${size}px; flex-shrink: 0;">
+        <img src="pet_${safeSp}.png" alt="${safeSp}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 16px; border: 2px solid ${borderColor}; box-shadow: ${glow}; display: block;">
+        <span style="position: absolute; bottom: -4px; right: -4px; background: linear-gradient(135deg, #FDE047, #D97706); color: #451A03; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; border: 1px solid #FFF;">S${stage}</span>
+        ${isDownMarket ? '<span title="貼息陪等填息中" style="position: absolute; top: -6px; left: -6px; font-size: 16px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));">🪖</span>' : ''}
+      </div>
     `;
   }
 
@@ -905,63 +759,66 @@
     const isDownMarket = holdings.length > 0 && (totalMarketValue - totalCost) < 0;
     const divSummary = analyzePortfolioDividendSources(holdings);
     const auras = getPetAuras(holdings, divSummary);
-    const themeClass = `pet-theme-${petState.activeTheme || 'default'}`;
-    const isDark = petState.activeTheme === 'obsidian';
+    const activeTheme = petState.activeTheme || 'fortune';
+    const themeClass = `pet-theme-${activeTheme}`;
+    const isDark = activeTheme === 'obsidian' || activeTheme === 'fortune';
     const stageTitle = meta.stageNames[lvInfo.stage - 1] || meta.stageNames[0];
 
     const themes = [
+      { id: 'fortune', name: '財運紅金', cost: 0 },
       { id: 'default', name: '極簡純白', cost: 0 },
       { id: 'obsidian', name: '曜石黑金', cost: 80 },
       { id: 'sakura', name: '晨曦櫻花', cost: 150 }
     ];
 
     openSheet(`
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div>
-          <h3 style="font-size: 16px; font-weight: 800;">🐾 財富寵物伴侶 · 精簡金融風</h3>
+          <h3 style="font-size: 16px; font-weight: 800;">🐾 財富寵物伴侶 · 開運招財組</h3>
           <div style="font-size: 11px; color: #8E8E93;">每實領 $100 股息 = 1 DP · 升級不扣代幣</div>
         </div>
         <button class="nav-btn" onclick="closeSheet()">關閉</button>
       </div>
 
-      <!-- 3 種造型切換列 -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+      <!-- 3 張卡牌造型切換列 (1:1 對應參考圖) -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
         ${['cat', 'bird', 'dog'].map(sp => {
           const m = PET_SPECIES_META[sp];
           const active = petState.species === sp;
           return `
-            <button class="sim-btn" style="justify-content: center; padding: 8px 6px; font-size: 12px; font-weight: 700; border-radius: 10px; background: ${active ? '#007AFF' : '#F2F2F7'}; color: ${active ? '#FFF' : '#1C1C1E'};" onclick="selectPetSpecies('${sp}')">
-              ${m.badge.split(' ')[0]} ${m.label}
-            </button>
+            <div onclick="selectPetSpecies('${sp}')" style="cursor: pointer; border-radius: 12px; padding: 4px; background: ${active ? 'linear-gradient(135deg, #FDE047, #D97706)' : '#F2F2F7'}; box-shadow: ${active ? '0 4px 12px rgba(217,119,6,0.35)' : 'none'}; transition: all 0.2s;">
+              <img src="pet_${sp}_card.png" alt="${m.label}" style="width: 100%; aspect-ratio: 320 / 540; object-fit: cover; border-radius: 9px; display: block;">
+            </div>
           `;
         }).join('')}
       </div>
 
       <!-- 寵物展示舞台 -->
-      <div class="${themeClass}" style="border-radius: 16px; padding: 16px; text-align: center; position: relative; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 6px;">
-          <span style="padding: 2px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
+      <div class="${themeClass}" style="border-radius: 16px; padding: 14px; text-align: center; position: relative; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 8px;">
+          <span style="padding: 2px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
             ${meta.badge}
           </span>
-          <span style="font-weight: 700; color: #F59E0B;">🪙 可用代幣: ${petState.spendableDP || 0} DP</span>
+          <span style="font-weight: 800; color: ${activeTheme === 'fortune' ? '#FDE047' : '#F59E0B'};">🪙 可用代幣: ${petState.spendableDP || 0} DP</span>
         </div>
 
-        <div style="position: relative; display: inline-block; margin: 6px 0;" onclick="triggerPetTapBounce(this)">
-          <div class="pet-float ${justBounced ? 'pet-bounce' : ''}">
-            ${renderPetSVG(petState.species, lvInfo.stage, isDownMarket, 118)}
+        <div style="position: relative; display: inline-block; margin: 2px 0;" onclick="triggerPetTapBounce(this)">
+          <div class="pet-float ${justBounced ? 'pet-bounce' : ''}" style="position: relative; display: inline-block;">
+            <img src="pet_${petState.species}_card.png" alt="${meta.label}" style="width: 138px; border-radius: 14px; border: 2px solid #FBBF24; box-shadow: 0 8px 20px rgba(0,0,0,0.28); display: block;">
+            ${isDownMarket ? '<span style="position: absolute; top: -6px; left: -6px; font-size: 20px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🪖</span>' : ''}
           </div>
           ${justBounced ? '<div class="pet-coin-pop">+XP 🪙</div>' : ''}
         </div>
 
-        <div style="font-size: 16px; font-weight: 800; margin-top: 2px;">Lv.${lvInfo.level} ${stageTitle}</div>
-        <div style="font-size: 11px; opacity: 0.78; margin: 4px 0 8px 0;">
+        <div style="font-size: 16px; font-weight: 800; margin-top: 6px;">Lv.${lvInfo.level} ${stageTitle}</div>
+        <div style="font-size: 11px; opacity: 0.85; margin: 4px 0 8px 0;">
           ${isDownMarket ? meta.downLine : meta.tagline}
         </div>
 
         <!-- 投組體質光環 -->
         <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">
           ${auras.map(a => `
-            <span style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: ${a.color}22; color: ${isDark && a.color === '#8E8E93' ? '#D1D5DB' : a.color};">
+            <span style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.16)' : a.color + '22'}; color: ${isDark ? '#FEF3C7' : a.color};">
               ${a.icon} ${a.text}
             </span>
           `).join('')}
@@ -986,13 +843,13 @@
       </div>
 
       <!-- 小窩質感背景切換 -->
-      <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #1C1C1E;">🎨 極簡小窩背景（用剩餘 DP 解鎖，不扣等級）</div>
-      <div style="display: flex; gap: 6px;">
+      <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #1C1C1E;">🎨 小窩背景（用剩餘 DP 解鎖，不扣等級）</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
         ${themes.map(t => {
-          const unlocked = (petState.unlockedThemes || ['default']).includes(t.id);
-          const active = (petState.activeTheme || 'default') === t.id;
+          const unlocked = t.cost === 0 || (petState.unlockedThemes || []).includes(t.id);
+          const active = activeTheme === t.id;
           return `
-            <button class="sim-btn" style="flex: 1; justify-content: center; padding: 8px 6px; font-size: 11px; font-weight: 700; background: ${active ? '#1C1C1E' : '#F2F2F7'}; color: ${active ? '#FFF' : '#1C1C1E'};" onclick="buyOrApplyPetTheme('${t.id}', ${t.cost})">
+            <button class="sim-btn" style="justify-content: center; padding: 8px 6px; font-size: 11px; font-weight: 700; background: ${active ? '#B91C1C' : '#F2F2F7'}; color: ${active ? '#FEF3C7' : '#1C1C1E'};" onclick="buyOrApplyPetTheme('${t.id}', ${t.cost})">
               ${active ? '✓ ' : ''}${t.name}${unlocked ? '' : ` (${t.cost}DP)`}
             </button>
           `;
@@ -1071,8 +928,8 @@
     const petLv = getPetLevelInfo(petState.totalXP);
     const petDownMarket = holdings.length > 0 && totalProfit < 0;
     const petAuras = getPetAuras(holdings, divSummary);
-    const petThemeCls = `pet-theme-${petState.activeTheme || 'default'}`;
-    const petDark = petState.activeTheme === 'obsidian';
+    const petThemeCls = `pet-theme-${petState.activeTheme || 'fortune'}`;
+    const petDark = petState.activeTheme === 'obsidian' || (petState.activeTheme || 'fortune') === 'fortune';
     const petPending = petState.pendingFeedDP || 0;
     const petStageTitle = petMeta.stageNames[petLv.stage - 1] || petMeta.stageNames[0];
     const petBubbleText = petPending > 0
@@ -1130,26 +987,26 @@
       <!-- 精簡金融風：財富寵物伴侶卡 (招財貓 / 貪錢鳥 / 財氣犬) -->
       <div class="card ${petThemeCls}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;" onclick="openPetModal()">
         <div class="pet-float" style="flex-shrink: 0;">
-          ${renderPetSVG(petState.species, petLv.stage, petDownMarket, 66)}
+          ${renderPetAvatar(petState.species, petLv.stage, petDownMarket, 64)}
         </div>
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
             <span style="font-size: 13px; font-weight: 800; white-space: nowrap;">Lv.${petLv.level} ${petStageTitle}</span>
-            <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: ${petDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,122,255,0.1)'}; color: ${petDark ? '#93C5FD' : '#007AFF'};">切換造型 ›</span>
+            <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: ${petDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,122,255,0.1)'}; color: ${petDark ? '#FDE047' : '#007AFF'};">切換造型 ›</span>
           </div>
-          <div style="font-size: 11px; opacity: 0.78; margin: 3px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <div style="font-size: 11px; opacity: 0.86; margin: 3px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
             ${petBubbleText}
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="flex: 1; height: 6px; border-radius: 3px; background: ${petDark ? 'rgba(255,255,255,0.15)' : '#E5E5EA'}; overflow: hidden;">
-              <div style="height: 100%; width: ${petLv.pct}%; background: linear-gradient(90deg, #F59E0B, #FBBF24); border-radius: 3px;"></div>
+            <div style="flex: 1; height: 6px; border-radius: 3px; background: ${petDark ? 'rgba(255,255,255,0.18)' : '#E5E5EA'}; overflow: hidden;">
+              <div style="height: 100%; width: ${petLv.pct}%; background: linear-gradient(90deg, #F59E0B, #FDE047); border-radius: 3px;"></div>
             </div>
             ${petPending > 0 ? `
-              <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 99px; background: #007AFF; color: #FFF;" onclick="event.stopPropagation(); feedPetPending(false);">
+              <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 99px; background: ${petDark ? 'linear-gradient(135deg, #FDE047, #F59E0B)' : '#007AFF'}; color: ${petDark ? '#451A03' : '#FFF'};" onclick="event.stopPropagation(); feedPetPending(false);">
                 🪙 餵食 +${petPending}
               </button>
             ` : `
-              <span style="font-size: 10px; font-weight: 700; color: ${petAuras[0].color};">${petAuras[0].icon} ${petAuras[0].text}</span>
+              <span style="font-size: 10px; font-weight: 700; color: ${petDark ? '#FDE047' : petAuras[0].color};">${petAuras[0].icon} ${petAuras[0].text}</span>
             `}
           </div>
         </div>

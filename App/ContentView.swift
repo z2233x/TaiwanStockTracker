@@ -92,6 +92,8 @@ struct DashboardView: View {
     @State private var isPrivacyMasked: Bool = StorageService.shared.isPrivacyMasked
     @State private var isShowingAdd = false
     @State private var isShowingRankSheet = false
+    @State private var isShowingPetSheet = false
+    @State private var petState: DividendPetState = PetService.shared.loadState()
     @State private var isRefreshing = false
     @State private var refreshMessage = ""
     @State private var lastRefreshedTime = ""
@@ -251,6 +253,20 @@ struct DashboardView: View {
                         .cornerRadius(22)
                         .shadow(color: Color(hex: "#1D58BD").opacity(0.28), radius: 12, x: 0, y: 6)
                     }
+                    
+                    // 1.5 財富寵物伴侶卡 (招財貓 / 貪錢鳥 / 財氣犬)
+                    PetCompanionBannerCard(
+                        petState: petState,
+                        isDownMarket: priceGainProfit < 0 && !holdings.isEmpty,
+                        auras: PetService.shared.auras(for: holdings, summary: dividendSourceSummary),
+                        onTapCard: { isShowingPetSheet = true },
+                        onTapFeed: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
+                                let res = PetService.shared.feedAllPending()
+                                petState = res.state
+                            }
+                        }
+                    )
                     
                     // 2. 存股被動收入目標計算機 (支援手動輸入與快選)
                     VStack(alignment: .leading, spacing: 12) {
@@ -494,21 +510,41 @@ struct DashboardView: View {
                 AddHoldingSheet { newHolding, isDCA in
                     StorageService.shared.addOrUpdateHolding(newHolding, isDCA: isDCA, autoAddJournal: true)
                     holdings = StorageService.shared.loadHoldings()
+                    petState = PetService.shared.syncDividendPoints(
+                        holdings: holdings,
+                        histories: StorageService.shared.loadHoldingHistories()
+                    )
                 }
             }
             .sheet(isPresented: $isShowingRankSheet) {
                 InvestorRankSheet(currentAmount: totalMarketValue)
             }
+            .sheet(isPresented: $isShowingPetSheet) {
+                PetCompanionSheet(
+                    petState: $petState,
+                    holdings: holdings,
+                    summary: dividendSourceSummary,
+                    isDownMarket: priceGainProfit < 0 && !holdings.isEmpty
+                )
+            }
             .onAppear {
                 holdings = StorageService.shared.loadHoldings()
+                petState = PetService.shared.syncDividendPoints(
+                    holdings: holdings,
+                    histories: StorageService.shared.loadHoldingHistories()
+                )
             }
         }
     }
     
     private func refreshQuotes() async {
         isRefreshing = true
-        let res = await StorageService.shared.refreshAllStockQuotes()
+        _ = await StorageService.shared.refreshAllStockQuotes()
         holdings = StorageService.shared.loadHoldings()
+        petState = PetService.shared.syncDividendPoints(
+            holdings: holdings,
+            histories: StorageService.shared.loadHoldingHistories()
+        )
         
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
@@ -3170,6 +3206,423 @@ struct InvestorRankSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+// MARK: ==========================================
+// MARK: 精簡金融風：財富寵物伴侶系統 (招財貓 / 貪錢鳥 / 財氣犬)
+// MARK: ==========================================
+
+struct PetCompanionBannerCard: View {
+    let petState: DividendPetState
+    let isDownMarket: Bool
+    let auras: [PetAuraBadge]
+    let onTapCard: () -> Void
+    let onTapFeed: () -> Void
+
+    private var levelInfo: PetLevelInfo {
+        PetService.shared.levelInfo(for: petState.totalXP)
+    }
+
+    private var stageTitle: String {
+        let names = petState.species.stageNames
+        let idx = max(0, min(names.count - 1, levelInfo.stage - 1))
+        return names[idx]
+    }
+
+    private var bubbleText: String {
+        if petState.pendingFeedDP > 0 {
+            return "有 \(petState.pendingFeedDP) DP 股息飼料待餵食"
+        }
+        if isDownMarket {
+            return petState.species.downMarketLine
+        }
+        let remain = max(0, levelInfo.needXP - levelInfo.currentXP)
+        return "距下級還差 \(remain) XP"
+    }
+
+    private var isDarkTheme: Bool {
+        petState.activeTheme.isDarkBackground
+    }
+
+    @ViewBuilder
+    private var cardBackground: some View {
+        switch petState.activeTheme {
+        case .fortune:
+            LinearGradient(
+                colors: [Color(hex: "#991B1B"), Color(hex: "#B91C1C"), Color(hex: "#7F1D1D")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .defaultLight:
+            Color(.systemBackground)
+        case .obsidian:
+            LinearGradient(
+                colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .sakura:
+            LinearGradient(
+                colors: [Color(hex: "#FFF5F7"), Color(hex: "#FCE7F3")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    var body: some View {
+        Button(action: onTapCard) {
+            HStack(spacing: 12) {
+                ZStack(alignment: .bottomTrailing) {
+                    Image(petState.species.avatarImageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 62, height: 62)
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(Color(hex: "#FBBF24"), lineWidth: 2)
+                        )
+                        .shadow(color: Color.black.opacity(0.18), radius: 5, x: 0, y: 3)
+
+                    Text("S\(levelInfo.stage)")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(Color(hex: "#451A03"))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#FDE047"), Color(hex: "#D97706")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white, lineWidth: 1))
+                        .offset(x: 4, y: 4)
+
+                    if isDownMarket {
+                        Text("🪖")
+                            .font(.system(size: 16))
+                            .offset(x: -48, y: -48)
+                    }
+                }
+                .frame(width: 66, height: 66)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text("Lv.\(levelInfo.level) \(stageTitle)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(isDarkTheme ? Color(hex: "#FEF3C7") : .primary)
+                            .lineLimit(1)
+                        Spacer()
+                        Text("切換造型 ›")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(isDarkTheme ? Color.white.opacity(0.16) : Color(hex: "#007AFF").opacity(0.1))
+                            .foregroundColor(isDarkTheme ? Color(hex: "#FDE047") : Color(hex: "#007AFF"))
+                            .clipShape(Capsule())
+                    }
+
+                    Text(bubbleText)
+                        .font(.caption)
+                        .foregroundColor(isDarkTheme ? Color(hex: "#FEF3C7").opacity(0.86) : .secondary)
+                        .lineLimit(1)
+
+                    HStack(spacing: 8) {
+                        ProgressView(value: levelInfo.progress)
+                            .tint(Color(hex: "#F59E0B"))
+
+                        if petState.pendingFeedDP > 0 {
+                            Button(action: onTapFeed) {
+                                Text("🪙 餵食 +\(petState.pendingFeedDP)")
+                                    .font(.system(size: 11, weight: .heavy))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        isDarkTheme
+                                            ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            : AnyShapeStyle(Color(hex: "#007AFF"))
+                                    )
+                                    .foregroundColor(isDarkTheme ? Color(hex: "#451A03") : .white)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.borderless)
+                        } else if let firstAura = auras.first {
+                            Text("\(firstAura.icon) \(firstAura.text)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(isDarkTheme ? Color(hex: "#FDE047") : Color(hex: firstAura.colorHex))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .background(cardBackground)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        petState.activeTheme == .fortune ? Color(hex: "#F59E0B") : Color.black.opacity(0.05),
+                        lineWidth: petState.activeTheme == .fortune ? 1.5 : 0.5
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct PetCompanionSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @Binding var petState: DividendPetState
+    let holdings: [StockHolding]
+    let summary: PortfolioDividendSourceSummary
+    let isDownMarket: Bool
+
+    @State private var bounceScale: CGFloat = 1.0
+    @State private var showInsufficientAlert = false
+    @State private var alertMessage = ""
+
+    private var levelInfo: PetLevelInfo {
+        PetService.shared.levelInfo(for: petState.totalXP)
+    }
+
+    private var stageTitle: String {
+        let names = petState.species.stageNames
+        let idx = max(0, min(names.count - 1, levelInfo.stage - 1))
+        return names[idx]
+    }
+
+    private var auras: [PetAuraBadge] {
+        PetService.shared.auras(for: holdings, summary: summary)
+    }
+
+    @ViewBuilder
+    private var stageBackground: some View {
+        switch petState.activeTheme {
+        case .fortune:
+            LinearGradient(
+                colors: [Color(hex: "#991B1B"), Color(hex: "#B91C1C"), Color(hex: "#7F1D1D")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .defaultLight:
+            Color(.secondarySystemBackground)
+        case .obsidian:
+            LinearGradient(
+                colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .sakura:
+            LinearGradient(
+                colors: [Color(hex: "#FFF5F7"), Color(hex: "#FCE7F3")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    // 3 張卡牌造型切換列
+                    HStack(spacing: 10) {
+                        ForEach(PetSpecies.allCases) { sp in
+                            let isActive = petState.species == sp
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    petState = PetService.shared.selectSpecies(sp)
+                                }
+                            } label: {
+                                Image(sp.cardImageName)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 150)
+                                    .clipped()
+                                    .cornerRadius(10)
+                                    .padding(3)
+                                    .background(
+                                        isActive
+                                            ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FDE047"), Color(hex: "#D97706")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            : AnyShapeStyle(Color(.systemGray5))
+                                    )
+                                    .cornerRadius(12)
+                                    .shadow(color: isActive ? Color(hex: "#D97706").opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    // 展示舞台
+                    VStack(spacing: 10) {
+                        HStack {
+                            Text(petState.species.badgeText)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(petState.activeTheme.isDarkBackground ? Color.white.opacity(0.16) : Color.black.opacity(0.06))
+                                .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : .primary)
+                                .clipShape(Capsule())
+                            Spacer()
+                            Text("🪙 可用代幣: \(petState.spendableDP) DP")
+                                .font(.caption.bold())
+                                .foregroundColor(petState.activeTheme == .fortune ? Color(hex: "#FDE047") : Color(hex: "#F59E0B"))
+                        }
+
+                        ZStack(alignment: .topLeading) {
+                            Image(petState.species.cardImageName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 220)
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color(hex: "#FBBF24"), lineWidth: 2)
+                                )
+                                .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 5)
+                                .scaleEffect(bounceScale)
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.45)) {
+                                        bounceScale = 1.07
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                            bounceScale = 1.0
+                                        }
+                                    }
+                                }
+
+                            if isDownMarket {
+                                Text("🪖")
+                                    .font(.title2)
+                                    .offset(x: -8, y: -8)
+                            }
+                        }
+
+                        Text("Lv.\(levelInfo.level) \(stageTitle)")
+                            .font(.headline.bold())
+                            .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : .primary)
+
+                        Text(isDownMarket ? petState.species.downMarketLine : petState.species.tagline)
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
+
+                        HStack(spacing: 6) {
+                            ForEach(auras) { aura in
+                                Text("\(aura.icon) \(aura.text)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(petState.activeTheme.isDarkBackground ? Color.white.opacity(0.16) : Color(hex: aura.colorHex).opacity(0.15))
+                                    .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : Color(hex: aura.colorHex))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(stageBackground)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(petState.activeTheme == .fortune ? Color(hex: "#F59E0B") : Color.clear, lineWidth: 1.5)
+                    )
+
+                    // 成長進度與餵食
+                    VStack(spacing: 10) {
+                        HStack {
+                            Text("成長進度 (Stage \(levelInfo.stage)/5)")
+                                .font(.caption.bold())
+                            Spacer()
+                            Text("\(levelInfo.currentXP) / \(levelInfo.needXP) XP")
+                                .font(.caption.bold())
+                                .foregroundColor(Color(hex: "#007AFF"))
+                        }
+                        ProgressView(value: levelInfo.progress)
+                            .tint(Color(hex: "#F59E0B"))
+
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                                let res = PetService.shared.feedAllPending()
+                                petState = res.state
+                                if res.fedAmount > 0 {
+                                    bounceScale = 1.08
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                                        withAnimation(.spring()) { bounceScale = 1.0 }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("🪙 餵食全部待領股息點數 (\(petState.pendingFeedDP) DP)")
+                                    .font(.subheadline.bold())
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(petState.pendingFeedDP > 0 ? Color(hex: "#007AFF") : Color(.systemGray4))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+                        .disabled(petState.pendingFeedDP <= 0)
+
+                        Text("每實領 $100 股息自動獲得 1 DP，餵食同時累積 XP 與可用代幣，升級不會扣代幣。")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(14)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(14)
+
+                    // 背景主題
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("🎨 小窩背景（用可用 DP 解鎖，不扣等級）")
+                            .font(.caption.bold())
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(PetCardTheme.allCases) { theme in
+                                let unlocked = theme.costDP == 0 || petState.unlockedThemes.contains(theme.rawValue)
+                                let isActive = petState.activeTheme == theme
+                                Button {
+                                    let res = PetService.shared.buyOrApplyTheme(theme)
+                                    petState = res.state
+                                    if res.insufficient {
+                                        alertMessage = "需要 \(theme.costDP) DP 才能解鎖【\(theme.title)】，目前可用 \(petState.spendableDP) DP。"
+                                        showInsufficientAlert = true
+                                    }
+                                } label: {
+                                    Text("\(isActive ? "✓ " : "")\(theme.title)\(unlocked ? "" : " (\(theme.costDP)DP)")")
+                                        .font(.caption.bold())
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(isActive ? Color(hex: "#B91C1C") : Color(.secondarySystemBackground))
+                                        .foregroundColor(isActive ? Color(hex: "#FEF3C7") : .primary)
+                                        .cornerRadius(10)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("財富寵物伴侶")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .alert("可用代幣不足", isPresented: $showInsufficientAlert) {
+                Button("確定", role: .cancel) {}
+            } message: {
+                Text(alertMessage)
             }
         }
     }
