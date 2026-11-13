@@ -1458,7 +1458,10 @@ struct StockHoldingRowView: View {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.bold())
                         .foregroundColor(.secondary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
             }
             
             Text(item.name)
@@ -1574,7 +1577,7 @@ struct StockHoldingRowView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     
-                    // 操作按鈕組
+                    // 操作按鈕組（在 List row 內必須使用 .buttonStyle(.borderless)，避免點擊整列觸發所有按鈕）
                     HStack(spacing: 8) {
                         Button(action: onEdit) {
                             HStack(spacing: 4) {
@@ -1587,6 +1590,7 @@ struct StockHoldingRowView: View {
                             .background(Color(.systemGray5))
                             .cornerRadius(8)
                         }
+                        .buttonStyle(.borderless)
                         
                         Button(action: onShowDetail) {
                             HStack(spacing: 4) {
@@ -1600,6 +1604,7 @@ struct StockHoldingRowView: View {
                             .background(Color(hex: "#007AFF"))
                             .cornerRadius(8)
                         }
+                        .buttonStyle(.borderless)
                         
                         Button(action: onDelete) {
                             Image(systemName: "trash")
@@ -1610,6 +1615,7 @@ struct StockHoldingRowView: View {
                                 .background(Color.red.opacity(0.12))
                                 .cornerRadius(8)
                         }
+                        .buttonStyle(.borderless)
                     }
                     .padding(.top, 2)
                 }
@@ -1810,8 +1816,14 @@ struct HoldingsListView: View {
                                             expandedSymbols.insert(item.symbol)
                                         }
                                     },
-                                    onEdit: { holdingToEdit = item },
-                                    onShowDetail: { selectedHoldingForDetail = item },
+                                    onEdit: {
+                                        selectedHoldingForDetail = nil
+                                        holdingToEdit = item
+                                    },
+                                    onShowDetail: {
+                                        holdingToEdit = nil
+                                        selectedHoldingForDetail = item
+                                    },
                                     onDelete: { holdingToDelete = item }
                                 )
                             }
