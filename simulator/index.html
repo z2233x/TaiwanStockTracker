@@ -327,37 +327,77 @@
   .goal-bar-bg { width: 100%; height: 10px; background: #E5E5EA; border-radius: 5px; overflow: hidden; margin: 8px 0; }
   .goal-bar-fill { height: 100%; background: linear-gradient(90deg, #007AFF, #5AC8FA); width: 45%; border-radius: 5px; transition: width 0.5s; }
 
-  /* 精簡金融風寵物動畫與主題樣式 */
+  /* 3D 互動寵物舞台動畫（去卡片化） */
   @keyframes petFloat {
     0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-4px); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes petShadowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.72; }
+    50% { transform: scale(0.86); opacity: 0.45; }
   }
   @keyframes petBounce {
     0% { transform: scale(1) translateY(0); }
-    35% { transform: scale(1.12, 0.92) translateY(2px); }
-    65% { transform: scale(0.95, 1.08) translateY(-10px); }
+    28% { transform: scale(1.14, 0.86) translateY(6px); }
+    62% { transform: scale(0.94, 1.08) translateY(-16px) rotateZ(-3deg); }
     100% { transform: scale(1) translateY(0); }
   }
-  @keyframes coinFloatUp {
-    0% { opacity: 1; transform: translateY(0) scale(0.8); }
-    100% { opacity: 0; transform: translateY(-28px) scale(1.15); }
+  @keyframes petSpin3D {
+    0% { transform: perspective(700px) rotateY(0deg) scale(1); }
+    45% { transform: perspective(700px) rotateY(190deg) translateY(-12px) scale(1.08); }
+    100% { transform: perspective(700px) rotateY(360deg) scale(1); }
   }
-  .pet-float { animation: petFloat 3.2s ease-in-out infinite; cursor: pointer; }
-  .pet-bounce { animation: petBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
-  .pet-coin-pop {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 12px;
-    font-weight: 800;
-    color: #D97706;
+  @keyframes particleBurst {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+    20% { opacity: 1; transform: translate(var(--tx, 0px), -14px) scale(1.15); }
+    100% { opacity: 0; transform: translate(var(--tx2, 0px), -54px) scale(0.85); }
+  }
+  @keyframes coinRainFall {
+    0% { opacity: 0; transform: translateY(-48px) rotateY(0deg) scale(0.7); }
+    25% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(42px) rotateY(360deg) scale(1.05); }
+  }
+  .pet-float { animation: petFloat 3.1s ease-in-out infinite; cursor: pointer; }
+  .pet-shadow-pulse { animation: petShadowPulse 3.1s ease-in-out infinite; }
+  .pet-bounce { animation: petBounce 0.52s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .pet-spin3d { animation: petSpin3D 0.85s cubic-bezier(0.22, 1, 0.36, 1); }
+  .pet-3d-stage {
+    perspective: 720px;
+    transform-style: preserve-3d;
+    touch-action: none;
+    user-select: none;
+  }
+  .pet-3d-img {
+    filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.28));
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+    display: block;
+  }
+  .pet-pedestal {
+    width: 126px;
+    height: 24px;
+    margin: -10px auto 0 auto;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.45) 0%, rgba(180, 83, 9, 0.2) 52%, transparent 74%);
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.35);
     pointer-events: none;
-    animation: coinFloatUp 0.9s ease-out forwards;
   }
-  .pet-theme-default { background: linear-gradient(135deg, #FFFFFF 0%, #F5F7FA 100%); color: #1C1C1E; border: 1px solid #E5E5EA; }
-  .pet-theme-fortune { background: linear-gradient(135deg, #991B1B 0%, #B91C1C 55%, #7F1D1D 100%); color: #FEF3C7; border: 1.5px solid #F59E0B; box-shadow: 0 6px 18px rgba(185, 28, 28, 0.25); }
-  .pet-theme-obsidian { background: linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%); color: #FFFFFF; border: 1px solid #3A3A3C; }
-  .pet-theme-sakura { background: linear-gradient(135deg, #FFF5F7 0%, #FCE7F3 100%); color: #1C1C1E; border: 1px solid #FBCFE8; }
+  .pet-particle {
+    position: absolute;
+    font-size: 16px;
+    pointer-events: none;
+    animation: particleBurst 0.95s ease-out forwards;
+  }
+  .pet-coin-rain {
+    position: absolute;
+    font-size: 18px;
+    pointer-events: none;
+    animation: coinRainFall 0.78s ease-in forwards;
+  }
+  .pet-stage-bg-default { background: radial-gradient(circle at 50% 42%, rgba(254, 243, 199, 0.55) 0%, rgba(242, 242, 247, 0.2) 72%); }
+  .pet-stage-bg-fortune { background: radial-gradient(circle at 50% 42%, rgba(220, 38, 38, 0.22) 0%, rgba(245, 158, 11, 0.14) 45%, transparent 78%); }
+  .pet-stage-bg-obsidian { background: radial-gradient(circle at 50% 42%, #2C2C2E 0%, #1C1C1E 85%); color: #FFF; }
+  .pet-stage-bg-sakura { background: radial-gradient(circle at 50% 42%, rgba(251, 207, 232, 0.55) 0%, rgba(255, 245, 247, 0.15) 75%); }
 </style>
 </head>
 <body>
@@ -679,23 +719,69 @@
     return auras;
   }
 
-  function renderPetAvatar(species, stage, isDownMarket, size = 64) {
+  const PET_INTERACT_LINES = {
+    cat: ['喵～多摸兩下，下個月股息翻倍！', '「發」字肉球借你摸一下，財氣滿溢！', '千万両金幣守護中，穩穩收租喵！'],
+    bird: ['啾啾！再多一點金幣，馬上買零股！', '眼睛亮晶晶✦ 我聞到除息的味道了！', '紅袋子還沒裝滿呢，繼續領息啾！'],
+    dog: ['汪汪！我幫你把「財」聚寶盆顧好好！', '背上這袋「福」元寶越養越重囉！', '摸頭好開心，長期持有我不放手汪！']
+  };
+
+  function renderPet3DModel(species, stage, isDownMarket, size = 88) {
     const safeSp = ['cat', 'bird', 'dog'].includes(species) ? species : 'cat';
-    const borderColor = stage >= 5 ? '#FDE047' : stage >= 3 ? '#F59E0B' : '#FBBF24';
-    const glow = stage >= 4 ? '0 0 14px rgba(245, 158, 11, 0.55)' : '0 4px 10px rgba(0, 0, 0, 0.16)';
+    const pedW = Math.round(size * 0.72);
+    const pedH = Math.max(12, Math.round(size * 0.14));
     return `
-      <div style="position: relative; width: ${size}px; height: ${size}px; flex-shrink: 0;">
-        <img src="pet_${safeSp}.png" alt="${safeSp}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 16px; border: 2px solid ${borderColor}; box-shadow: ${glow}; display: block;">
-        <span style="position: absolute; bottom: -4px; right: -4px; background: linear-gradient(135deg, #FDE047, #D97706); color: #451A03; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; border: 1px solid #FFF;">S${stage}</span>
-        ${isDownMarket ? '<span title="貼息陪等填息中" style="position: absolute; top: -6px; left: -6px; font-size: 16px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));">🪖</span>' : ''}
+      <div class="pet-3d-stage" style="position: relative; width: ${size}px; height: ${size + 10}px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+        <div class="pet-float" style="position: relative; width: ${size}px; height: ${size}px;">
+          <img src="pet_${safeSp}.png" alt="${safeSp}" class="pet-3d-img" style="width: 100%; height: 100%; object-fit: contain;">
+          ${isDownMarket ? '<span title="貼息陪等填息中" style="position: absolute; top: 0px; left: 2px; font-size: 18px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));">🪖</span>' : ''}
+        </div>
+        <div class="pet-pedestal pet-shadow-pulse" style="width: ${pedW}px; height: ${pedH}px; margin-top: -${Math.round(pedH * 0.6)}px;"></div>
       </div>
     `;
+  }
+
+  function spawnPetParticles(hostEl, emojis = ['❤️', '✨', '🪙'], isRain = false) {
+    if (!hostEl) return;
+    const count = isRain ? 6 : 4;
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      span.className = isRain ? 'pet-coin-rain' : 'pet-particle';
+      span.innerText = isRain ? '🪙' : emojis[i % emojis.length];
+      if (isRain) {
+        span.style.left = `${18 + Math.random() * 64}%`;
+        span.style.top = `4px`;
+        span.style.animationDelay = `${i * 0.08}s`;
+      } else {
+        const tx = Math.round((Math.random() - 0.5) * 60);
+        span.style.left = `${35 + Math.random() * 30}%`;
+        span.style.top = `${25 + Math.random() * 25}%`;
+        span.style.setProperty('--tx', `${tx * 0.5}px`);
+        span.style.setProperty('--tx2', `${tx}px`);
+      }
+      hostEl.appendChild(span);
+      setTimeout(() => span.remove(), 1000);
+    }
+  }
+
+  function pokeDashboardPet(wrapEl) {
+    const img = wrapEl ? wrapEl.querySelector('.pet-3d-img') : null;
+    if (img) {
+      img.classList.remove('pet-bounce');
+      void img.offsetWidth;
+      img.classList.add('pet-bounce');
+    }
+    spawnPetParticles(wrapEl, ['❤️', '✨', '🪙', '💰'], false);
+    const bubble = document.getElementById('dashPetBubble');
+    if (bubble) {
+      const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
+      bubble.innerText = lines[Math.floor(Math.random() * lines.length)];
+    }
   }
 
   function feedPetPending(fromModal = false) {
     const pending = petState.pendingFeedDP || 0;
     if (pending <= 0) {
-      if (fromModal) alert('目前沒有待餵食的股息點數，可以點下方「模擬領息 +50 DP」先體驗升級與進化！');
+      if (fromModal) alert('目前沒有待餵食的股息點數，可按「🧪 模擬領息 +50」或點「👋 摸摸招財」互動！');
       return;
     }
     petState.totalXP = (petState.totalXP || 0) + pending;
@@ -703,8 +789,12 @@
     petState.pendingFeedDP = 0;
     saveState();
     renderApp();
-    if (fromModal) openPetModal(true);
-    triggerNotification('🪙 餵食成功', `已餵食 ${pending} DP！寵物財富經驗值提升囉！`);
+    if (fromModal) {
+      openPetModal(true);
+      const stg = document.getElementById('petModalStage');
+      spawnPetParticles(stg, ['🪙'], true);
+    }
+    triggerNotification('🪙 餵食成功', `金幣雨入袋！已餵食 ${pending} DP 提升財富經驗！`);
   }
 
   function simulatePetDividendDP() {
@@ -723,8 +813,9 @@
   }
 
   function buyOrApplyPetTheme(themeId, cost) {
-    if (!Array.isArray(petState.unlockedThemes)) petState.unlockedThemes = ['default'];
-    if (petState.unlockedThemes.includes(themeId)) {
+    if (!Array.isArray(petState.unlockedThemes)) petState.unlockedThemes = ['fortune', 'default'];
+    if (cost === 0 || petState.unlockedThemes.includes(themeId)) {
+      if (!petState.unlockedThemes.includes(themeId)) petState.unlockedThemes.push(themeId);
       petState.activeTheme = themeId;
       saveState();
       renderApp();
@@ -732,7 +823,7 @@
       return;
     }
     if ((petState.spendableDP || 0) < cost) {
-      alert(`剩餘代幣不足！需要 ${cost} DP，目前有 ${petState.spendableDP || 0} DP（餵食不會扣光升級經驗，可先領息累積或用模擬按鈕體驗）。`);
+      alert(`剩餘代幣不足！需要 ${cost} DP，目前有 ${petState.spendableDP || 0} DP（餵食不會扣光升級經驗）。`);
       return;
     }
     petState.spendableDP -= cost;
@@ -743,11 +834,56 @@
     openPetModal(false);
   }
 
-  function triggerPetTapBounce(el) {
-    if (!el) return;
-    el.classList.remove('pet-bounce');
-    void el.offsetWidth;
-    el.classList.add('pet-bounce');
+  function interactModalPet(mode) {
+    const stg = document.getElementById('petModalStage');
+    const img = document.getElementById('petModalImg');
+    const quote = document.getElementById('petModalQuote');
+    if (img) {
+      img.classList.remove('pet-bounce', 'pet-spin3d');
+      void img.offsetWidth;
+      img.classList.add(mode === 'spin' ? 'pet-spin3d' : 'pet-bounce');
+    }
+    if (mode === 'coin') {
+      spawnPetParticles(stg, ['🪙'], true);
+    } else {
+      spawnPetParticles(stg, ['❤️', '✨', '💰', '🍀'], false);
+    }
+    if (quote) {
+      const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
+      quote.innerText = lines[Math.floor(Math.random() * lines.length)];
+    }
+  }
+
+  function bindPet3DTilt(stageEl) {
+    if (!stageEl || stageEl.dataset.tiltBound) return;
+    stageEl.dataset.tiltBound = '1';
+    const img = () => document.getElementById('petModalImg');
+    let dragging = false;
+    const updateTilt = (clientX, clientY) => {
+      const el = img();
+      if (!el) return;
+      const rect = stageEl.getBoundingClientRect();
+      const nx = ((clientX - rect.left) / rect.width - 0.5) * 2; // -1..1
+      const ny = ((clientY - rect.top) / rect.height - 0.5) * 2;
+      const ry = Math.max(-26, Math.min(26, nx * 26));
+      const rx = Math.max(-18, Math.min(18, -ny * 18));
+      el.style.transform = `perspective(700px) rotateY(${ry}deg) rotateX(${rx}deg) scale(1.06)`;
+    };
+    const resetTilt = () => {
+      dragging = false;
+      const el = img();
+      if (el) el.style.transform = '';
+    };
+    stageEl.addEventListener('pointerdown', e => {
+      dragging = true;
+      updateTilt(e.clientX, e.clientY);
+    });
+    stageEl.addEventListener('pointermove', e => {
+      if (dragging || e.pointerType === 'mouse') updateTilt(e.clientX, e.clientY);
+    });
+    stageEl.addEventListener('pointerup', resetTilt);
+    stageEl.addEventListener('pointerleave', resetTilt);
+    stageEl.addEventListener('pointercancel', resetTilt);
   }
 
   function openPetModal(justBounced = false) {
@@ -760,9 +896,9 @@
     const divSummary = analyzePortfolioDividendSources(holdings);
     const auras = getPetAuras(holdings, divSummary);
     const activeTheme = petState.activeTheme || 'fortune';
-    const themeClass = `pet-theme-${activeTheme}`;
-    const isDark = activeTheme === 'obsidian' || activeTheme === 'fortune';
-    const stageTitle = meta.stageNames[lvInfo.stage - 1] || meta.stageNames[0];
+    const bgCls = `pet-stage-bg-${activeTheme}`;
+    const isDark = activeTheme === 'obsidian';
+    const stageTitle = meta.stageNames[lvInfo.stage - 1] || petMetaSafe(meta);
 
     const themes = [
       { id: 'fortune', name: '財運紅金', cost: 0 },
@@ -774,51 +910,59 @@
     openSheet(`
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div>
-          <h3 style="font-size: 16px; font-weight: 800;">🐾 財富寵物伴侶 · 開運招財組</h3>
-          <div style="font-size: 11px; color: #8E8E93;">每實領 $100 股息 = 1 DP · 升級不扣代幣</div>
+          <h3 style="font-size: 16px; font-weight: 800;">✨ 3D 財富寵物互動舞台</h3>
+          <div style="font-size: 11px; color: #8E8E93;">拖曳旋轉 3D 角度 · 點擊摸頭互動</div>
         </div>
         <button class="nav-btn" onclick="closeSheet()">關閉</button>
       </div>
 
-      <!-- 3 張卡牌造型切換列 (1:1 對應參考圖) -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+      <!-- 3 隻無框 3D 公仔切換列 -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
         ${['cat', 'bird', 'dog'].map(sp => {
           const m = PET_SPECIES_META[sp];
           const active = petState.species === sp;
           return `
-            <div onclick="selectPetSpecies('${sp}')" style="cursor: pointer; border-radius: 12px; padding: 4px; background: ${active ? 'linear-gradient(135deg, #FDE047, #D97706)' : '#F2F2F7'}; box-shadow: ${active ? '0 4px 12px rgba(217,119,6,0.35)' : 'none'}; transition: all 0.2s;">
-              <img src="pet_${sp}_card.png" alt="${m.label}" style="width: 100%; aspect-ratio: 320 / 540; object-fit: cover; border-radius: 9px; display: block;">
+            <div onclick="selectPetSpecies('${sp}')" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 16px; background: ${active ? 'radial-gradient(circle, rgba(251,191,36,0.28) 0%, transparent 72%)' : 'transparent'}; transition: all 0.2s;">
+              <img src="pet_${sp}.png" alt="${m.label}" style="width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.22)); transform: scale(${active ? 1.12 : 0.94}); transition: transform 0.2s;">
+              <span style="font-size: 11px; font-weight: 800; margin-top: 2px; color: ${active ? '#D97706' : '#8E8E93'};">${m.label}</span>
             </div>
           `;
         }).join('')}
       </div>
 
-      <!-- 寵物展示舞台 -->
-      <div class="${themeClass}" style="border-radius: 16px; padding: 14px; text-align: center; position: relative; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 8px;">
-          <span style="padding: 2px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
+      <!-- 開放式 3D 互動舞台（無卡片框） -->
+      <div id="petModalStage" class="${bgCls} pet-3d-stage" style="border-radius: 22px; padding: 12px 14px 16px 14px; text-align: center; position: relative; margin-bottom: 12px; overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 2px;">
+          <span style="padding: 3px 9px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
             ${meta.badge}
           </span>
-          <span style="font-weight: 800; color: ${activeTheme === 'fortune' ? '#FDE047' : '#F59E0B'};">🪙 可用代幣: ${petState.spendableDP || 0} DP</span>
+          <span style="font-weight: 800; color: #D97706;">🪙 ${petState.spendableDP || 0} DP</span>
         </div>
 
-        <div style="position: relative; display: inline-block; margin: 2px 0;" onclick="triggerPetTapBounce(this)">
-          <div class="pet-float ${justBounced ? 'pet-bounce' : ''}" style="position: relative; display: inline-block;">
-            <img src="pet_${petState.species}_card.png" alt="${meta.label}" style="width: 138px; border-radius: 14px; border: 2px solid #FBBF24; box-shadow: 0 8px 20px rgba(0,0,0,0.28); display: block;">
-            ${isDownMarket ? '<span style="position: absolute; top: -6px; left: -6px; font-size: 20px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🪖</span>' : ''}
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; margin: 4px 0 6px 0;" onclick="interactModalPet('pat')">
+          <div class="pet-float">
+            <img id="petModalImg" src="pet_${petState.species}.png" alt="${meta.label}" class="pet-3d-img ${justBounced ? 'pet-bounce' : ''}" style="width: 185px; height: 185px; object-fit: contain;">
           </div>
-          ${justBounced ? '<div class="pet-coin-pop">+XP 🪙</div>' : ''}
+          <div class="pet-pedestal pet-shadow-pulse" style="width: 146px; height: 26px; margin-top: -12px;"></div>
+          ${isDownMarket ? '<span style="position: absolute; top: 6px; left: 26%; font-size: 24px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
         </div>
 
-        <div style="font-size: 16px; font-weight: 800; margin-top: 6px;">Lv.${lvInfo.level} ${stageTitle}</div>
-        <div style="font-size: 11px; opacity: 0.85; margin: 4px 0 8px 0;">
+        <div style="font-size: 16px; font-weight: 900; margin-top: 6px;">Lv.${lvInfo.level} ${stageTitle}</div>
+        <div id="petModalQuote" style="font-size: 12px; opacity: 0.85; margin: 4px 0 10px 0; min-height: 16px;">
           ${isDownMarket ? meta.downLine : meta.tagline}
+        </div>
+
+        <!-- 直接互動按鈕組 -->
+        <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 10px;">
+          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸招財</button>
+          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('spin');">🎲 3D轉圈</button>
+          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); interactModalPet('coin');">🪙 撒金幣</button>
         </div>
 
         <!-- 投組體質光環 -->
         <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">
           ${auras.map(a => `
-            <span style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.16)' : a.color + '22'}; color: ${isDark ? '#FEF3C7' : a.color};">
+            <span style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : a.color + '20'}; color: ${isDark ? '#FEF3C7' : a.color};">
               ${a.icon} ${a.text}
             </span>
           `).join('')}
@@ -826,7 +970,7 @@
       </div>
 
       <!-- 經驗條與餵食按鈕 -->
-      <div style="background: #F2F2F7; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+      <div style="background: #F2F2F7; border-radius: 14px; padding: 12px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px;">
           <span>成長進度 (Stage ${lvInfo.stage}/5)</span>
           <span style="color: #007AFF;">${lvInfo.currentXP} / ${lvInfo.needXP} XP</span>
@@ -842,20 +986,25 @@
         </div>
       </div>
 
-      <!-- 小窩質感背景切換 -->
-      <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #1C1C1E;">🎨 小窩背景（用剩餘 DP 解鎖，不扣等級）</div>
+      <!-- 氛圍光線切換 -->
+      <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #1C1C1E;">✨ 舞台氛圍（不遮寵物，用 DP 解鎖）</div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
         ${themes.map(t => {
           const unlocked = t.cost === 0 || (petState.unlockedThemes || []).includes(t.id);
           const active = activeTheme === t.id;
           return `
-            <button class="sim-btn" style="justify-content: center; padding: 8px 6px; font-size: 11px; font-weight: 700; background: ${active ? '#B91C1C' : '#F2F2F7'}; color: ${active ? '#FEF3C7' : '#1C1C1E'};" onclick="buyOrApplyPetTheme('${t.id}', ${t.cost})">
+            <button class="sim-btn" style="justify-content: center; padding: 8px 6px; font-size: 11px; font-weight: 700; background: ${active ? '#1C1C1E' : '#F2F2F7'}; color: ${active ? '#FDE047' : '#1C1C1E'};" onclick="buyOrApplyPetTheme('${t.id}', ${t.cost})">
               ${active ? '✓ ' : ''}${t.name}${unlocked ? '' : ` (${t.cost}DP)`}
             </button>
           `;
         }).join('')}
       </div>
     `);
+    setTimeout(() => bindPet3DTilt(document.getElementById('petModalStage')), 30);
+  }
+
+  function petMetaSafe(meta) {
+    return meta && meta.stageNames ? meta.stageNames[0] : '招財夥伴';
   }
 
   // 更新頂部時間
@@ -984,30 +1133,30 @@
         </div>
       </div>
 
-      <!-- 精簡金融風：財富寵物伴侶卡 (招財貓 / 貪錢鳥 / 財氣犬) -->
-      <div class="card ${petThemeCls}" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;" onclick="openPetModal()">
-        <div class="pet-float" style="flex-shrink: 0;">
-          ${renderPetAvatar(petState.species, petLv.stage, petDownMarket, 64)}
+      <!-- 去卡片化：開放式 3D 財富寵物互動區 (招財貓 / 貪錢鳥 / 財氣犬) -->
+      <div style="display: flex; align-items: flex-end; gap: 10px; padding: 6px 2px 10px 2px; margin-bottom: 6px; position: relative;">
+        <div style="position: relative; cursor: pointer;" onclick="pokeDashboardPet(this)" title="點擊摸摸寵物互動！">
+          ${renderPet3DModel(petState.species, petLv.stage, petDownMarket, 90)}
         </div>
-        <div style="flex: 1; min-width: 0;">
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
-            <span style="font-size: 13px; font-weight: 800; white-space: nowrap;">Lv.${petLv.level} ${petStageTitle}</span>
-            <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: ${petDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,122,255,0.1)'}; color: ${petDark ? '#FDE047' : '#007AFF'};">切換造型 ›</span>
-          </div>
-          <div style="font-size: 11px; opacity: 0.86; margin: 3px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <div style="flex: 1; min-width: 0; padding-bottom: 4px;">
+          <div id="dashPetBubble" style="background: #FFFFFF; color: #1C1C1E; font-size: 11.5px; font-weight: 600; padding: 8px 11px; border-radius: 14px 14px 14px 4px; box-shadow: 0 3px 10px rgba(0,0,0,0.06); margin-bottom: 7px; cursor: pointer;" onclick="openPetModal()">
             ${petBubbleText}
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="flex: 1; height: 6px; border-radius: 3px; background: ${petDark ? 'rgba(255,255,255,0.18)' : '#E5E5EA'}; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: 800; color: #D97706;">Lv.${petLv.level} ${petStageTitle}</span>
+            <div style="flex: 1; height: 5px; border-radius: 3px; background: #E5E5EA; overflow: hidden;">
               <div style="height: 100%; width: ${petLv.pct}%; background: linear-gradient(90deg, #F59E0B, #FDE047); border-radius: 3px;"></div>
             </div>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             ${petPending > 0 ? `
-              <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 99px; background: ${petDark ? 'linear-gradient(135deg, #FDE047, #F59E0B)' : '#007AFF'}; color: ${petDark ? '#451A03' : '#FFF'};" onclick="event.stopPropagation(); feedPetPending(false);">
+              <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 6px rgba(245,158,11,0.3);" onclick="feedPetPending(false);">
                 🪙 餵食 +${petPending}
               </button>
-            ` : `
-              <span style="font-size: 10px; font-weight: 700; color: ${petDark ? '#FDE047' : petAuras[0].color};">${petAuras[0].icon} ${petAuras[0].text}</span>
-            `}
+            ` : ''}
+            <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 99px; background: rgba(0,122,255,0.12); color: #007AFF;" onclick="openPetModal()">
+              🎮 3D 互動 / 換寵 ›
+            </button>
           </div>
         </div>
       </div>

@@ -3212,8 +3212,33 @@ struct InvestorRankSheet: View {
 }
 
 // MARK: ==========================================
-// MARK: 精簡金融風：財富寵物伴侶系統 (招財貓 / 貪錢鳥 / 財氣犬)
+// MARK: 3D 互動財富寵物舞台（去卡片化：招財貓 / 貪錢鳥 / 財氣犬）
 // MARK: ==========================================
+
+private struct PetParticle: Identifiable {
+    let id = UUID()
+    let emoji: String
+    let offsetX: CGFloat
+    let targetY: CGFloat
+}
+
+private let petInteractQuotes: [PetSpecies: [String]] = [
+    .cat: [
+        "喵～多摸兩下，下個月股息翻倍！",
+        "「發」字肉球借你摸一下，財氣滿溢！",
+        "千万両金幣守護中，穩穩收租喵！"
+    ],
+    .bird: [
+        "啾啾！再多一點金幣，馬上買零股！",
+        "眼睛亮晶晶✦ 我聞到除息的味道了！",
+        "紅袋子還沒裝滿呢，繼續領息啾！"
+    ],
+    .dog: [
+        "汪汪！我幫你把「財」聚寶盆顧好好！",
+        "背上這袋「福」元寶越養越重囉！",
+        "摸頭好開心，長期持有我不放手汪！"
+    ]
+]
 
 struct PetCompanionBannerCard: View {
     let petState: DividendPetState
@@ -3221,6 +3246,12 @@ struct PetCompanionBannerCard: View {
     let auras: [PetAuraBadge]
     let onTapCard: () -> Void
     let onTapFeed: () -> Void
+
+    @State private var floatUp = false
+    @State private var bounceScale: CGFloat = 1.0
+    @State private var tiltDeg: Double = 0.0
+    @State private var reactionQuote: String? = nil
+    @State private var particles: [PetParticle] = []
 
     private var levelInfo: PetLevelInfo {
         PetService.shared.levelInfo(for: petState.totalXP)
@@ -3233,6 +3264,7 @@ struct PetCompanionBannerCard: View {
     }
 
     private var bubbleText: String {
+        if let quote = reactionQuote { return quote }
         if petState.pendingFeedDP > 0 {
             return "有 \(petState.pendingFeedDP) DP 股息飼料待餵食"
         }
@@ -3240,140 +3272,147 @@ struct PetCompanionBannerCard: View {
             return petState.species.downMarketLine
         }
         let remain = max(0, levelInfo.needXP - levelInfo.currentXP)
-        return "距下級還差 \(remain) XP"
+        return "點我摸摸招財・距下級還差 \(remain) XP"
     }
 
-    private var isDarkTheme: Bool {
-        petState.activeTheme.isDarkBackground
-    }
-
-    @ViewBuilder
-    private var cardBackground: some View {
-        switch petState.activeTheme {
-        case .fortune:
-            LinearGradient(
-                colors: [Color(hex: "#991B1B"), Color(hex: "#B91C1C"), Color(hex: "#7F1D1D")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+    private func pokePet() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
+            reactionQuote = picked
+        }
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.42)) {
+            bounceScale = 1.14
+            tiltDeg = Double.random(in: -14...14)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
+                bounceScale = 1.0
+                tiltDeg = 0
+            }
+        }
+        let emojis = ["❤️", "✨", "🪙", "💰"]
+        for i in 0..<4 {
+            let p = PetParticle(
+                emoji: emojis[i % emojis.count],
+                offsetX: CGFloat.random(in: -26...26),
+                targetY: CGFloat.random(in: -55 ... -30)
             )
-        case .defaultLight:
-            Color(.systemBackground)
-        case .obsidian:
-            LinearGradient(
-                colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .sakura:
-            LinearGradient(
-                colors: [Color(hex: "#FFF5F7"), Color(hex: "#FCE7F3")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            particles.append(p)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                particles.removeAll { $0.id == p.id }
+            }
         }
     }
 
     var body: some View {
-        Button(action: onTapCard) {
-            HStack(spacing: 12) {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(petState.species.avatarImageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 62, height: 62)
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 15)
-                                .stroke(Color(hex: "#FBBF24"), lineWidth: 2)
+        HStack(alignment: .bottom, spacing: 10) {
+            // 左側：無邊框 3D 公仔＋立體地面陰影底座（點擊直接摸頭互動）
+            ZStack {
+                Ellipse()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color(hex: "#F59E0B").opacity(0.45), Color.black.opacity(0.18), Color.clear],
+                            center: .center,
+                            startRadius: 4,
+                            endRadius: 42
                         )
-                        .shadow(color: Color.black.opacity(0.18), radius: 5, x: 0, y: 3)
+                    )
+                    .frame(width: 72, height: 15)
+                    .scaleEffect(floatUp ? 0.86 : 1.0)
+                    .offset(y: 38)
 
-                    Text("S\(levelInfo.stage)")
-                        .font(.system(size: 9, weight: .black))
-                        .foregroundColor(Color(hex: "#451A03"))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(hex: "#FDE047"), Color(hex: "#D97706")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white, lineWidth: 1))
-                        .offset(x: 4, y: 4)
+                Image(petState.species.avatarImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 90, height: 90)
+                    .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 8)
+                    .offset(y: floatUp ? -5 : 1)
+                    .scaleEffect(bounceScale)
+                    .rotation3DEffect(.degrees(tiltDeg), axis: (x: 0, y: 1, z: 0))
 
-                    if isDownMarket {
-                        Text("🪖")
-                            .font(.system(size: 16))
-                            .offset(x: -48, y: -48)
-                    }
+                if isDownMarket {
+                    Text("🪖")
+                        .font(.system(size: 18))
+                        .offset(x: -30, y: -32)
                 }
-                .frame(width: 66, height: 66)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        Text("Lv.\(levelInfo.level) \(stageTitle)")
-                            .font(.subheadline.bold())
-                            .foregroundColor(isDarkTheme ? Color(hex: "#FEF3C7") : .primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("切換造型 ›")
-                            .font(.system(size: 10, weight: .bold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(isDarkTheme ? Color.white.opacity(0.16) : Color(hex: "#007AFF").opacity(0.1))
-                            .foregroundColor(isDarkTheme ? Color(hex: "#FDE047") : Color(hex: "#007AFF"))
-                            .clipShape(Capsule())
-                    }
-
-                    Text(bubbleText)
-                        .font(.caption)
-                        .foregroundColor(isDarkTheme ? Color(hex: "#FEF3C7").opacity(0.86) : .secondary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        ProgressView(value: levelInfo.progress)
-                            .tint(Color(hex: "#F59E0B"))
-
-                        if petState.pendingFeedDP > 0 {
-                            Button(action: onTapFeed) {
-                                Text("🪙 餵食 +\(petState.pendingFeedDP)")
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        isDarkTheme
-                                            ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                            : AnyShapeStyle(Color(hex: "#007AFF"))
-                                    )
-                                    .foregroundColor(isDarkTheme ? Color(hex: "#451A03") : .white)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.borderless)
-                        } else if let firstAura = auras.first {
-                            Text("\(firstAura.icon) \(firstAura.text)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(isDarkTheme ? Color(hex: "#FDE047") : Color(hex: firstAura.colorHex))
-                                .lineLimit(1)
-                        }
-                    }
+                ForEach(particles) { p in
+                    Text(p.emoji)
+                        .font(.system(size: 15))
+                        .offset(x: p.offsetX, y: p.targetY)
+                        .transition(.opacity.combined(with: .scale))
                 }
             }
-            .padding(14)
-            .background(cardBackground)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        petState.activeTheme == .fortune ? Color(hex: "#F59E0B") : Color.black.opacity(0.05),
-                        lineWidth: petState.activeTheme == .fortune ? 1.5 : 0.5
-                    )
-            )
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
+            .frame(width: 94, height: 96)
+            .contentShape(Rectangle())
+            .onTapGesture { pokePet() }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                    floatUp = true
+                }
+            }
+
+            // 右側：開放式對話氣泡 + 進度條 + 互動膠囊鈕
+            VStack(alignment: .leading, spacing: 7) {
+                Button(action: onTapCard) {
+                    Text(bubbleText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(14)
+                        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+
+                HStack(spacing: 6) {
+                    Text("Lv.\(levelInfo.level) \(stageTitle)")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(Color(hex: "#D97706"))
+                    ProgressView(value: levelInfo.progress)
+                        .tint(Color(hex: "#F59E0B"))
+                }
+
+                HStack(spacing: 6) {
+                    if petState.pendingFeedDP > 0 {
+                        Button(action: onTapFeed) {
+                            Text("🪙 餵食 +\(petState.pendingFeedDP)")
+                                .font(.system(size: 11, weight: .heavy))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .foregroundColor(Color(hex: "#451A03"))
+                                .clipShape(Capsule())
+                                .shadow(color: Color(hex: "#F59E0B").opacity(0.35), radius: 4, x: 0, y: 2)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+
+                    Button(action: onTapCard) {
+                        Text("🎮 3D 互動 / 換寵 ›")
+                            .font(.system(size: 11, weight: .bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(hex: "#007AFF").opacity(0.12))
+                            .foregroundColor(Color(hex: "#007AFF"))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
     }
 }
 
@@ -3384,7 +3423,13 @@ struct PetCompanionSheet: View {
     let summary: PortfolioDividendSourceSummary
     let isDownMarket: Bool
 
+    @State private var floatUp = false
     @State private var bounceScale: CGFloat = 1.0
+    @State private var dragTiltX: Double = 0.0
+    @State private var dragTiltY: Double = 0.0
+    @State private var spinAngle: Double = 0.0
+    @State private var quoteText: String? = nil
+    @State private var particles: [PetParticle] = []
     @State private var showInsufficientAlert = false
     @State private var alertMessage = ""
 
@@ -3403,118 +3448,252 @@ struct PetCompanionSheet: View {
     }
 
     @ViewBuilder
-    private var stageBackground: some View {
+    private var stageAtmosphere: some View {
         switch petState.activeTheme {
         case .fortune:
-            LinearGradient(
-                colors: [Color(hex: "#991B1B"), Color(hex: "#B91C1C"), Color(hex: "#7F1D1D")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            RadialGradient(
+                colors: [Color(hex: "#DC2626").opacity(0.22), Color(hex: "#F59E0B").opacity(0.12), Color.clear],
+                center: .center,
+                startRadius: 15,
+                endRadius: 200
             )
         case .defaultLight:
-            Color(.secondarySystemBackground)
+            RadialGradient(
+                colors: [Color(hex: "#FEF3C7").opacity(0.55), Color.clear],
+                center: .center,
+                startRadius: 15,
+                endRadius: 200
+            )
         case .obsidian:
-            LinearGradient(
-                colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            RadialGradient(
+                colors: [Color(hex: "#2C2C2E"), Color(hex: "#1C1C1E")],
+                center: .center,
+                startRadius: 15,
+                endRadius: 220
             )
         case .sakura:
-            LinearGradient(
-                colors: [Color(hex: "#FFF5F7"), Color(hex: "#FCE7F3")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            RadialGradient(
+                colors: [Color(hex: "#FBCFE8").opacity(0.55), Color.clear],
+                center: .center,
+                startRadius: 15,
+                endRadius: 200
             )
+        }
+    }
+
+    private func triggerInteraction(isCoinRain: Bool = false, spin: Bool = false) {
+        UIImpactFeedbackGenerator(style: isCoinRain ? .medium : .light).impactOccurred()
+        if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
+            quoteText = picked
+        }
+        if spin {
+            withAnimation(.spring(response: 0.75, dampingFraction: 0.65)) {
+                spinAngle += 360
+            }
+        }
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.45)) {
+            bounceScale = 1.12
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.58)) {
+                bounceScale = 1.0
+            }
+        }
+        let pool = isCoinRain ? ["🪙", "🪙", "💰", "🪙"] : ["❤️", "✨", "💰", "🍀"]
+        for i in 0..<(isCoinRain ? 6 : 5) {
+            let p = PetParticle(
+                emoji: pool[i % pool.count],
+                offsetX: CGFloat.random(in: -75...75),
+                targetY: isCoinRain ? CGFloat.random(in: -15...55) : CGFloat.random(in: -105 ... -55)
+            )
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
+                withAnimation(.easeOut(duration: 0.7)) {
+                    particles.append(p)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                    particles.removeAll { $0.id == p.id }
+                }
+            }
         }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
-                    // 3 張卡牌造型切換列
-                    HStack(spacing: 10) {
+                VStack(spacing: 14) {
+                    // 3 隻無框 3D 迷你公仔切換列
+                    HStack(spacing: 12) {
                         ForEach(PetSpecies.allCases) { sp in
                             let isActive = petState.species == sp
                             Button {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
                                     petState = PetService.shared.selectSpecies(sp)
+                                    quoteText = nil
                                 }
+                                triggerInteraction()
                             } label: {
-                                Image(sp.cardImageName)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 150)
-                                    .clipped()
-                                    .cornerRadius(10)
-                                    .padding(3)
-                                    .background(
-                                        isActive
-                                            ? AnyShapeStyle(LinearGradient(colors: [Color(hex: "#FDE047"), Color(hex: "#D97706")], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                            : AnyShapeStyle(Color(.systemGray5))
-                                    )
-                                    .cornerRadius(12)
-                                    .shadow(color: isActive ? Color(hex: "#D97706").opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
+                                VStack(spacing: 4) {
+                                    Image(sp.avatarImageName)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 62, height: 62)
+                                        .scaleEffect(isActive ? 1.12 : 0.92)
+                                        .shadow(color: isActive ? Color(hex: "#F59E0B").opacity(0.45) : Color.black.opacity(0.16), radius: isActive ? 8 : 4, x: 0, y: 4)
+                                    Text(sp.displayName)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isActive ? Color(hex: "#D97706") : .secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Circle()
+                                        .fill(isActive ? Color(hex: "#FBBF24").opacity(0.18) : Color.clear)
+                                        .blur(radius: 4)
+                                )
                             }
                             .buttonStyle(.plain)
                         }
                     }
 
-                    // 展示舞台
+                    // 開放式 3D 互動舞台（支援手指拖曳 3D 轉動與點擊互動）
                     VStack(spacing: 10) {
                         HStack {
                             Text(petState.species.badgeText)
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
-                                .background(petState.activeTheme.isDarkBackground ? Color.white.opacity(0.16) : Color.black.opacity(0.06))
-                                .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : .primary)
+                                .background(petState.activeTheme == .obsidian ? Color.white.opacity(0.14) : Color.black.opacity(0.06))
+                                .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
                                 .clipShape(Capsule())
                             Spacer()
-                            Text("🪙 可用代幣: \(petState.spendableDP) DP")
+                            Text("🪙 \(petState.spendableDP) DP")
                                 .font(.caption.bold())
-                                .foregroundColor(petState.activeTheme == .fortune ? Color(hex: "#FDE047") : Color(hex: "#F59E0B"))
+                                .foregroundColor(Color(hex: "#D97706"))
                         }
 
-                        ZStack(alignment: .topLeading) {
-                            Image(petState.species.cardImageName)
+                        ZStack {
+                            // 3D 地板聚光陰影
+                            Ellipse()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [Color(hex: "#F59E0B").opacity(0.42), Color.black.opacity(0.22), Color.clear],
+                                        center: .center,
+                                        startRadius: 8,
+                                        endRadius: 86
+                                    )
+                                )
+                                .frame(width: 156, height: 30)
+                                .scaleEffect(floatUp ? 0.88 : 1.0)
+                                .offset(y: 88)
+
+                            Image(petState.species.avatarImageName)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(height: 220)
-                                .cornerRadius(14)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(Color(hex: "#FBBF24"), lineWidth: 2)
-                                )
-                                .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 5)
+                                .frame(width: 195, height: 195)
+                                .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 12)
+                                .offset(y: floatUp ? -7 : 1)
                                 .scaleEffect(bounceScale)
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.45)) {
-                                        bounceScale = 1.07
-                                    }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                            bounceScale = 1.0
-                                        }
-                                    }
-                                }
+                                .rotation3DEffect(.degrees(dragTiltX), axis: (x: 1, y: 0, z: 0), perspective: 0.65)
+                                .rotation3DEffect(.degrees(dragTiltY + spinAngle), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
 
                             if isDownMarket {
                                 Text("🪖")
-                                    .font(.title2)
-                                    .offset(x: -8, y: -8)
+                                    .font(.title)
+                                    .offset(x: -55, y: -65)
+                            }
+
+                            ForEach(particles) { p in
+                                Text(p.emoji)
+                                    .font(.title3)
+                                    .offset(x: p.offsetX, y: p.targetY)
+                            }
+                        }
+                        .frame(height: 225)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            triggerInteraction()
+                        }
+                        .gesture(
+                            DragGesture(minimumDistance: 4)
+                                .onChanged { val in
+                                    let ry = max(-28.0, min(28.0, Double(val.translation.width) / 4.0))
+                                    let rx = max(-20.0, min(20.0, -Double(val.translation.height) / 5.0))
+                                    dragTiltY = ry
+                                    dragTiltX = rx
+                                }
+                                .onEnded { _ in
+                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.55)) {
+                                        dragTiltX = 0
+                                        dragTiltY = 0
+                                    }
+                                }
+                        )
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) {
+                                floatUp = true
                             }
                         }
 
                         Text("Lv.\(levelInfo.level) \(stageTitle)")
                             .font(.headline.bold())
-                            .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : .primary)
+                            .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
 
-                        Text(isDownMarket ? petState.species.downMarketLine : petState.species.tagline)
+                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : petState.species.tagline))
                             .font(.caption)
                             .multilineTextAlignment(.center)
-                            .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
+                            .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
+
+                        // 直接互動按鈕組
+                        HStack(spacing: 8) {
+                            Button {
+                                triggerInteraction()
+                            } label: {
+                                Text("👋 摸摸招財")
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Color(.systemBackground))
+                                    .foregroundColor(.primary)
+                                    .clipShape(Capsule())
+                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                triggerInteraction(spin: true)
+                            } label: {
+                                Text("🎲 3D轉圈")
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Color(.systemBackground))
+                                    .foregroundColor(.primary)
+                                    .clipShape(Capsule())
+                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                triggerInteraction(isCoinRain: true)
+                            } label: {
+                                Text("🪙 撒金幣")
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .foregroundColor(Color(hex: "#451A03"))
+                                    .clipShape(Capsule())
+                                    .shadow(color: Color(hex: "#F59E0B").opacity(0.35), radius: 4, x: 0, y: 2)
+                            }
+                            .buttonStyle(.plain)
+                        }
 
                         HStack(spacing: 6) {
                             ForEach(auras) { aura in
@@ -3522,19 +3701,15 @@ struct PetCompanionSheet: View {
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(petState.activeTheme.isDarkBackground ? Color.white.opacity(0.16) : Color(hex: aura.colorHex).opacity(0.15))
-                                    .foregroundColor(petState.activeTheme.isDarkBackground ? Color(hex: "#FEF3C7") : Color(hex: aura.colorHex))
+                                    .background(petState.activeTheme == .obsidian ? Color.white.opacity(0.14) : Color(hex: aura.colorHex).opacity(0.15))
+                                    .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : Color(hex: aura.colorHex))
                                     .clipShape(Capsule())
                             }
                         }
                     }
                     .padding(16)
-                    .background(stageBackground)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(petState.activeTheme == .fortune ? Color(hex: "#F59E0B") : Color.clear, lineWidth: 1.5)
-                    )
+                    .background(stageAtmosphere)
+                    .cornerRadius(24)
 
                     // 成長進度與餵食
                     VStack(spacing: 10) {
@@ -3550,15 +3725,10 @@ struct PetCompanionSheet: View {
                             .tint(Color(hex: "#F59E0B"))
 
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                                let res = PetService.shared.feedAllPending()
-                                petState = res.state
-                                if res.fedAmount > 0 {
-                                    bounceScale = 1.08
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                                        withAnimation(.spring()) { bounceScale = 1.0 }
-                                    }
-                                }
+                            let res = PetService.shared.feedAllPending()
+                            petState = res.state
+                            if res.fedAmount > 0 {
+                                triggerInteraction(isCoinRain: true)
                             }
                         } label: {
                             HStack {
@@ -3573,7 +3743,7 @@ struct PetCompanionSheet: View {
                         }
                         .disabled(petState.pendingFeedDP <= 0)
 
-                        Text("每實領 $100 股息自動獲得 1 DP，餵食同時累積 XP 與可用代幣，升級不會扣代幣。")
+                        Text("可拖曳寵物旋轉 3D 視角；每實領 $100 股息自動得 1 DP，升級不扣代幣。")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -3581,9 +3751,9 @@ struct PetCompanionSheet: View {
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(14)
 
-                    // 背景主題
+                    // 舞台氛圍
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("🎨 小窩背景（用可用 DP 解鎖，不扣等級）")
+                        Text("✨ 舞台氛圍（用可用 DP 解鎖，不扣等級）")
                             .font(.caption.bold())
 
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -3602,8 +3772,8 @@ struct PetCompanionSheet: View {
                                         .font(.caption.bold())
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 10)
-                                        .background(isActive ? Color(hex: "#B91C1C") : Color(.secondarySystemBackground))
-                                        .foregroundColor(isActive ? Color(hex: "#FEF3C7") : .primary)
+                                        .background(isActive ? Color(hex: "#1C1C1E") : Color(.secondarySystemBackground))
+                                        .foregroundColor(isActive ? Color(hex: "#FDE047") : .primary)
                                         .cornerRadius(10)
                                 }
                             }
@@ -3612,7 +3782,7 @@ struct PetCompanionSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("財富寵物伴侶")
+            .navigationTitle("3D 財富寵物互動舞台")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
