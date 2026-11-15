@@ -3254,7 +3254,7 @@ struct AnimatedPetModelView: View {
         birdFlapPhase = false
         dogTailPhase = false
         DispatchQueue.main.async {
-            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 0.56).repeatForever(autoreverses: true)) {
                 catWavePhase = true
             }
             withAnimation(.easeInOut(duration: 0.44).repeatForever(autoreverses: true)) {
@@ -3276,15 +3276,22 @@ struct AnimatedPetModelView: View {
                 Image("pet_cat_paw")
                     .resizable()
                     .scaledToFit()
+                    .scaleEffect(
+                        x: catWavePhase ? 1.03 : 1.0,
+                        y: catWavePhase ? 0.78 : 1.0,
+                        anchor: UnitPoint(x: 0.253, y: 0.492)
+                    )
                     .rotationEffect(
-                        .degrees(catWavePhase ? 10 : -12),
+                        .degrees(catWavePhase ? 4 : -2),
                         anchor: UnitPoint(x: 0.253, y: 0.492)
                     )
                     .rotation3DEffect(
-                        .degrees(catWavePhase ? -6 : 6),
+                        .degrees(catWavePhase ? -46 : 0),
                         axis: (x: 1, y: 0, z: 0),
-                        anchor: UnitPoint(x: 0.253, y: 0.492)
+                        anchor: UnitPoint(x: 0.253, y: 0.492),
+                        perspective: 0.65
                     )
+                    .offset(y: catWavePhase ? size * 0.008 : 0)
             case .bird:
                 Image("pet_bird_body")
                     .resizable()

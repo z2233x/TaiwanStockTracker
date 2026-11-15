@@ -415,8 +415,8 @@
     pointer-events: none;
   }
   @keyframes catPawWave {
-    0%, 100% { transform: rotate(-12deg) rotateX(6deg); }
-    50% { transform: rotate(10deg) rotateX(-6deg); }
+    0%, 100% { transform: perspective(340px) rotateX(0deg) rotateZ(-2deg) scaleY(1.0); }
+    46%, 56% { transform: perspective(340px) rotateX(-46deg) rotateZ(4deg) scaleY(0.79) translateY(2px); }
   }
   @keyframes birdWingFlap {
     0%, 100% { transform: rotate(-16deg) scaleY(0.84); }
@@ -436,7 +436,7 @@
   }
   .pet-cat-paw-anim {
     transform-origin: 25.3% 49.2%;
-    animation: catPawWave 1.25s ease-in-out infinite;
+    animation: catPawWave 1.05s ease-in-out infinite;
     z-index: 3;
   }
   .pet-bird-wing-anim {
