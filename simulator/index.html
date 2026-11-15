@@ -398,6 +398,65 @@
   .pet-stage-bg-fortune { background: radial-gradient(circle at 50% 42%, rgba(220, 38, 38, 0.22) 0%, rgba(245, 158, 11, 0.14) 45%, transparent 78%); }
   .pet-stage-bg-obsidian { background: radial-gradient(circle at 50% 42%, #2C2C2E 0%, #1C1C1E 85%); color: #FFF; }
   .pet-stage-bg-sakura { background: radial-gradient(circle at 50% 42%, rgba(251, 207, 232, 0.55) 0%, rgba(255, 245, 247, 0.15) 75%); }
+
+  /* 3D 關節動態圖層 */
+  .pet-rig {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+  .pet-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  @keyframes catPawWave {
+    0%, 100% { transform: rotate(-12deg) rotateX(6deg); }
+    50% { transform: rotate(10deg) rotateX(-6deg); }
+  }
+  @keyframes birdWingFlap {
+    0%, 100% { transform: rotate(-16deg) scaleY(0.84); }
+    50% { transform: rotate(12deg) scaleY(1.04); }
+  }
+  @keyframes birdBodyHover {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-2.5px) rotate(-1.2deg); }
+  }
+  @keyframes dogTailWagStand {
+    0%, 100% { transform: rotate(-14deg); }
+    50% { transform: rotate(17deg); }
+  }
+  @keyframes dogTailWagSit {
+    0%, 100% { transform: rotate(-15deg); }
+    50% { transform: rotate(18deg); }
+  }
+  .pet-cat-paw-anim {
+    transform-origin: 25.3% 49.2%;
+    animation: catPawWave 1.25s ease-in-out infinite;
+    z-index: 3;
+  }
+  .pet-bird-wing-anim {
+    transform-origin: 57.2% 45.9%;
+    animation: birdWingFlap 0.48s ease-in-out infinite;
+    z-index: 3;
+  }
+  .pet-bird-hover {
+    animation: birdBodyHover 0.48s ease-in-out infinite;
+  }
+  .pet-dog-tail-stand-anim {
+    transform-origin: 85.0% 60.3%;
+    animation: dogTailWagStand 0.36s ease-in-out infinite;
+    z-index: 1;
+  }
+  .pet-dog-tail-sit-anim {
+    transform-origin: 80.6% 75.0%;
+    animation: dogTailWagSit 0.34s ease-in-out infinite;
+    z-index: 1;
+  }
 </style>
 </head>
 <body>
@@ -725,6 +784,32 @@
     dog: ['汪汪！我幫你把「財」聚寶盆顧好好！', '背上這袋「福」元寶越養越重囉！', '摸頭好開心，長期持有我不放手汪！']
   };
 
+  let isDogSitting = false;
+
+  function renderPetRigHTML(species, extraCls = '', dogSitting = false, rigId = '') {
+    const safeSp = ['cat', 'bird', 'dog'].includes(species) ? species : 'cat';
+    let layers = '';
+    if (safeSp === 'cat') {
+      layers = `
+        <img src="pet_cat_body.png" alt="cat" class="pet-layer" style="z-index: 2;">
+        <img src="pet_cat_paw.png" alt="" class="pet-layer pet-cat-paw-anim">
+      `;
+    } else if (safeSp === 'bird') {
+      layers = `
+        <img src="pet_bird_body.png" alt="bird" class="pet-layer pet-bird-hover" style="z-index: 2;">
+        <img src="pet_bird_wing.png" alt="" class="pet-layer pet-bird-wing-anim">
+      `;
+    } else {
+      const prefix = dogSitting ? 'pet_dog_sit' : 'pet_dog';
+      const tailCls = dogSitting ? 'pet-dog-tail-sit-anim' : 'pet-dog-tail-stand-anim';
+      layers = `
+        <img src="${prefix}_tail.png" alt="" class="pet-layer ${tailCls}">
+        <img src="${prefix}_body.png" alt="dog" class="pet-layer" style="z-index: 2;">
+      `;
+    }
+    return `<div ${rigId ? `id="${rigId}"` : ''} class="pet-rig pet-3d-img ${extraCls}">${layers}</div>`;
+  }
+
   function renderPet3DModel(species, stage, isDownMarket, size = 88) {
     const safeSp = ['cat', 'bird', 'dog'].includes(species) ? species : 'cat';
     const pedW = Math.round(size * 0.72);
@@ -732,8 +817,8 @@
     return `
       <div class="pet-3d-stage" style="position: relative; width: ${size}px; height: ${size + 10}px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex-shrink: 0;">
         <div class="pet-float" style="position: relative; width: ${size}px; height: ${size}px;">
-          <img src="pet_${safeSp}.png" alt="${safeSp}" class="pet-3d-img" style="width: 100%; height: 100%; object-fit: contain;">
-          ${isDownMarket ? '<span title="貼息陪等填息中" style="position: absolute; top: 0px; left: 2px; font-size: 18px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));">🪖</span>' : ''}
+          ${renderPetRigHTML(safeSp, '', safeSp === 'dog' && isDogSitting, 'dashPetImg')}
+          ${isDownMarket ? '<span title="貼息陪等填息中" style="position: absolute; top: 0px; left: 2px; font-size: 18px; z-index: 5; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));">🪖</span>' : ''}
         </div>
         <div class="pet-pedestal pet-shadow-pulse" style="width: ${pedW}px; height: ${pedH}px; margin-top: -${Math.round(pedH * 0.6)}px;"></div>
       </div>
@@ -763,8 +848,39 @@
     }
   }
 
+  function applyDogPoseToRig(rigEl, sitting) {
+    if (!rigEl) return;
+    const imgs = rigEl.querySelectorAll('img');
+    if (imgs.length === 2) {
+      const prefix = sitting ? 'pet_dog_sit' : 'pet_dog';
+      imgs[0].src = `${prefix}_tail.png`;
+      imgs[0].className = `pet-layer ${sitting ? 'pet-dog-tail-sit-anim' : 'pet-dog-tail-stand-anim'}`;
+      imgs[1].src = `${prefix}_body.png`;
+    }
+  }
+
+  function toggleDogSit(fromDash = false) {
+    isDogSitting = !isDogSitting;
+    applyDogPoseToRig(document.getElementById('dashPetImg'), isDogSitting);
+    applyDogPoseToRig(document.getElementById('petModalImg'), isDogSitting);
+    const btn = document.getElementById('dogSitBtn');
+    if (btn) btn.innerText = isDogSitting ? '🐕 站起來' : '🐶 坐下';
+    const quote = document.getElementById(fromDash ? 'dashPetBubble' : 'petModalQuote');
+    if (quote) quote.innerText = isDogSitting ? '乖乖坐下顧聚寶盆，尾巴繼續搖汪！' : '精力充沛站起來守護股息袋汪！';
+    const rig = document.getElementById(fromDash ? 'dashPetImg' : 'petModalImg');
+    if (rig) {
+      rig.classList.remove('pet-bounce');
+      void rig.offsetWidth;
+      rig.classList.add('pet-bounce');
+    }
+  }
+
   function pokeDashboardPet(wrapEl) {
     const img = wrapEl ? wrapEl.querySelector('.pet-3d-img') : null;
+    if (petState.species === 'dog') {
+      isDogSitting = !isDogSitting;
+      applyDogPoseToRig(img, isDogSitting);
+    }
     if (img) {
       img.classList.remove('pet-bounce');
       void img.offsetWidth;
@@ -773,8 +889,12 @@
     spawnPetParticles(wrapEl, ['❤️', '✨', '🪙', '💰'], false);
     const bubble = document.getElementById('dashPetBubble');
     if (bubble) {
-      const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
-      bubble.innerText = lines[Math.floor(Math.random() * lines.length)];
+      if (petState.species === 'dog') {
+        bubble.innerText = isDogSitting ? '乖乖坐下搖尾巴顧「財」盆汪！' : '站起來繼續替你招財巡邏汪！';
+      } else {
+        const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
+        bubble.innerText = lines[Math.floor(Math.random() * lines.length)];
+      }
     }
   }
 
@@ -940,11 +1060,11 @@
         </div>
 
         <div style="position: relative; display: flex; flex-direction: column; align-items: center; margin: 4px 0 6px 0;" onclick="interactModalPet('pat')">
-          <div class="pet-float">
-            <img id="petModalImg" src="pet_${petState.species}.png" alt="${meta.label}" class="pet-3d-img ${justBounced ? 'pet-bounce' : ''}" style="width: 185px; height: 185px; object-fit: contain;">
+          <div class="pet-float" style="position: relative; width: 185px; height: 185px;">
+            ${renderPetRigHTML(petState.species, justBounced ? 'pet-bounce' : '', petState.species === 'dog' && isDogSitting, 'petModalImg')}
           </div>
           <div class="pet-pedestal pet-shadow-pulse" style="width: 146px; height: 26px; margin-top: -12px;"></div>
-          ${isDownMarket ? '<span style="position: absolute; top: 6px; left: 26%; font-size: 24px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
+          ${isDownMarket ? '<span style="position: absolute; top: 6px; left: 26%; font-size: 24px; z-index: 5; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
         </div>
 
         <div style="font-size: 16px; font-weight: 900; margin-top: 6px;">Lv.${lvInfo.level} ${stageTitle}</div>
@@ -953,10 +1073,11 @@
         </div>
 
         <!-- 直接互動按鈕組 -->
-        <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
           <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸招財</button>
           <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('spin');">🎲 3D轉圈</button>
           <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); interactModalPet('coin');">🪙 撒金幣</button>
+          ${petState.species === 'dog' ? `<button id="dogSitBtn" class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #9A3412; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); toggleDogSit(false);">${isDogSitting ? '🐕 站起來' : '🐶 坐下'}</button>` : ''}
         </div>
 
         <!-- 投組體質光環 -->

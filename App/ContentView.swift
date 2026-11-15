@@ -3240,6 +3240,90 @@ private let petInteractQuotes: [PetSpecies: [String]] = [
     ]
 ]
 
+struct AnimatedPetModelView: View {
+    let species: PetSpecies
+    let isSitting: Bool
+    let size: CGFloat
+
+    @State private var catWavePhase = false
+    @State private var birdFlapPhase = false
+    @State private var dogTailPhase = false
+
+    private func restartMotion() {
+        catWavePhase = false
+        birdFlapPhase = false
+        dogTailPhase = false
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true)) {
+                catWavePhase = true
+            }
+            withAnimation(.easeInOut(duration: 0.44).repeatForever(autoreverses: true)) {
+                birdFlapPhase = true
+            }
+            withAnimation(.easeInOut(duration: 0.34).repeatForever(autoreverses: true)) {
+                dogTailPhase = true
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            switch species {
+            case .cat:
+                Image("pet_cat_body")
+                    .resizable()
+                    .scaledToFit()
+                Image("pet_cat_paw")
+                    .resizable()
+                    .scaledToFit()
+                    .rotationEffect(
+                        .degrees(catWavePhase ? 10 : -12),
+                        anchor: UnitPoint(x: 0.253, y: 0.492)
+                    )
+                    .rotation3DEffect(
+                        .degrees(catWavePhase ? -6 : 6),
+                        axis: (x: 1, y: 0, z: 0),
+                        anchor: UnitPoint(x: 0.253, y: 0.492)
+                    )
+            case .bird:
+                Image("pet_bird_body")
+                    .resizable()
+                    .scaledToFit()
+                    .offset(y: birdFlapPhase ? -2.2 : 0.4)
+                Image("pet_bird_wing")
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(
+                        x: 1.0,
+                        y: birdFlapPhase ? 1.04 : 0.84,
+                        anchor: UnitPoint(x: 0.572, y: 0.459)
+                    )
+                    .rotationEffect(
+                        .degrees(birdFlapPhase ? 12 : -16),
+                        anchor: UnitPoint(x: 0.572, y: 0.459)
+                    )
+            case .dog:
+                Image(isSitting ? "pet_dog_sit_tail" : "pet_dog_tail")
+                    .resizable()
+                    .scaledToFit()
+                    .rotationEffect(
+                        .degrees(dogTailPhase ? 18 : -15),
+                        anchor: isSitting
+                            ? UnitPoint(x: 0.806, y: 0.750)
+                            : UnitPoint(x: 0.850, y: 0.603)
+                    )
+                Image(isSitting ? "pet_dog_sit_body" : "pet_dog_body")
+                    .resizable()
+                    .scaledToFit()
+            }
+        }
+        .frame(width: size, height: size)
+        .onAppear { restartMotion() }
+        .onChange(of: species) { _ in restartMotion() }
+        .onChange(of: isSitting) { _ in restartMotion() }
+    }
+}
+
 struct PetCompanionBannerCard: View {
     let petState: DividendPetState
     let isDownMarket: Bool
@@ -3252,6 +3336,7 @@ struct PetCompanionBannerCard: View {
     @State private var tiltDeg: Double = 0.0
     @State private var reactionQuote: String? = nil
     @State private var particles: [PetParticle] = []
+    @State private var isDogSitting = false
 
     private var levelInfo: PetLevelInfo {
         PetService.shared.levelInfo(for: petState.totalXP)
@@ -3277,7 +3362,10 @@ struct PetCompanionBannerCard: View {
 
     private func pokePet() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
+        if petState.species == .dog {
+            isDogSitting.toggle()
+            reactionQuote = isDogSitting ? "乖乖坐下搖尾巴顧「財」盆汪！" : "站起來繼續替你招財巡邏汪！"
+        } else if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
             reactionQuote = picked
         }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.42)) {
@@ -3321,14 +3409,15 @@ struct PetCompanionBannerCard: View {
                     .scaleEffect(floatUp ? 0.86 : 1.0)
                     .offset(y: 38)
 
-                Image(petState.species.avatarImageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 90, height: 90)
-                    .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 8)
-                    .offset(y: floatUp ? -5 : 1)
-                    .scaleEffect(bounceScale)
-                    .rotation3DEffect(.degrees(tiltDeg), axis: (x: 0, y: 1, z: 0))
+                AnimatedPetModelView(
+                    species: petState.species,
+                    isSitting: petState.species == .dog && isDogSitting,
+                    size: 90
+                )
+                .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 8)
+                .offset(y: floatUp ? -5 : 1)
+                .scaleEffect(bounceScale)
+                .rotation3DEffect(.degrees(tiltDeg), axis: (x: 0, y: 1, z: 0))
 
                 if isDownMarket {
                     Text("🪖")
@@ -3430,6 +3519,7 @@ struct PetCompanionSheet: View {
     @State private var spinAngle: Double = 0.0
     @State private var quoteText: String? = nil
     @State private var particles: [PetParticle] = []
+    @State private var isDogSitting = false
     @State private var showInsufficientAlert = false
     @State private var alertMessage = ""
 
@@ -3587,15 +3677,16 @@ struct PetCompanionSheet: View {
                                 .scaleEffect(floatUp ? 0.88 : 1.0)
                                 .offset(y: 88)
 
-                            Image(petState.species.avatarImageName)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 195, height: 195)
-                                .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 12)
-                                .offset(y: floatUp ? -7 : 1)
-                                .scaleEffect(bounceScale)
-                                .rotation3DEffect(.degrees(dragTiltX), axis: (x: 1, y: 0, z: 0), perspective: 0.65)
-                                .rotation3DEffect(.degrees(dragTiltY + spinAngle), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
+                            AnimatedPetModelView(
+                                species: petState.species,
+                                isSitting: petState.species == .dog && isDogSitting,
+                                size: 195
+                            )
+                            .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 12)
+                            .offset(y: floatUp ? -7 : 1)
+                            .scaleEffect(bounceScale)
+                            .rotation3DEffect(.degrees(dragTiltX), axis: (x: 1, y: 0, z: 0), perspective: 0.65)
+                            .rotation3DEffect(.degrees(dragTiltY + spinAngle), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
 
                             if isDownMarket {
                                 Text("🪖")
@@ -3679,7 +3770,7 @@ struct PetCompanionSheet: View {
                             } label: {
                                 Text("🪙 撒金幣")
                                     .font(.caption.bold())
-                                    .padding(.horizontal, 12)
+                                    .padding(.horizontal, 11)
                                     .padding(.vertical, 7)
                                     .background(
                                         LinearGradient(
@@ -3693,6 +3784,32 @@ struct PetCompanionSheet: View {
                                     .shadow(color: Color(hex: "#F59E0B").opacity(0.35), radius: 4, x: 0, y: 2)
                             }
                             .buttonStyle(.plain)
+
+                            if petState.species == .dog {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.52)) {
+                                        isDogSitting.toggle()
+                                        bounceScale = 1.12
+                                    }
+                                    quoteText = isDogSitting ? "乖乖坐下顧聚寶盆，尾巴繼續搖汪！" : "精力充沛站起來守護股息袋汪！"
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                                            bounceScale = 1.0
+                                        }
+                                    }
+                                } label: {
+                                    Text(isDogSitting ? "🐕 站起來" : "🐶 坐下")
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 11)
+                                        .padding(.vertical, 7)
+                                        .background(Color(.systemBackground))
+                                        .foregroundColor(Color(hex: "#9A3412"))
+                                        .clipShape(Capsule())
+                                        .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
 
                         HStack(spacing: 6) {
