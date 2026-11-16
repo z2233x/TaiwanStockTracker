@@ -3244,90 +3244,84 @@ struct AnimatedPetModelView: View {
     let species: PetSpecies
     let isSitting: Bool
     let size: CGFloat
-
-    @State private var catWavePhase = false
-    @State private var birdFlapPhase = false
-    @State private var dogTailPhase = false
-
-    private func restartMotion() {
-        catWavePhase = false
-        birdFlapPhase = false
-        dogTailPhase = false
-        DispatchQueue.main.async {
-            withAnimation(.easeInOut(duration: 0.56).repeatForever(autoreverses: true)) {
-                catWavePhase = true
-            }
-            withAnimation(.easeInOut(duration: 0.44).repeatForever(autoreverses: true)) {
-                birdFlapPhase = true
-            }
-            withAnimation(.easeInOut(duration: 0.34).repeatForever(autoreverses: true)) {
-                dogTailPhase = true
-            }
-        }
-    }
+    var parallaxX: CGFloat = 0
+    var parallaxY: CGFloat = 0
+    var motionSpeed: Double = 1.0
 
     var body: some View {
-        ZStack {
-            switch species {
-            case .cat:
-                Image("pet_cat_body")
-                    .resizable()
-                    .scaledToFit()
-                Image("pet_cat_paw")
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(
-                        x: catWavePhase ? 1.03 : 1.0,
-                        y: catWavePhase ? 0.78 : 1.0,
-                        anchor: UnitPoint(x: 0.253, y: 0.492)
-                    )
-                    .rotationEffect(
-                        .degrees(catWavePhase ? 4 : -2),
-                        anchor: UnitPoint(x: 0.253, y: 0.492)
-                    )
-                    .rotation3DEffect(
-                        .degrees(catWavePhase ? -46 : 0),
-                        axis: (x: 1, y: 0, z: 0),
-                        anchor: UnitPoint(x: 0.253, y: 0.492),
-                        perspective: 0.65
-                    )
-                    .offset(y: catWavePhase ? size * 0.008 : 0)
-            case .bird:
-                Image("pet_bird_body")
-                    .resizable()
-                    .scaledToFit()
-                    .offset(y: birdFlapPhase ? -2.2 : 0.4)
-                Image("pet_bird_wing")
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(
-                        x: 1.0,
-                        y: birdFlapPhase ? 1.04 : 0.84,
-                        anchor: UnitPoint(x: 0.572, y: 0.459)
-                    )
-                    .rotationEffect(
-                        .degrees(birdFlapPhase ? 12 : -16),
-                        anchor: UnitPoint(x: 0.572, y: 0.459)
-                    )
-            case .dog:
-                Image(isSitting ? "pet_dog_sit_tail" : "pet_dog_tail")
-                    .resizable()
-                    .scaledToFit()
-                    .rotationEffect(
-                        .degrees(dogTailPhase ? 18 : -15),
-                        anchor: isSitting
-                            ? UnitPoint(x: 0.806, y: 0.750)
-                            : UnitPoint(x: 0.850, y: 0.603)
-                    )
-                Image(isSitting ? "pet_dog_sit_body" : "pet_dog_body")
-                    .resizable()
-                    .scaledToFit()
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate * motionSpeed
+            let beck = pow(0.5 - 0.5 * cos(t * 3.1), 1.35)
+            let flap = 0.5 - 0.5 * cos(t * 10.5)
+            let wag = sin(t * (isSitting ? 11.0 : 14.5))
+            let pxLimbX = parallaxX * 5.0
+            let pxLimbY = parallaxY * 4.0
+            let pxBodyX = parallaxX * 1.8
+            let pxBodyY = parallaxY * 1.4
+
+            ZStack {
+                switch species {
+                case .cat:
+                    Image("pet_cat_body")
+                        .resizable()
+                        .scaledToFit()
+                        .offset(x: pxBodyX, y: pxBodyY)
+                    Image("pet_cat_paw")
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(
+                            x: 1.0 + 0.03 * beck,
+                            y: 1.0 - 0.22 * beck,
+                            anchor: UnitPoint(x: 0.253, y: 0.492)
+                        )
+                        .rotationEffect(
+                            .degrees(4.5 * beck - 2.0),
+                            anchor: UnitPoint(x: 0.253, y: 0.492)
+                        )
+                        .rotation3DEffect(
+                            .degrees(-46.0 * beck),
+                            axis: (x: 1, y: 0, z: 0),
+                            anchor: UnitPoint(x: 0.253, y: 0.492),
+                            perspective: 0.62
+                        )
+                        .offset(x: pxLimbX, y: pxLimbY + size * 0.008 * beck)
+                case .bird:
+                    Image("pet_bird_body")
+                        .resizable()
+                        .scaledToFit()
+                        .offset(x: pxBodyX, y: pxBodyY - 2.4 * sin(t * 10.5))
+                    Image("pet_bird_wing")
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(
+                            x: 1.0,
+                            y: 0.78 + 0.26 * flap,
+                            anchor: UnitPoint(x: 0.572, y: 0.459)
+                        )
+                        .rotationEffect(
+                            .degrees(-18.0 + 30.0 * flap),
+                            anchor: UnitPoint(x: 0.572, y: 0.459)
+                        )
+                        .offset(x: pxLimbX, y: pxLimbY - 2.4 * sin(t * 10.5))
+                case .dog:
+                    Image(isSitting ? "pet_dog_sit_tail" : "pet_dog_tail")
+                        .resizable()
+                        .scaledToFit()
+                        .rotationEffect(
+                            .degrees(18.0 * wag),
+                            anchor: isSitting
+                                ? UnitPoint(x: 0.806, y: 0.750)
+                                : UnitPoint(x: 0.850, y: 0.603)
+                        )
+                        .offset(x: pxBodyX * 0.4, y: pxBodyY * 0.4)
+                    Image(isSitting ? "pet_dog_sit_body" : "pet_dog_body")
+                        .resizable()
+                        .scaledToFit()
+                        .offset(x: pxBodyX, y: pxBodyY)
+                }
             }
+            .frame(width: size, height: size)
         }
-        .frame(width: size, height: size)
-        .onAppear { restartMotion() }
-        .onChange(of: species) { _ in restartMotion() }
-        .onChange(of: isSitting) { _ in restartMotion() }
     }
 }
 
@@ -3356,6 +3350,9 @@ struct PetCompanionBannerCard: View {
     }
 
     private var bubbleText: String {
+        if !petState.hasChosenStarter {
+            return "🎯 點擊選擇你的專屬財富寵物（三選一出發）"
+        }
         if let quote = reactionQuote { return quote }
         if petState.pendingFeedDP > 0 {
             return "有 \(petState.pendingFeedDP) DP 股息飼料待餵食"
@@ -3364,7 +3361,7 @@ struct PetCompanionBannerCard: View {
             return petState.species.downMarketLine
         }
         let remain = max(0, levelInfo.needXP - levelInfo.currentXP)
-        return "點我摸摸招財・距下級還差 \(remain) XP"
+        return "點我摸摸招財・距第 \(min(20, levelInfo.stage + 1)) 階還差 \(remain) XP"
     }
 
     private func pokePet() {
@@ -3495,7 +3492,7 @@ struct PetCompanionBannerCard: View {
                     }
 
                     Button(action: onTapCard) {
-                        Text("🎮 3D 互動 / 換寵 ›")
+                        Text(petState.hasChosenStarter ? "✨ 3D 互動舞台 ›" : "🎯 三選一領養陪伴 ›")
                             .font(.system(size: 11, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -3512,6 +3509,151 @@ struct PetCompanionBannerCard: View {
     }
 }
 
+private struct PetPlaygroundPose {
+    let x: CGFloat
+    let y: CGFloat
+    let altitude: CGFloat
+    let rollDeg: Double
+    let yawDeg: Double
+    let pitchDeg: Double
+    let squashY: CGFloat
+    let squashX: CGFloat
+    let shadowScale: CGFloat
+    let shadowOpacity: Double
+    let parallaxX: CGFloat
+    let parallaxY: CGFloat
+    let showTargetMarker: Bool
+    let speedMultiplier: Double
+
+    static func compute(
+        species: PetSpecies,
+        isDogSitting: Bool,
+        t: TimeInterval,
+        maxHalfW: CGFloat,
+        swoopTriggerTime: TimeInterval,
+        tapTargetX: CGFloat,
+        tapTargetY: CGFloat,
+        tapTargetTime: TimeInterval,
+        dragTiltX: Double,
+        dragTiltY: Double
+    ) -> PetPlaygroundPose {
+        let boundW = max(48.0, min(115.0, maxHalfW))
+        let swoopElapsed = t - swoopTriggerTime
+        let swoopActive = swoopElapsed >= 0 && swoopElapsed < 1.35
+        let swoopEnv = swoopActive ? sin(.pi * (swoopElapsed / 1.35)) : 0.0
+
+        let tapElapsed = t - tapTargetTime
+        let tapActive = tapElapsed >= 0 && tapElapsed < 2.1
+        let tapBlend: Double = tapActive ? sin(.pi * min(1.0, tapElapsed / 2.1)) : 0.0
+
+        var autoX: CGFloat = 0
+        var autoY: CGFloat = 0
+        var hopY: CGFloat = 0
+        var roll: Double = 0
+        var yaw: Double = 0
+        var pitch: Double = 0
+        var sX: CGFloat = 1.0
+        var sY: CGFloat = 1.0
+        var speedMult: Double = 1.0
+
+        switch species {
+        case .cat:
+            // 招財貓：流暢左右踱步＋小跳步，偶爾停在中央附近向前招手
+            let walkCycle = t * 0.65
+            let rawWave = sin(walkCycle)
+            let paceVel = cos(walkCycle)
+            autoX = CGFloat(rawWave) * boundW * 0.78
+            let stepWave = abs(sin(t * 5.2))
+            let movingWeight = min(1.0, abs(paceVel) * 1.4)
+            hopY = -CGFloat(stepWave) * 7.5 * CGFloat(movingWeight)
+            roll = Double(sin(t * 5.2)) * 4.2 * movingWeight + paceVel * 4.5
+            yaw = paceVel * 14.0
+            pitch = -Double(stepWave) * 4.0 * movingWeight
+            sY = 1.0 - CGFloat(movingWeight * stepWave) * 0.045
+            sX = 1.0 + CGFloat(movingWeight * stepWave) * 0.03
+            if swoopActive {
+                let leap = abs(sin(swoopElapsed * 7.5)) * swoopEnv
+                hopY -= CGFloat(leap * 24.0)
+                yaw += sin(swoopElapsed * 8.0) * 14.0 * swoopEnv
+                speedMult = 1.85
+            }
+        case .bird:
+            // 貪錢鳥：舞台中上層 8 字形盤旋飛翔
+            let flightT = t * 0.92
+            let velX = cos(flightT)
+            autoX = CGFloat(sin(flightT)) * boundW * 0.86
+            autoY = CGFloat(-18.0 + sin(flightT * 2.0 + 0.3) * 20.0 + cos(t * 1.35) * 6.0)
+            roll = velX * 15.0 + sin(t * 3.0) * 3.0
+            yaw = velX * 19.0
+            pitch = cos(flightT * 2.0 + 0.3) * 10.0
+            speedMult = 1.15 + abs(velX) * 0.45
+            if swoopActive {
+                let sPhase = swoopElapsed / 1.35 * .pi * 2.0
+                autoX += CGFloat(sin(sPhase)) * 32.0 * CGFloat(swoopEnv)
+                autoY -= CGFloat(swoopEnv * 26.0)
+                roll += cos(sPhase) * 16.0 * swoopEnv
+                speedMult = 1.9
+            }
+        case .dog:
+            // 財氣犬：站立時快步巡邏搖尾，坐下時乖乖在原地守護
+            if isDogSitting {
+                autoX = CGFloat(sin(t * 0.25)) * 12.0
+                hopY = CGFloat(sin(t * 2.4)) * 1.5
+                roll = sin(t * 1.4) * 1.8
+                yaw = sin(t * 0.8) * 6.0
+                speedMult = 0.95
+            } else {
+                let trotT = t * 0.88 + 0.28 * sin(t * 0.42)
+                let trotVel = cos(trotT)
+                autoX = CGFloat(sin(trotT)) * boundW * 0.82
+                let bounce = abs(sin(t * 7.6))
+                let moveW = min(1.0, abs(trotVel) * 1.5)
+                hopY = -CGFloat(bounce) * 7.0 * CGFloat(moveW)
+                roll = trotVel * 6.0 + sin(t * 7.6) * 3.2 * moveW
+                yaw = trotVel * 17.0
+                sY = 1.0 - CGFloat(moveW * bounce) * 0.04
+                sX = 1.0 + CGFloat(moveW * bounce) * 0.03
+                speedMult = 1.2 + moveW * 0.45
+            }
+            if swoopActive {
+                let dash = abs(sin(swoopElapsed * 9.0)) * swoopEnv
+                hopY -= CGFloat(dash * 26.0)
+                yaw += sin(swoopElapsed * 8.0) * 16.0 * swoopEnv
+                speedMult = 1.95
+            }
+        }
+
+        // 點擊舞台任意位置時平滑朝向目標點靠攏
+        let finalX = autoX * CGFloat(1.0 - tapBlend * 0.85) + tapTargetX * CGFloat(tapBlend * 0.85)
+        let targetYClamped: CGFloat = (species == .bird) ? tapTargetY : min(14.0, max(-16.0, tapTargetY * 0.35))
+        let baseFloorY: CGFloat = 14.0
+        let rawY = (species == .bird ? autoY : baseFloorY) * CGFloat(1.0 - tapBlend * 0.75) + targetYClamped * CGFloat(tapBlend * 0.75) + hopY
+        let clampedYaw = max(-22.0, min(22.0, yaw + dragTiltY + (tapBlend > 0.05 ? Double(tapTargetX - autoX) * 0.14 : 0)))
+        let clampedPitch = max(-16.0, min(16.0, pitch + dragTiltX))
+
+        let altitude = max(0, baseFloorY - rawY)
+        let shScale = max(0.48, min(1.05, 1.0 - Double(altitude) / 95.0))
+        let shOpacity = max(0.32, min(0.95, 0.92 - Double(altitude) / 110.0))
+
+        return PetPlaygroundPose(
+            x: finalX,
+            y: rawY,
+            altitude: altitude,
+            rollDeg: roll,
+            yawDeg: clampedYaw,
+            pitchDeg: clampedPitch,
+            squashY: sY,
+            squashX: sX,
+            shadowScale: CGFloat(shScale),
+            shadowOpacity: shOpacity,
+            parallaxX: CGFloat(clampedYaw / 22.0),
+            parallaxY: CGFloat(-clampedPitch / 16.0),
+            showTargetMarker: tapActive,
+            speedMultiplier: speedMult
+        )
+    }
+}
+
 struct PetCompanionSheet: View {
     @Environment(\.dismiss) var dismiss
     @Binding var petState: DividendPetState
@@ -3523,7 +3665,10 @@ struct PetCompanionSheet: View {
     @State private var bounceScale: CGFloat = 1.0
     @State private var dragTiltX: Double = 0.0
     @State private var dragTiltY: Double = 0.0
-    @State private var spinAngle: Double = 0.0
+    @State private var swoopTriggerTime: TimeInterval = -10.0
+    @State private var tapTargetX: CGFloat = 0.0
+    @State private var tapTargetY: CGFloat = 0.0
+    @State private var tapTargetTime: TimeInterval = -10.0
     @State private var quoteText: String? = nil
     @State private var particles: [PetParticle] = []
     @State private var isDogSitting = false
@@ -3549,47 +3694,55 @@ struct PetCompanionSheet: View {
         switch petState.activeTheme {
         case .fortune:
             RadialGradient(
-                colors: [Color(hex: "#DC2626").opacity(0.22), Color(hex: "#F59E0B").opacity(0.12), Color.clear],
+                colors: [Color(hex: "#DC2626").opacity(0.20), Color(hex: "#F59E0B").opacity(0.10), Color.clear],
                 center: .center,
-                startRadius: 15,
-                endRadius: 200
+                startRadius: 10,
+                endRadius: 210
             )
         case .defaultLight:
             RadialGradient(
                 colors: [Color(hex: "#FEF3C7").opacity(0.55), Color.clear],
                 center: .center,
-                startRadius: 15,
-                endRadius: 200
+                startRadius: 10,
+                endRadius: 210
             )
         case .obsidian:
             RadialGradient(
-                colors: [Color(hex: "#2C2C2E"), Color(hex: "#1C1C1E")],
+                colors: [Color(hex: "#2C2C2E").opacity(0.92), Color(hex: "#1C1C1E").opacity(0.65), Color.clear],
                 center: .center,
                 startRadius: 15,
-                endRadius: 220
+                endRadius: 230
             )
         case .sakura:
             RadialGradient(
                 colors: [Color(hex: "#FBCFE8").opacity(0.55), Color.clear],
                 center: .center,
-                startRadius: 15,
-                endRadius: 200
+                startRadius: 10,
+                endRadius: 210
             )
         }
     }
 
-    private func triggerInteraction(isCoinRain: Bool = false, spin: Bool = false) {
+    private func triggerInteraction(isCoinRain: Bool = false, swoop: Bool = false) {
         UIImpactFeedbackGenerator(style: isCoinRain ? .medium : .light).impactOccurred()
-        if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
+        if swoop {
+            if petState.species == .dog && isDogSitting {
+                isDogSitting = false
+            }
+            swoopTriggerTime = Date().timeIntervalSinceReferenceDate
+            switch petState.species {
+            case .cat:
+                quoteText = "喵～全速躍動招財！股息通通吸過來！"
+            case .bird:
+                quoteText = "啾啾～高空盤旋巡視高息除權息！"
+            case .dog:
+                quoteText = "汪汪！活力全開在舞台飛奔守護存摺！"
+            }
+        } else if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
             quoteText = picked
         }
-        if spin {
-            withAnimation(.spring(response: 0.75, dampingFraction: 0.65)) {
-                spinAngle += 360
-            }
-        }
         withAnimation(.spring(response: 0.24, dampingFraction: 0.45)) {
-            bounceScale = 1.12
+            bounceScale = swoop ? 1.16 : 1.12
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.58)) {
@@ -3618,43 +3771,98 @@ struct PetCompanionSheet: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
-                    // 3 隻無框 3D 迷你公仔切換列
-                    HStack(spacing: 12) {
-                        ForEach(PetSpecies.allCases) { sp in
-                            let isActive = petState.species == sp
+                    // 寵物選擇列（一開始僅可三選一領養陪伴，確認後鎖定專屬夥伴）
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text(petState.hasChosenStarter ? "🤝 專屬陪伴夥伴（一對一鎖定培育）" : "🎯 請選擇一種寵物陪伴出發（三選一）")
+                                .font(.caption.bold())
+                                .foregroundColor(petState.hasChosenStarter ? Color(hex: "#D97706") : .primary)
+                            Spacer()
+                            if petState.hasChosenStarter {
+                                Text("第 \(levelInfo.stage)/20 階")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            ForEach(PetSpecies.allCases) { sp in
+                                let isActive = petState.species == sp
+                                let isLocked = petState.hasChosenStarter && !isActive
+                                Button {
+                                    if isLocked {
+                                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                        quoteText = "每位投資人初始僅能選擇一隻專屬寵物陪伴，專心培育【\(petState.species.displayName)】至第 20 階吧！"
+                                        return
+                                    }
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
+                                        petState = PetService.shared.selectSpecies(sp)
+                                        quoteText = nil
+                                    }
+                                    triggerInteraction()
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        ZStack(alignment: .topTrailing) {
+                                            Image(sp.avatarImageName)
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 58, height: 58)
+                                                .opacity(isLocked ? 0.36 : 1.0)
+                                                .scaleEffect(isActive ? 1.14 : 0.90)
+                                                .shadow(color: isActive ? Color(hex: "#F59E0B").opacity(0.42) : Color.black.opacity(0.14), radius: isActive ? 8 : 4, x: 0, y: 4)
+                                            if isLocked {
+                                                Text("🔒")
+                                                    .font(.system(size: 13))
+                                                    .offset(x: 4, y: -2)
+                                            }
+                                        }
+                                        Text(isLocked ? "\(sp.displayName)" : (isActive && petState.hasChosenStarter ? "✓ \(sp.displayName)" : sp.displayName))
+                                            .font(.caption2.bold())
+                                            .foregroundColor(isActive ? Color(hex: "#D97706") : .secondary)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Circle()
+                                            .fill(isActive ? Color(hex: "#FBBF24").opacity(0.20) : Color.clear)
+                                            .blur(radius: 4)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        if !petState.hasChosenStarter {
                             Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
-                                    petState = PetService.shared.selectSpecies(sp)
-                                    quoteText = nil
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                                    petState = PetService.shared.adoptStarter(petState.species)
                                 }
-                                triggerInteraction()
+                                triggerInteraction(isCoinRain: true, swoop: true)
+                                quoteText = "太棒了！【\(petState.species.displayName)】正式成為你的專屬財富夥伴！"
                             } label: {
-                                VStack(spacing: 4) {
-                                    Image(sp.avatarImageName)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 62, height: 62)
-                                        .scaleEffect(isActive ? 1.12 : 0.92)
-                                        .shadow(color: isActive ? Color(hex: "#F59E0B").opacity(0.45) : Color.black.opacity(0.16), radius: isActive ? 8 : 4, x: 0, y: 4)
-                                    Text(sp.displayName)
-                                        .font(.caption2.bold())
-                                        .foregroundColor(isActive ? Color(hex: "#D97706") : .secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Circle()
-                                        .fill(isActive ? Color(hex: "#FBBF24").opacity(0.18) : Color.clear)
-                                        .blur(radius: 4)
-                                )
+                                Text("✨ 確認領養【\(petState.species.displayName)】開始陪伴")
+                                    .font(.subheadline.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .foregroundColor(Color(hex: "#451A03"))
+                                    .clipShape(Capsule())
+                                    .shadow(color: Color(hex: "#F59E0B").opacity(0.35), radius: 6, x: 0, y: 3)
                             }
                             .buttonStyle(.plain)
                         }
                     }
 
-                    // 開放式 3D 互動舞台（支援手指拖曳 3D 轉動與點擊互動）
-                    VStack(spacing: 10) {
+                    // 完全去卡片化：無外框 60fps 自由走動 / 飛翔 2.5D 立體互動舞台
+                    VStack(spacing: 8) {
                         HStack {
                             Text(petState.species.badgeText)
                                 .font(.caption2.bold())
@@ -3669,80 +3877,126 @@ struct PetCompanionSheet: View {
                                 .foregroundColor(Color(hex: "#D97706"))
                         }
 
-                        ZStack {
-                            // 3D 地板聚光陰影
-                            Ellipse()
-                                .fill(
-                                    RadialGradient(
-                                        colors: [Color(hex: "#F59E0B").opacity(0.42), Color.black.opacity(0.22), Color.clear],
-                                        center: .center,
-                                        startRadius: 8,
-                                        endRadius: 86
-                                    )
+                        GeometryReader { geo in
+                            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+                                let t = timeline.date.timeIntervalSinceReferenceDate
+                                let pose = PetPlaygroundPose.compute(
+                                    species: petState.species,
+                                    isDogSitting: isDogSitting,
+                                    t: t,
+                                    maxHalfW: (geo.size.width - 135) * 0.5,
+                                    swoopTriggerTime: swoopTriggerTime,
+                                    tapTargetX: tapTargetX,
+                                    tapTargetY: tapTargetY,
+                                    tapTargetTime: tapTargetTime,
+                                    dragTiltX: dragTiltX,
+                                    dragTiltY: dragTiltY
                                 )
-                                .frame(width: 156, height: 30)
-                                .scaleEffect(floatUp ? 0.88 : 1.0)
-                                .offset(y: 88)
 
-                            AnimatedPetModelView(
-                                species: petState.species,
-                                isSitting: petState.species == .dog && isDogSitting,
-                                size: 195
-                            )
-                            .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 12)
-                            .offset(y: floatUp ? -7 : 1)
-                            .scaleEffect(bounceScale)
-                            .rotation3DEffect(.degrees(dragTiltX), axis: (x: 1, y: 0, z: 0), perspective: 0.65)
-                            .rotation3DEffect(.degrees(dragTiltY + spinAngle), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
+                                ZStack {
+                                    // 無框環境光暈（漸層自然淡出無卡片邊界）
+                                    stageAtmosphere
+                                        .clipShape(Ellipse())
+                                        .blur(radius: 18)
+                                        .opacity(0.9)
 
-                            if isDownMarket {
-                                Text("🪖")
-                                    .font(.title)
-                                    .offset(x: -55, y: -65)
-                            }
+                                    // 點擊引導目標金幣標記
+                                    if pose.showTargetMarker {
+                                        Text("🪙")
+                                            .font(.title3)
+                                            .shadow(color: Color(hex: "#F59E0B").opacity(0.6), radius: 6)
+                                            .offset(x: tapTargetX, y: tapTargetY + 46)
+                                    }
 
-                            ForEach(particles) { p in
-                                Text(p.emoji)
-                                    .font(.title3)
-                                    .offset(x: p.offsetX, y: p.targetY)
-                            }
-                        }
-                        .frame(height: 225)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            triggerInteraction()
-                        }
-                        .gesture(
-                            DragGesture(minimumDistance: 4)
-                                .onChanged { val in
-                                    let ry = max(-28.0, min(28.0, Double(val.translation.width) / 4.0))
-                                    let rx = max(-20.0, min(20.0, -Double(val.translation.height) / 5.0))
-                                    dragTiltY = ry
-                                    dragTiltX = rx
-                                }
-                                .onEnded { _ in
-                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.55)) {
-                                        dragTiltX = 0
-                                        dragTiltY = 0
+                                    // 動態追蹤地面立體陰影（隨高度與左右移動縮放濃淡）
+                                    Ellipse()
+                                        .fill(
+                                            RadialGradient(
+                                                colors: [Color(hex: "#F59E0B").opacity(0.45 * pose.shadowOpacity), Color.black.opacity(0.24 * pose.shadowOpacity), Color.clear],
+                                                center: .center,
+                                                startRadius: 6,
+                                                endRadius: 72
+                                            )
+                                        )
+                                        .frame(width: 126, height: 22)
+                                        .scaleEffect(pose.shadowScale)
+                                        .offset(x: pose.x, y: 82)
+
+                                    // 2.5D 多層視差動態公仔（會在舞台內左右走動或上下盤旋飛行）
+                                    AnimatedPetModelView(
+                                        species: petState.species,
+                                        isSitting: petState.species == .dog && isDogSitting,
+                                        size: 146,
+                                        parallaxX: pose.parallaxX,
+                                        parallaxY: pose.parallaxY,
+                                        motionSpeed: pose.speedMultiplier
+                                    )
+                                    .shadow(color: Color.black.opacity(0.24), radius: 12, x: -pose.parallaxX * 6, y: 10 + pose.altitude * 0.15)
+                                    .scaleEffect(x: bounceScale * pose.squashX, y: bounceScale * pose.squashY)
+                                    .rotationEffect(.degrees(pose.rollDeg))
+                                    .rotation3DEffect(.degrees(pose.pitchDeg), axis: (x: 1, y: 0, z: 0), perspective: 0.55)
+                                    .rotation3DEffect(.degrees(pose.yawDeg), axis: (x: 0, y: 1, z: 0), perspective: 0.55)
+                                    .offset(x: pose.x, y: pose.y)
+
+                                    if isDownMarket {
+                                        Text("🪖")
+                                            .font(.title2)
+                                            .offset(x: pose.x - 42, y: pose.y - 52)
+                                    }
+
+                                    ForEach(particles) { p in
+                                        Text(p.emoji)
+                                            .font(.title3)
+                                            .offset(x: pose.x + p.offsetX, y: pose.y + p.targetY)
                                     }
                                 }
-                        )
-                        .onAppear {
-                            withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) {
-                                floatUp = true
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                                        .onChanged { val in
+                                            let dist = hypot(val.translation.width, val.translation.height)
+                                            if dist > 6 {
+                                                let ry = max(-22.0, min(22.0, Double(val.translation.width) / 4.2))
+                                                let rx = max(-16.0, min(16.0, -Double(val.translation.height) / 5.2))
+                                                dragTiltY = ry
+                                                dragTiltX = rx
+                                            }
+                                        }
+                                        .onEnded { val in
+                                            let dist = hypot(val.translation.width, val.translation.height)
+                                            if dist <= 8 {
+                                                // 點擊舞台任意處：寵物會走/飛到點擊位置！
+                                                let halfW = max(50.0, (geo.size.width - 130) * 0.5)
+                                                tapTargetX = max(-halfW, min(halfW, val.location.x - geo.size.width * 0.5))
+                                                tapTargetY = max(-48.0, min(26.0, val.location.y - geo.size.height * 0.5))
+                                                tapTargetTime = Date().timeIntervalSinceReferenceDate
+                                                if petState.species == .dog && isDogSitting {
+                                                    isDogSitting = false
+                                                }
+                                                triggerInteraction()
+                                            } else {
+                                                withAnimation(.spring(response: 0.45, dampingFraction: 0.55)) {
+                                                    dragTiltX = 0
+                                                    dragTiltY = 0
+                                                }
+                                            }
+                                        }
+                                )
                             }
                         }
+                        .frame(height: 230)
 
-                        Text("Lv.\(levelInfo.level) \(stageTitle)")
+                        Text("Lv.\(levelInfo.level) \(stageTitle)（第 \(levelInfo.stage)/20 階）")
                             .font(.headline.bold())
                             .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
 
-                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : petState.species.tagline))
+                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : "\(petState.species.tagline)（點擊舞台任意處引導移動）"))
                             .font(.caption)
                             .multilineTextAlignment(.center)
                             .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
 
-                        // 直接互動按鈕組
+                        // 直接互動按鈕組（以流暢走動/盤旋俯衝動作取代生硬的卡片翻轉）
                         HStack(spacing: 8) {
                             Button {
                                 triggerInteraction()
@@ -3759,9 +4013,9 @@ struct PetCompanionSheet: View {
                             .buttonStyle(.plain)
 
                             Button {
-                                triggerInteraction(spin: true)
+                                triggerInteraction(swoop: true)
                             } label: {
-                                Text("🎲 3D轉圈")
+                                Text(petState.species == .bird ? "🪽 盤旋飛翔" : (petState.species == .dog ? "🦴 飛奔巡邏" : "🐾 躍動招手"))
                                     .font(.caption.bold())
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
@@ -3799,7 +4053,7 @@ struct PetCompanionSheet: View {
                                         isDogSitting.toggle()
                                         bounceScale = 1.12
                                     }
-                                    quoteText = isDogSitting ? "乖乖坐下顧聚寶盆，尾巴繼續搖汪！" : "精力充沛站起來守護股息袋汪！"
+                                    quoteText = isDogSitting ? "乖乖坐下顧聚寶盆，尾巴繼續搖汪！" : "精力充沛站起來在舞台走動汪！"
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
                                         withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
                                             bounceScale = 1.0
@@ -3831,14 +4085,12 @@ struct PetCompanionSheet: View {
                             }
                         }
                     }
-                    .padding(16)
-                    .background(stageAtmosphere)
-                    .cornerRadius(24)
+                    .padding(.vertical, 6)
 
                     // 成長進度與餵食
                     VStack(spacing: 10) {
                         HStack {
-                            Text("成長進度 (Stage \(levelInfo.stage)/5)")
+                            Text("晉升階位 (第 \(levelInfo.stage)/20 階)")
                                 .font(.caption.bold())
                             Spacer()
                             Text("\(levelInfo.currentXP) / \(levelInfo.needXP) XP")

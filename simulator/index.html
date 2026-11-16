@@ -394,10 +394,22 @@
     pointer-events: none;
     animation: coinRainFall 0.78s ease-in forwards;
   }
-  .pet-stage-bg-default { background: radial-gradient(circle at 50% 42%, rgba(254, 243, 199, 0.55) 0%, rgba(242, 242, 247, 0.2) 72%); }
-  .pet-stage-bg-fortune { background: radial-gradient(circle at 50% 42%, rgba(220, 38, 38, 0.22) 0%, rgba(245, 158, 11, 0.14) 45%, transparent 78%); }
-  .pet-stage-bg-obsidian { background: radial-gradient(circle at 50% 42%, #2C2C2E 0%, #1C1C1E 85%); color: #FFF; }
-  .pet-stage-bg-sakura { background: radial-gradient(circle at 50% 42%, rgba(251, 207, 232, 0.55) 0%, rgba(255, 245, 247, 0.15) 75%); }
+  .pet-stage-bg-default { background: radial-gradient(ellipse at 50% 54%, rgba(254, 243, 199, 0.55) 0%, rgba(254, 243, 199, 0.12) 48%, transparent 74%); }
+  .pet-stage-bg-fortune { background: radial-gradient(ellipse at 50% 54%, rgba(220, 38, 38, 0.20) 0%, rgba(245, 158, 11, 0.12) 44%, transparent 74%); }
+  .pet-stage-bg-obsidian { background: radial-gradient(ellipse at 50% 54%, rgba(44, 44, 46, 0.94) 0%, rgba(28, 28, 30, 0.55) 56%, transparent 78%); color: #FFF; }
+  .pet-stage-bg-sakura { background: radial-gradient(ellipse at 50% 54%, rgba(251, 207, 232, 0.58) 0%, rgba(255, 245, 247, 0.16) 48%, transparent 74%); }
+  @keyframes coinLurePulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+    50% { transform: translate(-50%, -50%) scale(1.25) translateY(-4px); opacity: 1; }
+  }
+  .pet-lure-coin {
+    position: absolute;
+    font-size: 20px;
+    pointer-events: none;
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.75));
+    animation: coinLurePulse 0.65s ease-in-out infinite;
+    z-index: 6;
+  }
 
   /* 3D 關節動態圖層 */
   .pet-rig {
@@ -658,6 +670,7 @@
   let holdingHistories = JSON.parse(localStorage.getItem('twstock_user_holding_histories_v4')) || {};
   let petState = JSON.parse(localStorage.getItem('twstock_pet_state_v1')) || {
     species: 'cat',
+    hasChosenStarter: false,
     totalXP: 0,
     spendableDP: 0,
     pendingFeedDP: 60,
@@ -665,6 +678,7 @@
     unlockedThemes: ['fortune', 'default'],
     activeTheme: 'fortune'
   };
+  if (typeof petState.hasChosenStarter !== 'boolean') petState.hasChosenStarter = false;
 
   function resolveStockName(h) {
     if (!h) return '';
@@ -695,7 +709,12 @@
       accent: '#F59E0B',
       tagline: '右爪一招，月配股息穩穩入庫。',
       downLine: '大盤整理中，先戴安全帽守著金庫等除息喵！',
-      stageNames: ['小瓷招財貓', '金判招財貓', '御守招財王', '雙幣聚財貓', '白金招財尊爵']
+      stageNames: [
+        '零股小瓷貓', '糖果盒見習貓', '銅板存摺貓', '月配巡邏貓', '聚財鈴鐺貓',
+        '金判見習掌櫃', '複利記帳貓', '除息守門貓', '填息招手王', '御守銀庫貓',
+        '紅繩富貴貓', '百張收租貓', '千萬兩小財主', '黃金金庫執事', '股息永動機貓',
+        '雙幣大掌櫃', '御用金磚貓神', '傳說聚寶貓皇', '白金複利宗師', '宇宙金庫招財尊爵'
+      ]
     },
     bird: {
       id: 'bird',
@@ -704,7 +723,12 @@
       accent: '#0284C7',
       tagline: '緊抱每枚配息金幣，精算再投入複利。',
       downLine: '貼息不賣股！金幣抱緊緊等填息爆發啾！',
-      stageNames: ['愛幣小雀', '金冠吸金鳥', '分析師金鳥', '聚寶飛羽鳥', '黃金複利鳳凰']
+      stageNames: [
+        '叼幣小麻雀', '銅板尋寶鳥', '零股偵察雀', '配息報喜鳥', '複利小飛羽',
+        '算盤啄金鳥', '現金流快遞鳥', '填息俯衝鷹', '金冠分析鳥', '精算再投資雀',
+        '紅袋裝滿鳥', '雪球滾動鷲', '除息獵金隼', '高息巡航鳳', '財務自由飛羽',
+        '百倍複利鷹王', '極光尋寶金鸞', '永動現金流凰', '黃金天際鳳凰', '傳說天界聚寶神鳥'
+      ]
     },
     dog: {
       id: 'dog',
@@ -713,7 +737,12 @@
       accent: '#EA580C',
       tagline: '長抱不放手，幫你咬住每一張配息存摺。',
       downLine: '就算帳面浮虧，我也幫你咬住籌碼不放汪！',
-      stageNames: ['小赤財氣犬', '咬券小財柴', '金鈴護息犬', '御守守財柴', '白金聚財神犬']
+      stageNames: [
+        '咬存摺小柴', '看門小赤犬', '零股守護柴', '忠實存股幼犬', '旺財小黃狗',
+        '咬緊籌碼犬', '金鈴警衛柴', '高息巡邏犬', '穩健配息牧犬', '御守旺財大將',
+        '聚寶盆守門犬', '福袋護法柴', '扛跌鐵壁神犬', '長年複利守護者', '百張不賣忠犬',
+        '黃金財庫犬尊', '白金鎮庫獅犬', '御賜招財大將軍', '天命守息神柴', '萬年聚財太上犬尊'
+      ]
     }
   };
 
@@ -721,9 +750,9 @@
     let lv = 1;
     let remaining = Math.max(0, Math.floor(totalXP || 0));
     while (lv < 99) {
-      const need = Math.round(40 * Math.pow(lv, 1.45));
+      const need = Math.round(30 * Math.pow(lv, 1.35));
       if (remaining < need) {
-        const stage = lv >= 80 ? 5 : lv >= 50 ? 4 : lv >= 25 ? 3 : lv >= 10 ? 2 : 1;
+        const stage = Math.min(20, Math.max(1, lv));
         return {
           level: lv,
           currentXP: remaining,
@@ -735,7 +764,7 @@
       remaining -= need;
       lv++;
     }
-    return { level: 99, currentXP: 0, needXP: 1, pct: 100, stage: 5 };
+    return { level: 99, currentXP: 0, needXP: 1, pct: 100, stage: 20 };
   }
 
   function syncPetDividendPoints() {
@@ -926,10 +955,29 @@
 
   function selectPetSpecies(species) {
     if (!PET_SPECIES_META[species]) return;
+    if (petState.hasChosenStarter && petState.species !== species) {
+      const q = document.getElementById('petModalQuote');
+      const curName = (PET_SPECIES_META[petState.species] || PET_SPECIES_META.cat).label;
+      if (q) q.innerText = `每位投資人初始僅能選擇一隻專屬寵物陪伴，專心培育【${curName}】至第 20 階吧！`;
+      return;
+    }
     petState.species = species;
     saveState();
     renderApp();
     openPetModal(true);
+  }
+
+  function adoptStarterPet() {
+    petState.hasChosenStarter = true;
+    saveState();
+    renderApp();
+    openPetModal(true);
+    interactModalPet('swoop');
+    const stg = document.getElementById('petModalStage');
+    spawnPetParticles(stg, ['🪙'], true);
+    const q = document.getElementById('petModalQuote');
+    const m = PET_SPECIES_META[petState.species] || PET_SPECIES_META.cat;
+    if (q) q.innerText = `太棒了！【${m.label}】正式成為你的專屬財富夥伴！`;
   }
 
   function buyOrApplyPetTheme(themeId, cost) {
@@ -954,14 +1002,37 @@
     openPetModal(false);
   }
 
+  let petRoamRAF = null;
+  const petRoam = {
+    x: 0,
+    y: 0,
+    dragYaw: 0,
+    dragPitch: 0,
+    targetX: 0,
+    targetY: 0,
+    tapUntil: 0,
+    swoopUntil: 0,
+    swoopStart: 0
+  };
+
   function interactModalPet(mode) {
     const stg = document.getElementById('petModalStage');
     const img = document.getElementById('petModalImg');
     const quote = document.getElementById('petModalQuote');
-    if (img) {
-      img.classList.remove('pet-bounce', 'pet-spin3d');
+    if (mode === 'swoop') {
+      if (petState.species === 'dog' && isDogSitting) {
+        isDogSitting = false;
+        applyDogPoseToRig(img, false);
+        const btn = document.getElementById('dogSitBtn');
+        if (btn) btn.innerText = '🐶 坐下';
+      }
+      const now = performance.now();
+      petRoam.swoopStart = now;
+      petRoam.swoopUntil = now + 1350;
+    } else if (img) {
+      img.classList.remove('pet-bounce');
       void img.offsetWidth;
-      img.classList.add(mode === 'spin' ? 'pet-spin3d' : 'pet-bounce');
+      img.classList.add('pet-bounce');
     }
     if (mode === 'coin') {
       spawnPetParticles(stg, ['🪙'], true);
@@ -969,41 +1040,186 @@
       spawnPetParticles(stg, ['❤️', '✨', '💰', '🍀'], false);
     }
     if (quote) {
-      const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
-      quote.innerText = lines[Math.floor(Math.random() * lines.length)];
+      if (mode === 'swoop') {
+        quote.innerText = petState.species === 'bird'
+          ? '啾啾～高空盤旋巡視高息除權息！'
+          : (petState.species === 'dog' ? '汪汪！活力全開在舞台飛奔守護存摺！' : '喵～全速躍動招財！股息通通吸過來！');
+      } else {
+        const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
+        quote.innerText = lines[Math.floor(Math.random() * lines.length)];
+      }
     }
+  }
+
+  function startPetStageLoop() {
+    if (petRoamRAF) cancelAnimationFrame(petRoamRAF);
+    const tick = (now) => {
+      const stageEl = document.getElementById('petPlayground');
+      const actorEl = document.getElementById('petPlaygroundActor');
+      const rigEl = document.getElementById('petModalImg');
+      const shadowEl = document.getElementById('petPlaygroundShadow');
+      const lureEl = document.getElementById('petLureCoin');
+      if (!stageEl || !stageEl.isConnected || !actorEl || !rigEl) {
+        petRoamRAF = null;
+        return;
+      }
+
+      const t = now * 0.001;
+      const w = stageEl.clientWidth || 300;
+      const maxX = Math.max(46, Math.min(108, (w - 135) * 0.5));
+      const swoopActive = now < petRoam.swoopUntil;
+      const swoopU = swoopActive ? Math.max(0, Math.min(1, (now - petRoam.swoopStart) / 1350)) : 0;
+      const swoopEnv = swoopActive ? Math.sin(Math.PI * swoopU) : 0;
+
+      const tapActive = now < petRoam.tapUntil;
+      const tapRem = tapActive ? (petRoam.tapUntil - now) / 2100 : 0;
+      const tapBlend = tapActive ? Math.sin(Math.PI * (1 - tapRem)) : 0;
+      if (lureEl) {
+        lureEl.style.display = tapActive ? 'block' : 'none';
+        if (tapActive) {
+          lureEl.style.left = `calc(50% + ${petRoam.targetX.toFixed(1)}px)`;
+          lureEl.style.top = `calc(54% + ${petRoam.targetY.toFixed(1)}px)`;
+        }
+      }
+
+      let autoX = 0, autoY = 0, hopY = 0, roll = 0, yaw = 0, pitch = 0, sX = 1, sY = 1;
+      const sp = petState.species || 'cat';
+      if (sp === 'cat') {
+        const wc = t * 0.65;
+        const vel = Math.cos(wc);
+        autoX = Math.sin(wc) * maxX * 0.78;
+        const stepWave = Math.abs(Math.sin(t * 5.2));
+        const mw = Math.min(1, Math.abs(vel) * 1.4);
+        hopY = -stepWave * 7.5 * mw;
+        roll = Math.sin(t * 5.2) * 4.2 * mw + vel * 4.5;
+        yaw = vel * 14;
+        pitch = -stepWave * 4 * mw;
+        sY = 1 - mw * stepWave * 0.045;
+        sX = 1 + mw * stepWave * 0.03;
+        if (swoopActive) {
+          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3)) * 22 * swoopEnv;
+          yaw += Math.sin(swoopU * Math.PI * 4) * 14 * swoopEnv;
+        }
+      } else if (sp === 'bird') {
+        const ft = t * 0.92;
+        const velX = Math.cos(ft);
+        autoX = Math.sin(ft) * maxX * 0.86;
+        autoY = -18 + Math.sin(ft * 2 + 0.3) * 20 + Math.cos(t * 1.35) * 6;
+        roll = velX * 15 + Math.sin(t * 3) * 3;
+        yaw = velX * 19;
+        pitch = Math.cos(ft * 2 + 0.3) * 10;
+        if (swoopActive) {
+          autoX += Math.sin(swoopU * Math.PI * 2) * 32 * swoopEnv;
+          autoY -= swoopEnv * 26;
+          roll += Math.cos(swoopU * Math.PI * 2) * 16 * swoopEnv;
+        }
+      } else {
+        if (isDogSitting) {
+          autoX = Math.sin(t * 0.25) * 10;
+          hopY = Math.sin(t * 2.4) * 1.5;
+          roll = Math.sin(t * 1.4) * 1.8;
+          yaw = Math.sin(t * 0.8) * 6;
+        } else {
+          const tt = t * 0.88 + 0.28 * Math.sin(t * 0.42);
+          const tv = Math.cos(tt);
+          autoX = Math.sin(tt) * maxX * 0.82;
+          const bnc = Math.abs(Math.sin(t * 7.6));
+          const mw = Math.min(1, Math.abs(tv) * 1.5);
+          hopY = -bnc * 7 * mw;
+          roll = tv * 6 + Math.sin(t * 7.6) * 3.2 * mw;
+          yaw = tv * 17;
+          sY = 1 - mw * bnc * 0.04;
+          sX = 1 + mw * bnc * 0.03;
+        }
+        if (swoopActive) {
+          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3.5)) * 24 * swoopEnv;
+          yaw += Math.sin(swoopU * Math.PI * 4) * 16 * swoopEnv;
+        }
+      }
+
+      const targetX = petRoam.targetX;
+      const targetYClamped = sp === 'bird' ? petRoam.targetY : Math.min(14, Math.max(-16, petRoam.targetY * 0.35));
+      const baseFloorY = 10;
+      const finalX = autoX * (1 - tapBlend * 0.85) + targetX * (tapBlend * 0.85);
+      const rawY = (sp === 'bird' ? autoY : baseFloorY) * (1 - tapBlend * 0.75) + targetYClamped * (tapBlend * 0.75) + hopY;
+
+      const clampedYaw = Math.max(-22, Math.min(22, yaw + petRoam.dragYaw + (tapBlend > 0.05 ? (targetX - autoX) * 0.14 : 0)));
+      const clampedPitch = Math.max(-16, Math.min(16, pitch + petRoam.dragPitch));
+      const px = clampedYaw / 22;
+      const py = -clampedPitch / 16;
+
+      actorEl.style.transform = `translate3d(${finalX.toFixed(1)}px, ${rawY.toFixed(1)}px, 0)`;
+      rigEl.style.transform = `perspective(520px) rotateX(${clampedPitch.toFixed(1)}deg) rotateY(${clampedYaw.toFixed(1)}deg) rotateZ(${roll.toFixed(1)}deg) scale(${sX.toFixed(3)}, ${sY.toFixed(3)})`;
+
+      // 2.5D 分層視差（肢體層與本體層以不同深度偏移，消除平面感）
+      const layers = rigEl.querySelectorAll('.pet-layer');
+      if (layers.length === 2) {
+        if (sp === 'dog') {
+          layers[0].style.translate = `${(px * 1.5).toFixed(1)}px ${(py * 1.2).toFixed(1)}px`;
+          layers[1].style.translate = `${(px * 3.5).toFixed(1)}px ${(py * 2.5).toFixed(1)}px`;
+        } else {
+          layers[0].style.translate = `${(px * 2.0).toFixed(1)}px ${(py * 1.5).toFixed(1)}px`;
+          layers[1].style.translate = `${(px * 5.2).toFixed(1)}px ${(py * 3.8).toFixed(1)}px`;
+        }
+      }
+
+      const alt = Math.max(0, baseFloorY - rawY);
+      const shScale = Math.max(0.48, Math.min(1.05, 1 - alt / 95));
+      const shOp = Math.max(0.32, Math.min(0.95, 0.92 - alt / 110));
+      if (shadowEl) {
+        shadowEl.style.transform = `translate3d(${finalX.toFixed(1)}px, 0, 0) scale(${shScale.toFixed(3)})`;
+        shadowEl.style.opacity = shOp.toFixed(2);
+      }
+      petRoamRAF = requestAnimationFrame(tick);
+    };
+    petRoamRAF = requestAnimationFrame(tick);
   }
 
   function bindPet3DTilt(stageEl) {
     if (!stageEl || stageEl.dataset.tiltBound) return;
     stageEl.dataset.tiltBound = '1';
-    const img = () => document.getElementById('petModalImg');
     let dragging = false;
+    let downX = 0, downY = 0;
     const updateTilt = (clientX, clientY) => {
-      const el = img();
-      if (!el) return;
       const rect = stageEl.getBoundingClientRect();
-      const nx = ((clientX - rect.left) / rect.width - 0.5) * 2; // -1..1
+      const nx = ((clientX - rect.left) / rect.width - 0.5) * 2;
       const ny = ((clientY - rect.top) / rect.height - 0.5) * 2;
-      const ry = Math.max(-26, Math.min(26, nx * 26));
-      const rx = Math.max(-18, Math.min(18, -ny * 18));
-      el.style.transform = `perspective(700px) rotateY(${ry}deg) rotateX(${rx}deg) scale(1.06)`;
-    };
-    const resetTilt = () => {
-      dragging = false;
-      const el = img();
-      if (el) el.style.transform = '';
+      petRoam.dragYaw = Math.max(-20, Math.min(20, nx * 20));
+      petRoam.dragPitch = Math.max(-14, Math.min(14, -ny * 14));
     };
     stageEl.addEventListener('pointerdown', e => {
       dragging = true;
+      downX = e.clientX;
+      downY = e.clientY;
       updateTilt(e.clientX, e.clientY);
     });
     stageEl.addEventListener('pointermove', e => {
       if (dragging || e.pointerType === 'mouse') updateTilt(e.clientX, e.clientY);
     });
-    stageEl.addEventListener('pointerup', resetTilt);
-    stageEl.addEventListener('pointerleave', resetTilt);
-    stageEl.addEventListener('pointercancel', resetTilt);
+    stageEl.addEventListener('pointerup', e => {
+      const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+      dragging = false;
+      petRoam.dragYaw = 0;
+      petRoam.dragPitch = 0;
+      if (dist <= 8) {
+        const rect = stageEl.getBoundingClientRect();
+        const maxX = Math.max(46, Math.min(108, (rect.width - 135) * 0.5));
+        petRoam.targetX = Math.max(-maxX, Math.min(maxX, e.clientX - rect.left - rect.width * 0.5));
+        petRoam.targetY = Math.max(-46, Math.min(24, e.clientY - rect.top - rect.height * 0.54));
+        petRoam.tapUntil = performance.now() + 2100;
+        if (petState.species === 'dog' && isDogSitting) {
+          isDogSitting = false;
+          applyDogPoseToRig(document.getElementById('petModalImg'), false);
+          const btn = document.getElementById('dogSitBtn');
+          if (btn) btn.innerText = '🐶 坐下';
+        }
+        interactModalPet('pat');
+      }
+    });
+    const resetDrag = () => { dragging = false; petRoam.dragYaw = 0; petRoam.dragPitch = 0; };
+    stageEl.addEventListener('pointerleave', resetDrag);
+    stageEl.addEventListener('pointercancel', resetDrag);
+    startPetStageLoop();
   }
 
   function openPetModal(justBounced = false) {
@@ -1027,31 +1243,44 @@
       { id: 'sakura', name: '晨曦櫻花', cost: 150 }
     ];
 
+    const swoopLabel = petState.species === 'bird' ? '🪽 盤旋飛翔' : (petState.species === 'dog' ? '🦴 飛奔巡邏' : '🐾 躍動招手');
+
     openSheet(`
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div>
-          <h3 style="font-size: 16px; font-weight: 800;">✨ 3D 財富寵物互動舞台</h3>
-          <div style="font-size: 11px; color: #8E8E93;">拖曳旋轉 3D 角度 · 點擊摸頭互動</div>
+          <h3 style="font-size: 16px; font-weight: 800;">✨ 2.5D 財富寵物互動舞台</h3>
+          <div style="font-size: 11px; color: #8E8E93;">點擊舞台引導移動 · 拖曳調整立體視角</div>
         </div>
         <button class="nav-btn" onclick="closeSheet()">關閉</button>
       </div>
 
-      <!-- 3 隻無框 3D 公仔切換列 -->
+      <!-- 寵物選擇列（一開始僅可三選一領養陪伴，確認後鎖定專屬夥伴） -->
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; margin-bottom: 4px; color: ${petState.hasChosenStarter ? '#D97706' : '#1C1C1E'};">
+        <span>${petState.hasChosenStarter ? '🤝 專屬陪伴夥伴（一對一鎖定培育）' : '🎯 請選擇一種寵物陪伴出發（三選一）'}</span>
+        ${petState.hasChosenStarter ? `<span style="color: #8E8E93;">第 ${lvInfo.stage}/20 階</span>` : ''}
+      </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
         ${['cat', 'bird', 'dog'].map(sp => {
           const m = PET_SPECIES_META[sp];
           const active = petState.species === sp;
+          const locked = petState.hasChosenStarter && !active;
           return `
-            <div onclick="selectPetSpecies('${sp}')" style="cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 16px; background: ${active ? 'radial-gradient(circle, rgba(251,191,36,0.28) 0%, transparent 72%)' : 'transparent'}; transition: all 0.2s;">
-              <img src="pet_${sp}.png" alt="${m.label}" style="width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.22)); transform: scale(${active ? 1.12 : 0.94}); transition: transform 0.2s;">
-              <span style="font-size: 11px; font-weight: 800; margin-top: 2px; color: ${active ? '#D97706' : '#8E8E93'};">${m.label}</span>
+            <div onclick="selectPetSpecies('${sp}')" style="position: relative; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 16px; background: ${active ? 'radial-gradient(circle, rgba(251,191,36,0.28) 0%, transparent 72%)' : 'transparent'}; opacity: ${locked ? 0.36 : 1}; transition: all 0.2s;">
+              <img src="pet_${sp}.png" alt="${m.label}" style="width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.22)); transform: scale(${active ? 1.14 : 0.90}); transition: transform 0.2s;">
+              ${locked ? '<span style="position: absolute; top: 4px; right: 16%; font-size: 12px;">🔒</span>' : ''}
+              <span style="font-size: 11px; font-weight: 800; margin-top: 2px; color: ${active ? '#D97706' : '#8E8E93'};">${active && petState.hasChosenStarter ? '✓ ' : ''}${m.label}</span>
             </div>
           `;
         }).join('')}
       </div>
+      ${!petState.hasChosenStarter ? `
+        <button class="sim-btn" style="width: 100%; justify-content: center; padding: 9px 12px; font-size: 13px; font-weight: 800; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 4px 10px rgba(245,158,11,0.3); margin-bottom: 10px;" onclick="adoptStarterPet()">
+          ✨ 確認領養【${meta.label}】開始陪伴
+        </button>
+      ` : ''}
 
-      <!-- 開放式 3D 互動舞台（無卡片框） -->
-      <div id="petModalStage" class="${bgCls} pet-3d-stage" style="border-radius: 22px; padding: 12px 14px 16px 14px; text-align: center; position: relative; margin-bottom: 12px; overflow: hidden;">
+      <!-- 無外框 2.5D 自由走動／飛翔舞台 -->
+      <div id="petModalStage" class="${bgCls}" style="padding: 6px 6px 10px 6px; text-align: center; position: relative; margin-bottom: 10px;">
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 2px;">
           <span style="padding: 3px 9px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
             ${meta.badge}
@@ -1059,23 +1288,24 @@
           <span style="font-weight: 800; color: #D97706;">🪙 ${petState.spendableDP || 0} DP</span>
         </div>
 
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; margin: 4px 0 6px 0;" onclick="interactModalPet('pat')">
-          <div class="pet-float" style="position: relative; width: 185px; height: 185px;">
+        <div id="petPlayground" class="pet-3d-stage" style="position: relative; width: 100%; height: 215px; display: flex; align-items: center; justify-content: center; overflow: visible; cursor: pointer;">
+          <span id="petLureCoin" class="pet-lure-coin" style="display: none;">🪙</span>
+          <div id="petPlaygroundActor" style="position: relative; width: 146px; height: 146px; pointer-events: none;">
             ${renderPetRigHTML(petState.species, justBounced ? 'pet-bounce' : '', petState.species === 'dog' && isDogSitting, 'petModalImg')}
+            ${isDownMarket ? '<span style="position: absolute; top: 4px; left: 10px; font-size: 22px; z-index: 5; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
           </div>
-          <div class="pet-pedestal pet-shadow-pulse" style="width: 146px; height: 26px; margin-top: -12px;"></div>
-          ${isDownMarket ? '<span style="position: absolute; top: 6px; left: 26%; font-size: 24px; z-index: 5; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
+          <div id="petPlaygroundShadow" class="pet-pedestal" style="position: absolute; bottom: 10px; width: 120px; height: 20px; margin: 0;"></div>
         </div>
 
-        <div style="font-size: 16px; font-weight: 900; margin-top: 6px;">Lv.${lvInfo.level} ${stageTitle}</div>
+        <div style="font-size: 15px; font-weight: 900; margin-top: 2px;">Lv.${lvInfo.level} ${stageTitle}（第 ${lvInfo.stage}/20 階）</div>
         <div id="petModalQuote" style="font-size: 12px; opacity: 0.85; margin: 4px 0 10px 0; min-height: 16px;">
-          ${isDownMarket ? meta.downLine : meta.tagline}
+          ${isDownMarket ? meta.downLine : `${meta.tagline}（點舞台引導移動）`}
         </div>
 
         <!-- 直接互動按鈕組 -->
         <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
-          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸招財</button>
-          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.9); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('spin');">🎲 3D轉圈</button>
+          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸招財</button>
+          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('swoop');">${swoopLabel}</button>
           <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); interactModalPet('coin');">🪙 撒金幣</button>
           ${petState.species === 'dog' ? `<button id="dogSitBtn" class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #9A3412; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); toggleDogSit(false);">${isDogSitting ? '🐕 站起來' : '🐶 坐下'}</button>` : ''}
         </div>
@@ -1093,7 +1323,7 @@
       <!-- 經驗條與餵食按鈕 -->
       <div style="background: #F2F2F7; border-radius: 14px; padding: 12px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px;">
-          <span>成長進度 (Stage ${lvInfo.stage}/5)</span>
+          <span>晉升階位 (第 ${lvInfo.stage}/20 階)</span>
           <span style="color: #007AFF;">${lvInfo.currentXP} / ${lvInfo.needXP} XP</span>
         </div>
         <div class="goal-bar-bg" style="margin: 4px 0 10px 0;"><div class="goal-bar-fill" style="width: ${lvInfo.pct}%;"></div></div>
@@ -1121,7 +1351,7 @@
         }).join('')}
       </div>
     `);
-    setTimeout(() => bindPet3DTilt(document.getElementById('petModalStage')), 30);
+    setTimeout(() => bindPet3DTilt(document.getElementById('petPlayground')), 30);
   }
 
   function petMetaSafe(meta) {
@@ -1202,9 +1432,11 @@
     const petDark = petState.activeTheme === 'obsidian' || (petState.activeTheme || 'fortune') === 'fortune';
     const petPending = petState.pendingFeedDP || 0;
     const petStageTitle = petMeta.stageNames[petLv.stage - 1] || petMeta.stageNames[0];
-    const petBubbleText = petPending > 0
-      ? `有 ${petPending} DP 股息飼料待餵食`
-      : (petDownMarket ? petMeta.downLine : `距下級還差 ${Math.max(0, petLv.needXP - petLv.currentXP)} XP`);
+    const petBubbleText = !petState.hasChosenStarter
+      ? '🎯 點擊選擇你的專屬財富寵物（三選一出發）'
+      : (petPending > 0
+        ? `有 ${petPending} DP 股息飼料待餵食`
+        : (petDownMarket ? petMeta.downLine : `距第 ${Math.min(20, petLv.stage + 1)} 階還差 ${Math.max(0, petLv.needXP - petLv.currentXP)} XP`));
 
     return `
       <div class="nav-bar">
@@ -1276,7 +1508,7 @@
               </button>
             ` : ''}
             <button class="sim-btn" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 99px; background: rgba(0,122,255,0.12); color: #007AFF;" onclick="openPetModal()">
-              🎮 3D 互動 / 換寵 ›
+              ${petState.hasChosenStarter ? '✨ 2.5D 互動舞台 ›' : '🎯 三選一領養陪伴 ›'}
             </button>
           </div>
         </div>

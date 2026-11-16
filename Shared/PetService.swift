@@ -55,14 +55,30 @@ public enum PetSpecies: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    /// 20 個細分晉升階位名稱（對應 Lv.1 ~ Lv.20+）
     public var stageNames: [String] {
         switch self {
         case .cat:
-            return ["小瓷招財貓", "金判招財貓", "御守招財王", "雙幣聚財貓", "白金招財尊爵"]
+            return [
+                "零股小瓷貓", "糖果盒見習貓", "銅板存摺貓", "月配巡邏貓", "聚財鈴鐺貓",
+                "金判見習掌櫃", "複利記帳貓", "除息守門貓", "填息招手王", "御守銀庫貓",
+                "紅繩富貴貓", "百張收租貓", "千萬兩小財主", "黃金金庫執事", "股息永動機貓",
+                "雙幣大掌櫃", "御用金磚貓神", "傳說聚寶貓皇", "白金複利宗師", "宇宙金庫招財尊爵"
+            ]
         case .bird:
-            return ["愛幣小雀", "金冠吸金鳥", "分析師金鳥", "聚寶飛羽鳥", "黃金複利鳳凰"]
+            return [
+                "叼幣小麻雀", "銅板尋寶鳥", "零股偵察雀", "配息報喜鳥", "複利小飛羽",
+                "算盤啄金鳥", "現金流快遞鳥", "填息俯衝鷹", "金冠分析鳥", "精算再投資雀",
+                "紅袋裝滿鳥", "雪球滾動鷲", "除息獵金隼", "高息巡航鳳", "財務自由飛羽",
+                "百倍複利鷹王", "極光尋寶金鸞", "永動現金流凰", "黃金天際鳳凰", "傳說天界聚寶神鳥"
+            ]
         case .dog:
-            return ["小赤財氣犬", "咬券小財柴", "金鈴護息犬", "御守守財柴", "白金聚財神犬"]
+            return [
+                "咬存摺小柴", "看門小赤犬", "零股守護柴", "忠實存股幼犬", "旺財小黃狗",
+                "咬緊籌碼犬", "金鈴警衛柴", "高息巡邏犬", "穩健配息牧犬", "御守旺財大將",
+                "聚寶盆守門犬", "福袋護法柴", "扛跌鐵壁神犬", "長年複利守護者", "百張不賣忠犬",
+                "黃金財庫犬尊", "白金鎮庫獅犬", "御賜招財大將軍", "天命守息神柴", "萬年聚財太上犬尊"
+            ]
         }
     }
 }
@@ -118,6 +134,7 @@ public struct PetAuraBadge: Identifiable {
 
 public struct DividendPetState: Codable {
     public var species: PetSpecies = .cat
+    public var hasChosenStarter: Bool = false
     public var totalXP: Int = 0
     public var spendableDP: Int = 0
     public var pendingFeedDP: Int = 60 // 新手見面禮 60 DP，首次開啟即可體驗餵食
@@ -126,6 +143,22 @@ public struct DividendPetState: Codable {
     public var activeTheme: PetCardTheme = .fortune
 
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case species, hasChosenStarter, totalXP, spendableDP, pendingFeedDP, claimedRecordIDs, unlockedThemes, activeTheme
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        species = try c.decodeIfPresent(PetSpecies.self, forKey: .species) ?? .cat
+        hasChosenStarter = try c.decodeIfPresent(Bool.self, forKey: .hasChosenStarter) ?? false
+        totalXP = try c.decodeIfPresent(Int.self, forKey: .totalXP) ?? 0
+        spendableDP = try c.decodeIfPresent(Int.self, forKey: .spendableDP) ?? 0
+        pendingFeedDP = try c.decodeIfPresent(Int.self, forKey: .pendingFeedDP) ?? 60
+        claimedRecordIDs = try c.decodeIfPresent([String].self, forKey: .claimedRecordIDs) ?? []
+        unlockedThemes = try c.decodeIfPresent([String].self, forKey: .unlockedThemes) ?? [PetCardTheme.fortune.rawValue, PetCardTheme.defaultLight.rawValue]
+        activeTheme = try c.decodeIfPresent(PetCardTheme.self, forKey: .activeTheme) ?? .fortune
+    }
 }
 
 public final class PetService {
@@ -154,20 +187,15 @@ public final class PetService {
         var lv = 1
         var remaining = max(0, totalXP)
         while lv < 99 {
-            let need = Int((40.0 * pow(Double(lv), 1.45)).rounded())
+            let need = Int((30.0 * pow(Double(lv), 1.35)).rounded())
             if remaining < need {
-                let stage: Int
-                if lv >= 80 { stage = 5 }
-                else if lv >= 50 { stage = 4 }
-                else if lv >= 25 { stage = 3 }
-                else if lv >= 10 { stage = 2 }
-                else { stage = 1 }
+                let stage = min(20, max(1, lv))
                 return PetLevelInfo(level: lv, currentXP: remaining, needXP: need, stage: stage)
             }
             remaining -= need
             lv += 1
         }
-        return PetLevelInfo(level: 99, currentXP: 0, needXP: 1, stage: 5)
+        return PetLevelInfo(level: 99, currentXP: 0, needXP: 1, stage: 20)
     }
 
     @discardableResult
@@ -215,10 +243,22 @@ public final class PetService {
         return (state, amount)
     }
 
-    public func selectSpecies(_ species: PetSpecies) -> DividendPetState {
+    /// 領養專屬夥伴（選定後即鎖定為唯一的初始陪伴夥伴）
+    public func adoptStarter(_ species: PetSpecies) -> DividendPetState {
         var state = loadState()
         state.species = species
+        state.hasChosenStarter = true
         saveState(state)
+        return state
+    }
+
+    public func selectSpecies(_ species: PetSpecies) -> DividendPetState {
+        var state = loadState()
+        // 一開始選定後即鎖定專屬陪伴夥伴，僅在尚未確認領養時可切換預覽
+        if !state.hasChosenStarter {
+            state.species = species
+            saveState(state)
+        }
         return state
     }
 
