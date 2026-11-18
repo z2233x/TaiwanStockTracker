@@ -1,6 +1,15 @@
 import Foundation
 import WidgetKit
 
+public struct NextMonthDividendForecast {
+    public let monthKey: String
+    public let estimatedDividend: Double
+    public let totalEligibleShares: Int
+    public let pendingAddedShares: Int
+    public let isMidMonthAnnounced: Bool
+    public let activeSymbols: [String]
+}
+
 public struct MonthlyTimelineSummary: Identifiable, Codable {
     public var id: String { monthKey }
     public let monthKey: String          // e.g. "2026年 11月"
@@ -544,6 +553,7 @@ public final class StorageService {
         monthFormatter.locale = Locale(identifier: "zh_TW")
         
         var rawSummaries: [MonthlyTimelineSummary] = []
+        var fallbackLatestSummary: MonthlyTimelineSummary? = nil
         var runningCumulativeDividend: Double = 0.0
         
         // 4. 從歷史最早月份依序往當前月份推算 (依當月實際可領除息股數計算)
@@ -593,25 +603,35 @@ public final class StorageService {
             
             guard ownedHoldingsCount > 0 else { continue }
             monthDividendSum = (monthDividendSum * 10.0).rounded() / 10.0
-            runningCumulativeDividend += monthDividendSum
             let monthProfit = monthVal - monthCost
             
-            rawSummaries.append(
-                MonthlyTimelineSummary(
-                    monthKey: monthTitle,
-                    totalMarketValue: monthVal.rounded(),
-                    totalCost: monthCost.rounded(),
-                    priceGainProfit: monthProfit.rounded(),
-                    totalFee: monthFee.rounded(),
-                    monthDividend: monthDividendSum.rounded(),
-                    cumulativeDividend: runningCumulativeDividend.rounded(),
-                    activeHoldingCount: ownedHoldingsCount,
-                    activeSymbols: divActiveSymbols,
-                    pendingNextDividend: pendingDividendSum.rounded(),
-                    pendingSharesCount: pendingSharesTotal,
-                    pendingSymbols: pendingSymbols
-                )
+            let summary = MonthlyTimelineSummary(
+                monthKey: monthTitle,
+                totalMarketValue: monthVal.rounded(),
+                totalCost: monthCost.rounded(),
+                priceGainProfit: monthProfit.rounded(),
+                totalFee: monthFee.rounded(),
+                monthDividend: monthDividendSum.rounded(),
+                cumulativeDividend: (runningCumulativeDividend + monthDividendSum).rounded(),
+                activeHoldingCount: ownedHoldingsCount,
+                activeSymbols: divActiveSymbols,
+                pendingNextDividend: pendingDividendSum.rounded(),
+                pendingSharesCount: pendingSharesTotal,
+                pendingSymbols: pendingSymbols
             )
+            fallbackLatestSummary = summary
+            
+            // 尚未開始任何首期配息前的純買入月份（例如 10/20 買 00406A，首期配息在 11 月），不列入 $0 歷史配息列以免稀釋平均月配息
+            if monthDividendSum <= 0 && runningCumulativeDividend == 0 {
+                continue
+            }
+            
+            runningCumulativeDividend += monthDividendSum
+            rawSummaries.append(summary)
+        }
+        
+        if rawSummaries.isEmpty, let latest = fallbackLatestSummary {
+            rawSummaries.append(latest)
         }
         
         // 5. 依月份新到舊排序 (近月排前面)
@@ -622,6 +642,51 @@ public final class StorageService {
         result.removeAll { deletedKeys.contains($0.monthKey) }
         
         return result
+    }
+
+    /// 推算下個月（例如 11 月中旬後已公布之 12 月預估配息，納入本月新買／加碼股數）
+    public func getNextMonthDividendForecast(holdings: [StockHolding]? = nil) -> NextMonthDividendForecast? {
+        let activeHoldings = holdings ?? loadHoldings()
+        guard !activeHoldings.isEmpty else { return nil }
+        let events = loadEvents()
+        let cal = Calendar.current
+        let now = Date()
+        guard let nextMonthDate = cal.date(byAdding: .month, value: 1, to: now) else { return nil }
+
+        let nextY = cal.component(.year, from: nextMonthDate)
+        let nextM = cal.component(.month, from: nextMonthDate)
+        let curY = cal.component(.year, from: now)
+        let curM = cal.component(.month, from: now)
+        let dayOfMonth = cal.component(.day, from: now)
+
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy年 M月"
+        fmt.locale = Locale(identifier: "zh_TW")
+
+        var totalDiv = 0.0
+        var totalElig = 0
+        var totalPendingAdded = 0
+        var symbols: [String] = []
+
+        for h in activeHoldings {
+            let nextElig = h.eligibleSharesForMonth(year: nextY, month: nextM, events: events)
+            let curElig = h.eligibleSharesForMonth(year: curY, month: curM, events: events)
+            if nextElig > 0 {
+                totalDiv += DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: nextElig)
+                totalElig += nextElig
+                totalPendingAdded += max(0, nextElig - curElig)
+                symbols.append(h.symbol)
+            }
+        }
+
+        return NextMonthDividendForecast(
+            monthKey: fmt.string(from: nextMonthDate),
+            estimatedDividend: totalDiv.rounded(),
+            totalEligibleShares: totalElig,
+            pendingAddedShares: totalPendingAdded,
+            isMidMonthAnnounced: dayOfMonth >= 15,
+            activeSymbols: symbols
+        )
     }
     
     // MARK: - 資料備份 (JSON 匯出/匯入)

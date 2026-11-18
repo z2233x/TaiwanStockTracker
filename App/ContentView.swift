@@ -1248,13 +1248,15 @@ struct DataBackupSheet: View {
 struct DividendTimelineView: View {
     @State private var holdings: [StockHolding] = StorageService.shared.loadHoldings()
     @State private var monthlySummaries: [MonthlyTimelineSummary] = []
+    @State private var nextForecast: NextMonthDividendForecast? = nil
     
     var totalDividendsSum: Double {
         monthlySummaries.reduce(0.0) { $0 + $1.monthDividend }
     }
     
     var averageMonthlyDividend: Double {
-        monthlySummaries.isEmpty ? 0 : (totalDividendsSum / Double(monthlySummaries.count))
+        let activeMonths = monthlySummaries.filter { $0.monthDividend > 0 }
+        return activeMonths.isEmpty ? 0 : (totalDividendsSum / Double(activeMonths.count))
     }
     
     var body: some View {
@@ -1324,6 +1326,51 @@ struct DividendTimelineView: View {
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                        }
+
+                        // 1.5 下期配息公告／預估（如 10 月中旬後預估 11 月，或 11 月中旬後含新加碼預估 12 月）
+                        if let forecast = nextForecast, forecast.estimatedDividend > 0 {
+                            Section {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Label("下期預估：\(forecast.monthKey)", systemImage: "megaphone.fill")
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(Color(hex: "#C2410C"))
+                                        Spacer()
+                                        Text(forecast.isMidMonthAnnounced ? "✓ 已過中旬公告期" : "⏳ 待本月中旬公告")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(forecast.isMidMonthAnnounced ? Color.green.opacity(0.15) : Color.orange.opacity(0.16))
+                                            .foregroundColor(forecast.isMidMonthAnnounced ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+                                            .cornerRadius(6)
+                                    }
+
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text("下月預期領取")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text("$\(Int(forecast.estimatedDividend).formatted())")
+                                            .font(.title3.bold())
+                                            .foregroundColor(Color(hex: "#EA580C"))
+                                    }
+
+                                    Text("參與下月除息股數共 \(forecast.totalEligibleShares.formatted()) 股\(forecast.pendingAddedShares > 0 ? "（含本月新買／加碼 \(forecast.pendingAddedShares.formatted()) 股）" : "")，待實際除息後入帳。")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(14)
+                                .background(Color.orange.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.orange.opacity(0.28), lineWidth: 1)
+                                )
+                                .cornerRadius(14)
+                                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 8, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                            }
                         }
                         
                         // 2. 時間軸月份卡片清單 (支援向左滑動刪除)
@@ -1449,6 +1496,7 @@ struct DividendTimelineView: View {
                     Button {
                         StorageService.shared.resetDeletedTimelineMonths()
                         monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
+                        nextForecast = StorageService.shared.getNextMonthDividendForecast(holdings: holdings)
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption.bold())
@@ -1458,6 +1506,7 @@ struct DividendTimelineView: View {
             .onAppear {
                 holdings = StorageService.shared.loadHoldings()
                 monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
+                nextForecast = StorageService.shared.getNextMonthDividendForecast(holdings: holdings)
             }
         }
     }
