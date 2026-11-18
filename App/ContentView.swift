@@ -354,7 +354,8 @@ struct DashboardView: View {
                             }
                         }
                         
-                        Divider().padding(.vertical, 2)
+                        Divider()
+
                         
                         // 試算數據網格
                         HStack {
@@ -533,6 +534,17 @@ struct DashboardView: View {
                     holdings: holdings,
                     histories: StorageService.shared.loadHoldingHistories()
                 )
+                if let ts = StorageService.shared.lastQuoteUpdatedAt {
+                    let f = DateFormatter()
+                    f.dateFormat = "HH:mm:ss"
+                    lastRefreshedTime = f.string(from: ts)
+                }
+            }
+            .task {
+                let last = StorageService.shared.lastQuoteUpdatedAt
+                if !holdings.isEmpty && (last == nil || Date().timeIntervalSince(last!) > 30) {
+                    await refreshQuotes()
+                }
             }
         }
     }
@@ -617,15 +629,21 @@ struct DividendSourceBreakdownCard: View {
             }
 
             if summary.totalPendingShares > 0 {
+                let cal = Calendar.current
+                let today = Date()
+                let isMidMonth = cal.component(.day, from: today) >= 15
+                let nextM = (cal.component(.month, from: today) % 12) + 1
                 HStack(spacing: 6) {
-                    Text("⏳")
-                    Text("本月除息後新買／加碼 \(summary.totalPendingShares.formatted()) 股（+$\(Int(summary.totalPendingMonthlyDividend).formatted())/月），須待下月配息公布後方可領取。")
+                    Text(isMidMonth ? "📢" : "⏳")
+                    Text(isMidMonth
+                         ? "\(nextM) 月配息已公布：除息後新買／加碼 \(summary.totalPendingShares.formatted()) 股（+$\(Int(summary.totalPendingMonthlyDividend).formatted())/月）將於 \(nextM) 月除息領取。"
+                         : "本月除息後新買／加碼 \(summary.totalPendingShares.formatted()) 股（+$\(Int(summary.totalPendingMonthlyDividend).formatted())/月），待本月中旬公布 \(nextM) 月配息後領取。")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: "#9A3412"))
+                        .foregroundColor(Color(hex: isMidMonth ? "#1D4ED8" : "#9A3412"))
                 }
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.12))
+                .background((isMidMonth ? Color.blue : Color.orange).opacity(0.11))
                 .cornerRadius(8)
             }
             
@@ -764,9 +782,11 @@ struct DividendSourceBreakdownCard: View {
                                         .font(.caption.bold())
                                         .foregroundColor(Color(hex: "#007AFF"))
                                     if c.pendingNextMonthShares > 0 {
-                                        Text("⏳ \(c.pendingNextMonthShares.formatted()) 股待下月公布")
+                                        let isMid = Calendar.current.component(.day, from: Date()) >= 15
+                                        let nextM = (Calendar.current.component(.month, from: Date()) % 12) + 1
+                                        Text(isMid ? "📢 \(c.pendingNextMonthShares.formatted()) 股領 \(nextM) 月息(已公布)" : "⏳ \(c.pendingNextMonthShares.formatted()) 股待中旬公布")
                                             .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(Color(hex: "#EA580C"))
+                                            .foregroundColor(Color(hex: isMid ? "#1D4ED8" : "#EA580C"))
                                     } else {
                                         Text("免稅比例 \(String(format: "%.0f", c.taxExemptPercentage))%")
                                             .font(.system(size: 10))
@@ -1062,6 +1082,7 @@ struct JournalManagementView: View {
                 .padding(.vertical, 8)
                 
                 Divider()
+
                 
                 // 3. 交易日記流水清單 (連動真實持股)
                 if filteredJournals.isEmpty {
@@ -1302,7 +1323,8 @@ struct DividendTimelineView: View {
                                     }
                                 }
                                 
-                                Divider().background(Color.white.opacity(0.3))
+                                Divider()
+
                                 
                                 HStack {
                                     Label("\(monthlySummaries.count) 個月份紀錄", systemImage: "calendar.badge.clock")
@@ -1446,7 +1468,8 @@ struct DividendTimelineView: View {
                                                 .cornerRadius(6)
                                         }
                                         
-                                        Divider().padding(.vertical, 1)
+                                        Divider()
+
                                         
                                         // 資產指標網格
                                         HStack {
@@ -1632,21 +1655,37 @@ struct StockHoldingRowView: View {
             if isExpanded {
                 VStack(spacing: 10) {
                     Divider()
+
                     HStack {
                         Text("現值: $\(Int(item.marketValue).formatted())")
                         Spacer()
                         Text("均價: $\(String(format: "%.2f", item.averageCost))")
                         Spacer()
-                        Text("現價: $\(String(format: "%.2f", item.currentPrice))")
+                        let diff = item.currentPrice - item.previousClose
+                        let diffPct = item.todayChangePercentage
+                        HStack(spacing: 3) {
+                            Text("現價: $\(String(format: "%.2f", item.currentPrice))")
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            if item.previousClose > 0 && abs(diff) >= 0.005 {
+                                Text(String(format: "(%@%.2f%%)", diff >= 0 ? "▲" : "▼", abs(diffPct)))
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(diff >= 0 ? Color(hex: "#FF3B30") : Color(hex: "#34C759"))
+                            }
+                        }
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
                     
-                    // 股息來源與掩護性買權推算（依買入／加碼日期區分本月可領 vs 待下月公布）
+                    // 股息來源與掩護性買權推算（依買入／加碼日期＋中旬公告期區分本月可領 vs 下月已公布領取）
                     let allEvents = StorageService.shared.loadEvents()
                     let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item, events: allEvents)
-                    let curY = Calendar.current.component(.year, from: Date())
-                    let curM = Calendar.current.component(.month, from: Date())
+                    let cal = Calendar.current
+                    let todayNow = Date()
+                    let curY = cal.component(.year, from: todayNow)
+                    let curM = cal.component(.month, from: todayNow)
+                    let isMidMonthAnnounced = cal.component(.day, from: todayNow) >= 15
+                    let nextM = (curM % 12) + 1
                     let cutoffNow = StockHolding.exDividendCutoffDate(for: item.symbol, year: curY, month: curM, events: allEvents)
 
                     if !item.lots.isEmpty {
@@ -1655,7 +1694,10 @@ struct StockHoldingRowView: View {
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.secondary)
                             ForEach(item.lots) { lot in
-                                let isElig = Calendar.current.startOfDay(for: lot.buyDate) < cutoffNow
+                                let isElig = cal.startOfDay(for: lot.buyDate) < cutoffNow
+                                let badgeText = isElig ? "✓ 本月計息" : (isMidMonthAnnounced ? "📢 領 \(nextM) 月息(已公布)" : "⏳ 待 \(nextM) 月公布")
+                                let badgeBg = isElig ? Color.green.opacity(0.14) : (isMidMonthAnnounced ? Color.blue.opacity(0.14) : Color.orange.opacity(0.14))
+                                let badgeFg = isElig ? Color(hex: "#15803D") : (isMidMonthAnnounced ? Color(hex: "#1D4ED8") : Color(hex: "#C2410C"))
                                 HStack(spacing: 6) {
                                     Text(lot.shortDateString)
                                         .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -1666,12 +1708,12 @@ struct StockHoldingRowView: View {
                                         .font(.system(size: 10))
                                         .foregroundColor(.secondary)
                                     Spacer()
-                                    Text(isElig ? "✓ 本月計息" : "⏳ 待下月公布")
+                                    Text(badgeText)
                                         .font(.system(size: 10, weight: .bold))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(isElig ? Color.green.opacity(0.14) : Color.orange.opacity(0.14))
-                                        .foregroundColor(isElig ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+                                        .background(badgeBg)
+                                        .foregroundColor(badgeFg)
                                         .cornerRadius(4)
                                 }
                             }
@@ -1699,9 +1741,11 @@ struct StockHoldingRowView: View {
                         }
 
                         if calc.pendingNextMonthShares > 0 {
-                            Text("⏳ 本月除息後加碼 \(calc.pendingNextMonthShares.formatted()) 股須待下月配息公布領取（下期滿倉預估 $\(Int(calc.fullMonthlyDividend).formatted()) /月）")
+                            Text(isMidMonthAnnounced
+                                 ? "📢 \(nextM) 月配息已公布：此筆 \(calc.pendingNextMonthShares.formatted()) 股將於 \(nextM) 月除息領取（下月合計 $\(Int(calc.fullMonthlyDividend).formatted()) /月）"
+                                 : "⏳ 本月除息後加碼 \(calc.pendingNextMonthShares.formatted()) 股待本月中旬公布 \(nextM) 月配息後領取（下期滿倉預估 $\(Int(calc.fullMonthlyDividend).formatted()) /月）")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Color(hex: "#C2410C"))
+                                .foregroundColor(Color(hex: isMidMonthAnnounced ? "#1D4ED8" : "#C2410C"))
                         }
                         
                         // 來源百分比拆解
@@ -1810,6 +1854,7 @@ struct HoldingsListView: View {
     @State private var isShowingPhotoOCR = false
     @State private var searchText = ""
     @State private var isRefreshing = false
+    @State private var lastQuoteTimeText = ""
     @State private var isShowingBackup = false
     @State private var isShowingRankSheet = false
     
@@ -1911,6 +1956,40 @@ struct HoldingsListView: View {
                 .background(Color(.secondarySystemBackground))
                 
                 Divider()
+
+                // 1.5 即時報價狀態列（隨時掌握最新現價並支援一鍵重整）
+                if !holdings.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: isRefreshing ? "antenna.radiowaves.left.and.right" : "checkmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(isRefreshing ? Color(hex: "#007AFF") : Color(hex: "#34C759"))
+                        Text(isRefreshing
+                             ? "正在連線證交所/Yahoo 同步最新現價..."
+                             : (lastQuoteTimeText.isEmpty ? "點擊更新即時現價 (證交所 MIS / Yahoo)" : "即時現價已更新 \(lastQuoteTimeText)"))
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button {
+                            Task { await refreshQuotes() }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("更新股價")
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color(hex: "#007AFF"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color(hex: "#007AFF").opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(isRefreshing)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color(.systemBackground))
+                    Divider()
+                }
                 
                 // 2. 現有持股主要清單
                     if holdings.isEmpty {
@@ -2053,6 +2132,7 @@ struct HoldingsListView: View {
                 EditHoldingSheet(holding: h) { updated in
                     StorageService.shared.updateHolding(updated)
                     reloadAllData()
+                    Task { await refreshQuotes() }
                 } onDelete: {
                     StorageService.shared.deleteHolding(id: h.id)
                     reloadAllData()
@@ -2062,16 +2142,19 @@ struct HoldingsListView: View {
                 AddHoldingSheet { newHolding, isDCA in
                     StorageService.shared.addOrUpdateHolding(newHolding, isDCA: isDCA, autoAddJournal: true)
                     reloadAllData()
+                    Task { await refreshQuotes() }
                 }
             }
             .sheet(isPresented: $isShowingBrokerageSync) {
                 BrokerageSyncSheet {
                     reloadAllData()
+                    Task { await refreshQuotes() }
                 }
             }
             .sheet(isPresented: $isShowingPhotoOCR) {
                 PhotoOCRScannerSheet { _ in
                     reloadAllData()
+                    Task { await refreshQuotes() }
                 }
             }
             .sheet(isPresented: $isShowingBackup) {
@@ -2084,6 +2167,17 @@ struct HoldingsListView: View {
             }
             .onAppear {
                 reloadAllData()
+                if let ts = StorageService.shared.lastQuoteUpdatedAt {
+                    let f = DateFormatter()
+                    f.dateFormat = "HH:mm:ss"
+                    lastQuoteTimeText = f.string(from: ts)
+                }
+            }
+            .task {
+                let last = StorageService.shared.lastQuoteUpdatedAt
+                if !holdings.isEmpty && (last == nil || Date().timeIntervalSince(last!) > 30) {
+                    await refreshQuotes()
+                }
             }
         }
     }
@@ -2102,6 +2196,11 @@ struct HoldingsListView: View {
         isRefreshing = true
         _ = await StorageService.shared.refreshAllStockQuotes()
         reloadAllData()
+        if let ts = StorageService.shared.lastQuoteUpdatedAt {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm:ss"
+            lastQuoteTimeText = f.string(from: ts)
+        }
         isRefreshing = false
     }
 }
@@ -2183,6 +2282,7 @@ struct EditHoldingSheet: View {
                                         .onChange(of: lot.shares) { _ in recalculateFromLots() }
                                 }
                                 Divider()
+
                                 HStack(spacing: 4) {
                                     Text("單價").font(.caption).foregroundColor(.secondary)
                                     TextField("價格", value: $lot.price, format: .number)

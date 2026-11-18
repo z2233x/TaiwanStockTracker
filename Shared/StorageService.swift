@@ -292,32 +292,39 @@ public final class StorageService {
         return count
     }
     
-    // MARK: - 即時報價更新 (Yahoo Finance 批次查詢)
+    // MARK: - 即時報價更新 (證交所 MIS 即時行情 + Yahoo Finance 併發備援)
+    private let lastQuoteUpdatedKey = "last_quote_updated_ts_v1"
+
+    public var lastQuoteUpdatedAt: Date? {
+        let ts = userDefaults?.double(forKey: lastQuoteUpdatedKey) ?? 0
+        return ts > 0 ? Date(timeIntervalSince1970: ts) : nil
+    }
+
     public func refreshAllStockQuotes() async -> (successCount: Int, failedCount: Int) {
         var current = loadHoldings()
         guard !current.isEmpty else { return (0, 0) }
         
+        let symbols = current.map { $0.symbol }
+        let quoteMap = await StockQuoteService.shared.fetchQuotes(symbols: symbols)
+        
         var success = 0
         var failed = 0
-        
         for i in 0..<current.count {
-            let symbol = current[i].symbol
-            do {
-                let quote = try await StockQuoteService.shared.fetchQuote(symbol: symbol)
-                if quote.currentPrice > 0 {
-                    current[i].currentPrice = quote.currentPrice
-                    if quote.previousClose > 0 {
-                        current[i].previousClose = quote.previousClose
-                    }
-                    current[i].updatedAt = Date()
-                    success += 1
+            let sym = current[i].symbol
+            if let quote = quoteMap[sym], quote.currentPrice > 0 {
+                current[i].currentPrice = quote.currentPrice
+                if quote.previousClose > 0 {
+                    current[i].previousClose = quote.previousClose
                 }
-            } catch {
+                current[i].updatedAt = quote.fetchedAt
+                success += 1
+            } else {
                 failed += 1
             }
         }
         
         if success > 0 {
+            userDefaults?.set(Date().timeIntervalSince1970, forKey: lastQuoteUpdatedKey)
             saveHoldings(current)
         }
         return (success, failed)

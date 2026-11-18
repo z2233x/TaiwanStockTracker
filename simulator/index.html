@@ -1531,11 +1531,16 @@
           <div>本月可領推算: <b style="color:var(--ios-blue);">$${Math.round(estMonthlyDiv).toLocaleString()}</b>${divSummary.totalPendingShares > 0 ? ` <span style="color:#C2410C; font-weight:700;">(+待下月 $${Math.round(divSummary.totalPendingMonthlyDividend).toLocaleString()})</span>` : ''}</div>
           <div>本金差額: <b>$${Math.round(principalGap).toLocaleString()}</b></div>
         </div>
-        ${divSummary.totalPendingShares > 0 ? `
-          <div style="margin-top: 6px; padding: 6px 8px; background: rgba(245,158,11,0.12); color: #9A3412; font-size: 10.5px; font-weight: 600; border-radius: 6px;">
-            ⏳ 本月除息後新買／加碼 ${divSummary.totalPendingShares.toLocaleString()} 股，須待下月配息公布後方可領取（滿倉月息 $${Math.round(divSummary.totalFullMonthlyDividend).toLocaleString()}）
-          </div>
-        ` : ''}
+        ${divSummary.totalPendingShares > 0 ? (() => {
+          const dNow = new Date();
+          const isMid = dNow.getDate() >= 15;
+          const nextM = (dNow.getMonth() + 1) % 12 + 1;
+          return `
+            <div style="margin-top: 6px; padding: 6px 8px; background: ${isMid ? 'rgba(0,122,255,0.10)' : 'rgba(245,158,11,0.12)'}; color: ${isMid ? '#1D4ED8' : '#9A3412'}; font-size: 10.5px; font-weight: 600; border-radius: 6px;">
+              ${isMid ? '📢' : '⏳'} ${isMid ? `${nextM} 月配息已公布` : `待本月中旬公布 ${nextM} 月配息`}：除息後新買／加碼 ${divSummary.totalPendingShares.toLocaleString()} 股（+$${Math.round(divSummary.totalPendingMonthlyDividend).toLocaleString()}/月）將於 ${nextM} 月除息領取（滿倉月息 $${Math.round(divSummary.totalFullMonthlyDividend).toLocaleString()}）
+            </div>
+          `;
+        })() : ''}
       </div>
 
       <!-- 領息頻率卡片 -->
@@ -1726,7 +1731,15 @@
     const nowObj = new Date();
     const curY = nowObj.getFullYear();
     const curM = nowObj.getMonth() + 1;
-    return items.map(h => {
+    const isMidMonthAnnounced = nowObj.getDate() >= 15;
+    const nextMNum = (curM % 12) + 1;
+    const quoteStrip = `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; margin-bottom: 8px; background: #FFF; border-radius: 10px; font-size: 11px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+        <span style="color: #666;">📡 ${lastSimQuoteUpdateText ? `即時現價已更新 ${lastSimQuoteUpdateText}` : '點擊同步最新台股即時現價 (證交所 MIS / Yahoo)'}</span>
+        <button class="sim-btn" style="padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 99px; background: rgba(0,122,255,0.12); color: #007AFF;" onclick="refreshQuotesSim()">🔄 更新股價</button>
+      </div>
+    `;
+    return quoteStrip + items.map(h => {
       const isExpanded = expandedHoldings.has(h.symbol);
       const hProfile = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
       const lots = getHoldingLots(h);
@@ -1782,10 +1795,13 @@
                   <div style="font-size: 10px; font-weight: 700; color: #8E8E93; margin-bottom: 4px;">買入與加碼批次 (${lots.length} 筆)</div>
                   ${lots.map(l => {
                     const isElig = (l.buyDate || '').slice(0, 10) < cutoffNow;
+                    const badgeTxt = isElig ? '✓ 本月計息' : (isMidMonthAnnounced ? `📢 領 ${nextMNum} 月息(已公布)` : `⏳ 待 ${nextMNum} 月公布`);
+                    const badgeBg = isElig ? 'rgba(52,199,89,0.14)' : (isMidMonthAnnounced ? 'rgba(0,122,255,0.12)' : 'rgba(245,158,11,0.16)');
+                    const badgeCol = isElig ? '#15803D' : (isMidMonthAnnounced ? '#1D4ED8' : '#C2410C');
                     return `
                       <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
                         <span><b>${(l.buyDate || '').slice(5, 10).replace('-', '/')}</b> · ${Number(l.shares).toLocaleString()}股 <span style="color:#8E8E93;">@$${l.price}</span></span>
-                        <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: ${isElig ? 'rgba(52,199,89,0.14)' : 'rgba(245,158,11,0.16)'}; color: ${isElig ? '#15803D' : '#C2410C'};">${isElig ? '✓ 本月計息' : '⏳ 待下月公布'}</span>
+                        <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: ${badgeBg}; color: ${badgeCol};">${badgeTxt}</span>
                       </div>
                     `;
                   }).join('')}
@@ -1796,7 +1812,7 @@
                   <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${hProfile.dps ? `(${eligibleShares.toLocaleString()}股 × $${hProfile.dps})` : ''}</span>
                   <span style="color: #34C759;">免稅比 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>
                 </div>
-                ${pendingShares > 0 ? `<div style="color: #C2410C; font-size: 10.5px; font-weight: 700; margin-bottom: 3px;">⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待下月配息公布領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）</div>` : ''}
+                ${pendingShares > 0 ? `<div style="color: ${isMidMonthAnnounced ? '#1D4ED8' : '#C2410C'}; font-size: 10.5px; font-weight: 700; margin-bottom: 3px;">${isMidMonthAnnounced ? `📢 ${nextMNum} 月配息已公布：此筆 ${pendingShares.toLocaleString()} 股將於 ${nextMNum} 月除息領取（下月合計 $${Math.round(hFullMonthlyDiv).toLocaleString()}）` : `⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待本月中旬公布 ${nextMNum} 月配息領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）`}</div>` : ''}
                 <div style="color: #666; font-size: 10px;">${hProfile.notes}</div>
               </div>
               <div style="display: flex; gap: 8px; margin-top: 2px;">
@@ -2787,15 +2803,64 @@
     document.getElementById('dynamicIsland').classList.toggle('expanded');
   }
 
-  // 模擬即時報價刷新
-  function refreshQuotesSim() {
+  let lastSimQuoteUpdateText = '';
+
+  // 即時報價刷新（優先查詢證交所 MIS / Yahoo Finance，不亂加假隨機誤差）
+  async function refreshQuotesSim() {
+    if (!holdings || holdings.length === 0) return;
+    const fallbackRefs = { '00406A': 6.85, '00406': 6.85 };
+    if (typeof allTaiwanStocks !== 'undefined') {
+      allTaiwanStocks.forEach(s => { if (s.referencePrice > 0) fallbackRefs[s.symbol] = s.referencePrice; });
+    }
+    let liveCount = 0;
+    const exCh = holdings.map(h => `tse_${h.symbol}.tw|otc_${h.symbol}.tw`).join('|');
+    const misUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${encodeURIComponent(exCh)}&json=1&delay=0&_=${Date.now()}`;
+    const proxyUrls = [
+      `https://corsproxy.io/?${encodeURIComponent(misUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(misUrl)}`
+    ];
+    let misMap = {};
+    for (const url of proxyUrls) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4500);
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.msgArray)) {
+            data.msgArray.forEach(item => {
+              const c = (item.c || '').toUpperCase().trim();
+              const z = parseFloat(item.z) || 0;
+              const pz = parseFloat(item.pz) || 0;
+              const y = parseFloat(item.y) || 0;
+              const px = z > 0 ? z : (pz > 0 ? pz : y);
+              if (c && px > 0 && (!misMap[c] || z > 0)) {
+                misMap[c] = +px.toFixed(2);
+              }
+            });
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+
     holdings.forEach(h => {
-      const delta = (Math.random() - 0.48) * 0.3;
-      h.currentPrice = Math.max(1, +(h.currentPrice + delta).toFixed(2));
+      const sym = (h.symbol || '').toUpperCase();
+      if (misMap[sym]) {
+        h.currentPrice = misMap[sym];
+        liveCount++;
+      } else if (fallbackRefs[sym]) {
+        h.currentPrice = fallbackRefs[sym];
+      }
     });
+    const d = new Date();
+    lastSimQuoteUpdateText = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
     saveState();
     renderApp();
-    triggerNotification('📈 股價已刷新', '全體持股現價已串接 Yahoo Finance 完成同步更新！');
+    triggerNotification('📈 股價已更新', liveCount > 0
+      ? `已同步證交所即時成交現價 (${liveCount} 檔)！`
+      : '已同步最新收盤參考現價（瀏覽器跨網域受限時使用基準價，iOS 實機直連證交所即時）！');
   }
 
   // 彈出 Sheet
@@ -2912,7 +2977,7 @@
   // 新增存股 Sheet
   function openAddHoldingSheet(presetSymbol = '') {
     const presets = [
-      { sym: '00406A', name: '主動中信台灣收益', freq: '月配', price: 7.54 },
+      { sym: '00406A', name: '主動中信台灣收益', freq: '月配', price: 6.85 },
       { sym: '0056', name: '元大高股息', freq: '季配', price: 37.5 },
       { sym: '00878', name: '國泰永續高股息', freq: '季配', price: 22.8 },
       { sym: '00919', name: '群益台灣精選高息', freq: '季配', price: 24.2 },
