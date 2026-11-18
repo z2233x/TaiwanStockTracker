@@ -108,8 +108,11 @@ public struct HoldingDividendCalculation: Identifiable {
     public var id: String { holding.symbol }
     public let holding: StockHolding
     public let profile: HoldingDividendProfile
-    public let monthlyDividend: Double       // 該檔預估月股息
-    public let annualDividend: Double        // 該檔預估年股息
+    public let eligibleSharesNow: Int        // 本月已趕上除息基準日之有效股數
+    public let pendingNextMonthShares: Int   // 本月除息後加碼、須待下月配息公布領取之股數
+    public let monthlyDividend: Double       // 本月實際可領預估月股息 (依 eligibleSharesNow)
+    public let fullMonthlyDividend: Double   // 下期含新加碼滿倉預估月股息
+    public let annualDividend: Double        // 滿倉推算年化股息
     public let effectiveAnnualYield: Double  // 實質年化殖利率
     public let amount76Monthly: Double       // 每月 76 權利金金額
     public let amount54CMonthly: Double      // 每月 54C 股利金額
@@ -122,12 +125,15 @@ public struct HoldingDividendCalculation: Identifiable {
 
 // MARK: - 全體持股投資組合股息來源彙整報告
 public struct PortfolioDividendSourceSummary {
-    public let totalMonthlyDividend: Double      // 總預估月被動股息
-    public let totalAnnualDividend: Double       // 總預估年被動股息
-    public let total76Amount: Double             // 選擇權權利金(76)總金額
-    public let total54CAmount: Double            // 54C股利總金額
-    public let totalReserveAmount: Double        // 收益平準金總金額
-    public let totalSurplusAmount: Double        // 資本公積總金額
+    public let totalMonthlyDividend: Double             // 本月實際可領預估月配息總額
+    public let totalFullPositionMonthlyDividend: Double // 含本月新加碼後之滿倉預估月配息
+    public let totalPendingMonthlyDividend: Double      // 須待下月配息公布才領取之新加碼預估月配息
+    public let totalPendingShares: Int                  // 須待下月配息公布之總股數
+    public let totalAnnualDividend: Double              // 總預估年被動股息
+    public let total76Amount: Double                    // 選擇權權利金(76)總金額
+    public let total54CAmount: Double                   // 54C股利總金額
+    public let totalReserveAmount: Double               // 收益平準金總金額
+    public let totalSurplusAmount: Double               // 資本公積總金額
     
     public let total76Percent: Double            // 76 佔比 (%)
     public let total54CPercent: Double           // 54C 佔比 (%)
@@ -242,48 +248,52 @@ public final class DividendSourceService {
         }
     }
     
-    /// 計算單一持股之預估股息與各項來源 (精準支援每股配息金額 dps)
-    public func calculateHoldingDividend(holding: StockHolding) -> HoldingDividendCalculation {
+    /// 依指定股數計算該標的等效單月股息（給各月份股息歷程與當月實領計算共用）
+    public func calculateMonthlyDividendAmount(for holding: StockHolding, shares: Int) -> Double {
+        guard shares > 0 else { return 0.0 }
         let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
-        let totalVal = holding.marketValue
-        
-        let annual: Double
-        let monthly: Double
-        
-        // 優先採用每股明確預估配息 (例如 00406A 最新預計月配 0.138 元/股)
         if let dps = profile.defaultCashDividendPerShare, dps > 0 {
             switch holding.frequency {
             case .monthly:
-                monthly = Double(holding.shares) * dps
-                annual = monthly * 12.0
+                return Double(shares) * dps
             case .bimonthly:
-                annual = Double(holding.shares) * dps * 6.0
-                monthly = annual / 12.0
+                return (Double(shares) * dps * 6.0) / 12.0
             case .quarterly:
-                annual = Double(holding.shares) * dps * 4.0
-                monthly = annual / 12.0
+                return (Double(shares) * dps * 4.0) / 12.0
             case .semiannual:
-                annual = Double(holding.shares) * dps * 2.0
-                monthly = annual / 12.0
+                return (Double(shares) * dps * 2.0) / 12.0
             case .annual:
-                annual = Double(holding.shares) * dps
-                monthly = annual / 12.0
+                return (Double(shares) * dps) / 12.0
             }
-        } else {
-            annual = totalVal * profile.estimatedYield
-            monthly = annual / 12.0
         }
-        
+        return (Double(shares) * holding.currentPrice * profile.estimatedYield) / 12.0
+    }
+
+    /// 計算單一持股之預估股息與各項來源 (納入買入／加碼日期，區分「本月已參與除息」與「待下月公布領取」)
+    public func calculateHoldingDividend(
+        holding: StockHolding,
+        asOf date: Date = Date(),
+        events: [DividendEvent] = []
+    ) -> HoldingDividendCalculation {
+        let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        let eligibleShares = holding.eligibleSharesForMonth(year: y, month: m, events: events)
+        let pendingShares = max(0, holding.shares - eligibleShares)
+        let totalVal = holding.marketValue
+
+        let monthly = calculateMonthlyDividendAmount(for: holding, shares: eligibleShares)
+        let fullMonthly = calculateMonthlyDividendAmount(for: holding, shares: holding.shares)
+        let annual = fullMonthly * 12.0
         let effYield = totalVal > 0 ? (annual / totalVal) : profile.estimatedYield
-        
+
         let amt76 = monthly * profile.ratio76
         let amt54C = monthly * profile.ratio54C
         let amtReserve = monthly * profile.ratioReserve
         let amtSurplus = monthly * profile.ratioSurplus
-        
         let exemptPct = (profile.ratio76 + profile.ratioReserve + profile.ratioSurplus) * 100.0
-        
-        // 估算單次配息金額
+
         let timesPerYear: Double
         switch holding.frequency {
         case .monthly: timesPerYear = 12.0
@@ -294,11 +304,14 @@ public final class DividendSourceService {
         }
         let singleDist54C = (annual * profile.ratio54C) / timesPerYear
         let isAboveNhi = singleDist54C >= 20000.0
-        
+
         return HoldingDividendCalculation(
             holding: holding,
             profile: profile,
+            eligibleSharesNow: eligibleShares,
+            pendingNextMonthShares: pendingShares,
             monthlyDividend: monthly,
+            fullMonthlyDividend: fullMonthly,
             annualDividend: annual,
             effectiveAnnualYield: effYield,
             amount76Monthly: amt76,
@@ -310,35 +323,45 @@ public final class DividendSourceService {
             isAboveNhiThreshold: isAboveNhi
         )
     }
-    
+
     /// 計算全體持股組合之總體股息來源結構
-    public func analyzePortfolio(holdings: [StockHolding]) -> PortfolioDividendSourceSummary {
-        let calcs = holdings.map { calculateHoldingDividend(holding: $0) }
-        
+    public func analyzePortfolio(
+        holdings: [StockHolding],
+        asOf date: Date = Date(),
+        events: [DividendEvent]? = nil
+    ) -> PortfolioDividendSourceSummary {
+        let activeEvents = events ?? StorageService.shared.loadEvents()
+        let calcs = holdings.map { calculateHoldingDividend(holding: $0, asOf: date, events: activeEvents) }
+
         let totalMonthly = calcs.reduce(0.0) { $0 + $1.monthlyDividend }
-        let totalAnnual = totalMonthly * 12.0
-        
+        let totalFullMonthly = calcs.reduce(0.0) { $0 + $1.fullMonthlyDividend }
+        let totalPendingMonthly = max(0.0, totalFullMonthly - totalMonthly)
+        let totalPendingShares = calcs.reduce(0) { $0 + $1.pendingNextMonthShares }
+        let totalAnnual = totalFullMonthly * 12.0
+
         let total76 = calcs.reduce(0.0) { $0 + $1.amount76Monthly }
         let total54C = calcs.reduce(0.0) { $0 + $1.amount54CMonthly }
         let totalReserve = calcs.reduce(0.0) { $0 + $1.amountReserveMonthly }
         let totalSurplus = calcs.reduce(0.0) { $0 + $1.amountSurplusMonthly }
-        
+
         let pct76 = totalMonthly > 0 ? (total76 / totalMonthly) * 100.0 : 0.0
         let pct54C = totalMonthly > 0 ? (total54C / totalMonthly) * 100.0 : 0.0
         let pctReserve = totalMonthly > 0 ? (totalReserve / totalMonthly) * 100.0 : 0.0
         let pctSurplus = totalMonthly > 0 ? (totalSurplus / totalMonthly) * 100.0 : 0.0
         let taxExemptPct = pct76 + pctReserve + pctSurplus
-        
+
         let ccCalcs = calcs.filter { $0.profile.strategy == .coveredCall }
         let hasCC = !ccCalcs.isEmpty
         let ccMonthly = ccCalcs.reduce(0.0) { $0 + $1.monthlyDividend }
-        
-        // 估算藉由 76 權利金與收益平準金節省之二代健保費用 (以 2.11% 計算)
+
         let exemptAnnualAmount = (total76 + totalReserve + totalSurplus) * 12.0
         let nhiSaved = exemptAnnualAmount * 0.0211
-        
+
         return PortfolioDividendSourceSummary(
             totalMonthlyDividend: totalMonthly,
+            totalFullPositionMonthlyDividend: totalFullMonthly,
+            totalPendingMonthlyDividend: totalPendingMonthly,
+            totalPendingShares: totalPendingShares,
             totalAnnualDividend: totalAnnual,
             total76Amount: total76,
             total54CAmount: total54C,

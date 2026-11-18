@@ -60,6 +60,53 @@ public struct PopularStockPreset: Identifiable, Equatable {
     ]
 }
 
+/// 單筆買入 / 加碼存股批次紀錄（用以精準計算各月份除息可參與股數）
+public struct HoldingLot: Identifiable, Codable, Equatable {
+    public var id: UUID
+    public var buyDate: Date
+    public var shares: Int
+    public var price: Double
+    public var note: String
+
+    public init(
+        id: UUID = UUID(),
+        buyDate: Date = Date(),
+        shares: Int,
+        price: Double,
+        note: String = "買入"
+    ) {
+        self.id = id
+        self.buyDate = buyDate
+        self.shares = max(0, shares)
+        self.price = max(0.0, price)
+        self.note = note
+    }
+
+    public var dateString: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: buyDate)
+    }
+
+    public var shortDateString: String {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd"
+        return f.string(from: buyDate)
+    }
+
+    public var lotsText: String {
+        let lots = shares / 1000
+        let odd = shares % 1000
+        if lots > 0 && odd > 0 {
+            return "\(lots)張\(odd)股"
+        } else if lots > 0 {
+            return "\(lots)張"
+        } else {
+            return "\(odd)股"
+        }
+    }
+}
+
 public struct StockHolding: Identifiable, Codable, Equatable {
     public var id: UUID
     public var symbol: String              // 代號 (如 0056, 00878, 2330)
@@ -74,6 +121,8 @@ public struct StockHolding: Identifiable, Codable, Equatable {
     public var totalDividendsReceived: Double // 累計已領股息
     public var dividendCount: Int          // 累計領息次數
     public var brokerage: String           // 所屬券商 (如 元大證券、國泰證券)
+    public var purchaseDate: Date          // 初始/最早買入日期
+    public var lots: [HoldingLot]          // 買入與加碼批次明細
     public var updatedAt: Date
     
     public init(
@@ -90,6 +139,8 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         totalDividendsReceived: Double = 0.0,
         dividendCount: Int = 0,
         brokerage: String = "元大證券",
+        purchaseDate: Date? = nil,
+        lots: [HoldingLot]? = nil,
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -101,8 +152,24 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         } else {
             self.frequency = frequency
         }
-        self.shares = max(0, shares)
-        self.averageCost = averageCost
+        let initDate = purchaseDate ?? updatedAt
+        let clampedShares = max(0, shares)
+        if let providedLots = lots, !providedLots.isEmpty {
+            let sorted = providedLots.sorted { $0.buyDate < $1.buyDate }
+            self.lots = sorted
+            let sumShares = sorted.reduce(0) { $0 + $1.shares }
+            let sumCost = sorted.reduce(0.0) { $0 + Double($1.shares) * $1.price }
+            self.shares = sumShares
+            self.averageCost = sumShares > 0 ? ((sumCost / Double(sumShares)) * 100.0).rounded() / 100.0 : averageCost
+            self.purchaseDate = sorted.first?.buyDate ?? initDate
+        } else {
+            self.shares = clampedShares
+            self.averageCost = averageCost
+            self.purchaseDate = initDate
+            self.lots = clampedShares > 0
+                ? [HoldingLot(buyDate: initDate, shares: clampedShares, price: averageCost, note: "初始買入")]
+                : []
+        }
         self.currentPrice = currentPrice
         self.previousClose = previousClose > 0 ? previousClose : currentPrice
         self.stockType = stockType
@@ -115,7 +182,8 @@ public struct StockHolding: Identifiable, Codable, Equatable {
     
     enum CodingKeys: String, CodingKey {
         case id, symbol, name, frequency, shares, averageCost, currentPrice, previousClose
-        case stockType, brokerFeeDiscount, totalDividendsReceived, dividendCount, brokerage, updatedAt
+        case stockType, brokerFeeDiscount, totalDividendsReceived, dividendCount, brokerage
+        case purchaseDate, lots, updatedAt
     }
     
     public init(from decoder: Decoder) throws {
@@ -133,21 +201,143 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         self.totalDividendsReceived = try container.decodeIfPresent(Double.self, forKey: .totalDividendsReceived) ?? 0.0
         self.dividendCount = try container.decodeIfPresent(Int.self, forKey: .dividendCount) ?? 0
         self.brokerage = try container.decodeIfPresent(String.self, forKey: .brokerage) ?? "元大證券"
-        self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        let upd = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        self.updatedAt = upd
+        let pDate = try container.decodeIfPresent(Date.self, forKey: .purchaseDate) ?? upd
+        let decodedLots = try container.decodeIfPresent([HoldingLot].self, forKey: .lots) ?? []
+        if decodedLots.isEmpty && self.shares > 0 {
+            self.lots = [HoldingLot(buyDate: pDate, shares: self.shares, price: self.averageCost, note: "既有庫存")]
+            self.purchaseDate = pDate
+        } else {
+            self.lots = decodedLots.sorted { $0.buyDate < $1.buyDate }
+            self.purchaseDate = self.lots.first?.buyDate ?? pDate
+        }
     }
     
-    // 定期定額加碼存股試算：加權更新均價與股數
-    public mutating func addDCA(newShares: Int, buyPrice: Double) {
+    // 定期定額加碼存股試算：寫入加碼日期批次並加權更新均價與總股數
+    public mutating func addDCA(newShares: Int, buyPrice: Double, buyDate: Date = Date(), note: String = "加碼買進") {
         guard newShares > 0 else { return }
-        let currentCost = Double(shares) * averageCost
-        let addedCost = Double(newShares) * buyPrice
-        let total = shares + newShares
-        let newAverageCost = (currentCost + addedCost) / Double(total)
-        
-        self.shares = total
-        self.averageCost = (newAverageCost * 100.0).rounded() / 100.0
+        if lots.isEmpty && shares > 0 {
+            lots = [HoldingLot(buyDate: purchaseDate, shares: shares, price: averageCost, note: "初始買入")]
+        }
+        lots.append(HoldingLot(buyDate: buyDate, shares: newShares, price: buyPrice, note: note))
+        lots.sort { $0.buyDate < $1.buyDate }
+        syncFromLots()
         self.currentPrice = buyPrice
         self.updatedAt = Date()
+    }
+
+    /// 依批次明細重新計算總股數、加權均價與最早買入日期
+    public mutating func syncFromLots() {
+        lots = lots.filter { $0.shares > 0 }.sorted { $0.buyDate < $1.buyDate }
+        let total = lots.reduce(0) { $0 + $1.shares }
+        let cost = lots.reduce(0.0) { $0 + Double($1.shares) * $1.price }
+        self.shares = total
+        if total > 0 {
+            self.averageCost = ((cost / Double(total)) * 100.0).rounded() / 100.0
+            self.purchaseDate = lots.first?.buyDate ?? purchaseDate
+        }
+        self.updatedAt = Date()
+    }
+
+    // MARK: - 除息基準日與可參與配息股數計算
+    /// 取得該標的於指定年月的除息截算日（須於此日「前」買進，才計入該月配息）
+    public static func exDividendCutoffDate(
+        for symbol: String,
+        year: Int,
+        month: Int,
+        events: [DividendEvent] = []
+    ) -> Date {
+        let cal = Calendar.current
+        if let exEvt = events.first(where: {
+            $0.symbol == symbol &&
+            $0.eventType == .exDividendDate &&
+            cal.component(.year, from: $0.targetDate) == year &&
+            cal.component(.month, from: $0.targetDate) == month
+        }) {
+            return cal.startOfDay(for: exEvt.targetDate)
+        }
+        if let lastEvt = events.first(where: {
+            $0.symbol == symbol &&
+            $0.eventType == .lastBuyDate &&
+            cal.component(.year, from: $0.targetDate) == year &&
+            cal.component(.month, from: $0.targetDate) == month
+        }) {
+            let dayAfter = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: lastEvt.targetDate)) ?? lastEvt.targetDate
+            return dayAfter
+        }
+        // 預設月配 / ETF 月初除息截算：每月 3 號（3 號前買進計入當月，例如 10/20 計入 11 月；11/04 買進則順延至 12 月配息公布領取）
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 3
+        return cal.date(from: comps) ?? Date()
+    }
+
+    /// 指定年月底為止實際持有總股數（含本月除息後新買加碼）
+    public func ownedShares(asOfEndOfYear year: Int, month: Int) -> Int {
+        let cal = Calendar.current
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 1
+        guard let monthStart = cal.date(from: comps),
+              let interval = cal.dateInterval(of: .month, for: monthStart) else {
+            return shares
+        }
+        let effectiveLots = lots.isEmpty && shares > 0
+            ? [HoldingLot(buyDate: purchaseDate, shares: shares, price: averageCost)]
+            : lots
+        return effectiveLots
+            .filter { cal.startOfDay(for: $0.buyDate) < interval.end }
+            .reduce(0) { $0 + $1.shares }
+    }
+
+    /// 指定年月底為止實際持有本金成本（依各批次成交價累計）
+    public func costPrincipal(asOfEndOfYear year: Int, month: Int) -> Double {
+        let cal = Calendar.current
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = 1
+        guard let monthStart = cal.date(from: comps),
+              let interval = cal.dateInterval(of: .month, for: monthStart) else {
+            return totalCostPrincipal
+        }
+        let effectiveLots = lots.isEmpty && shares > 0
+            ? [HoldingLot(buyDate: purchaseDate, shares: shares, price: averageCost)]
+            : lots
+        return effectiveLots
+            .filter { cal.startOfDay(for: $0.buyDate) < interval.end }
+            .reduce(0.0) { $0 + Double($1.shares) * $1.price }
+    }
+
+    /// 指定年月真正「趕上除息截算日、可參與當月配息」的有效股數
+    public func eligibleSharesForMonth(year: Int, month: Int, events: [DividendEvent] = []) -> Int {
+        let cal = Calendar.current
+        let cutoff = Self.exDividendCutoffDate(for: symbol, year: year, month: month, events: events)
+        let effectiveLots = lots.isEmpty && shares > 0
+            ? [HoldingLot(buyDate: purchaseDate, shares: shares, price: averageCost)]
+            : lots
+        return effectiveLots
+            .filter { cal.startOfDay(for: $0.buyDate) < cutoff }
+            .reduce(0) { $0 + $1.shares }
+    }
+
+    /// 本月已持有但錯過本月除息（須待下月配息公告才能領取）的股數
+    public func pendingNextMonthShares(asOf date: Date = Date(), events: [DividendEvent] = []) -> Int {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let m = cal.component(.month, from: date)
+        let owned = ownedShares(asOfEndOfYear: y, month: m)
+        let eligible = eligibleSharesForMonth(year: y, month: m, events: events)
+        return max(0, owned - eligible)
+    }
+
+    public var earliestBuyDateString: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: lots.first?.buyDate ?? purchaseDate)
     }
     
     // 總成本本金 (不含買進手續費)

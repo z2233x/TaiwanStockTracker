@@ -1528,9 +1528,14 @@
           <button class="chip ${targetMonthlyIncome === 100000 ? 'active' : ''}" onclick="setGoal(100000)">月領10萬</button>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-top: 8px; border-top: 1px solid #EEE; padding-top: 8px;">
-          <div>目前推算月股息: <b style="color:var(--ios-blue);">$${Math.round(estMonthlyDiv).toLocaleString()}</b></div>
+          <div>本月可領推算: <b style="color:var(--ios-blue);">$${Math.round(estMonthlyDiv).toLocaleString()}</b>${divSummary.totalPendingShares > 0 ? ` <span style="color:#C2410C; font-weight:700;">(+待下月 $${Math.round(divSummary.totalPendingMonthlyDividend).toLocaleString()})</span>` : ''}</div>
           <div>本金差額: <b>$${Math.round(principalGap).toLocaleString()}</b></div>
         </div>
+        ${divSummary.totalPendingShares > 0 ? `
+          <div style="margin-top: 6px; padding: 6px 8px; background: rgba(245,158,11,0.12); color: #9A3412; font-size: 10.5px; font-weight: 600; border-radius: 6px;">
+            ⏳ 本月除息後新買／加碼 ${divSummary.totalPendingShares.toLocaleString()} 股，須待下月配息公布後方可領取（滿倉月息 $${Math.round(divSummary.totalFullMonthlyDividend).toLocaleString()}）
+          </div>
+        ` : ''}
       </div>
 
       <!-- 領息頻率卡片 -->
@@ -1718,19 +1723,18 @@
         </div>
       `;
     }
+    const nowObj = new Date();
+    const curY = nowObj.getFullYear();
+    const curM = nowObj.getMonth() + 1;
     return items.map(h => {
       const isExpanded = expandedHoldings.has(h.symbol);
       const hProfile = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
-      let hMonthlyDiv;
-      if (hProfile.dps && hProfile.dps > 0) {
-        if (h.frequency === '月配') hMonthlyDiv = h.shares * hProfile.dps;
-        else if (h.frequency === '雙月配') hMonthlyDiv = (h.shares * hProfile.dps * 6) / 12;
-        else if (h.frequency === '季配') hMonthlyDiv = (h.shares * hProfile.dps * 4) / 12;
-        else if (h.frequency === '半年配') hMonthlyDiv = (h.shares * hProfile.dps * 2) / 12;
-        else hMonthlyDiv = (h.shares * hProfile.dps) / 12;
-      } else {
-        hMonthlyDiv = (h.shares * h.currentPrice * hProfile.yield) / 12;
-      }
+      const lots = getHoldingLots(h);
+      const cutoffNow = getExDividendCutoffDateStr(h.symbol, curY, curM);
+      const eligibleShares = getEligibleSharesForMonth(h, curY, curM);
+      const pendingShares = Math.max(0, h.shares - eligibleShares);
+      const hMonthlyDiv = calculateMonthlyDivForShares(h, eligibleShares);
+      const hFullMonthlyDiv = calculateMonthlyDivForShares(h, h.shares);
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
@@ -1773,11 +1777,26 @@
                 <span>均價: $${h.averageCost}</span>
                 <span>現價: $${h.currentPrice}</span>
               </div>
+              ${lots.length > 0 ? `
+                <div style="background: #F9F9FB; border: 1px solid #EFEFF4; border-radius: 8px; padding: 7px 9px; margin-bottom: 8px; font-size: 11px;">
+                  <div style="font-size: 10px; font-weight: 700; color: #8E8E93; margin-bottom: 4px;">買入與加碼批次 (${lots.length} 筆)</div>
+                  ${lots.map(l => {
+                    const isElig = (l.buyDate || '').slice(0, 10) < cutoffNow;
+                    return `
+                      <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+                        <span><b>${(l.buyDate || '').slice(5, 10).replace('-', '/')}</b> · ${Number(l.shares).toLocaleString()}股 <span style="color:#8E8E93;">@$${l.price}</span></span>
+                        <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: ${isElig ? 'rgba(52,199,89,0.14)' : 'rgba(245,158,11,0.16)'}; color: ${isElig ? '#15803D' : '#C2410C'};">${isElig ? '✓ 本月計息' : '⏳ 待下月公布'}</span>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
               <div style="background: #F2F2F7; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px;">
                 <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--ios-blue); margin-bottom: 4px;">
-                  <span>💡 預估月息: $${Math.round(hMonthlyDiv).toLocaleString()} ${hProfile.dps ? `(每股預估 $${hProfile.dps} 元/月)` : ''}</span>
+                  <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${hProfile.dps ? `(${eligibleShares.toLocaleString()}股 × $${hProfile.dps})` : ''}</span>
                   <span style="color: #34C759;">免稅比 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>
                 </div>
+                ${pendingShares > 0 ? `<div style="color: #C2410C; font-size: 10.5px; font-weight: 700; margin-bottom: 3px;">⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待下月配息公布領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）</div>` : ''}
                 <div style="color: #666; font-size: 10px;">${hProfile.notes}</div>
               </div>
               <div style="display: flex; gap: 8px; margin-top: 2px;">
@@ -2142,7 +2161,7 @@
 
   // ==================== 模組 4: 股息歷程 (連動真實持有現股) ====================
   
-  // ==================== 股息歷程：買入後起算配息、滑動刪除與加總 ====================
+  // ==================== 股息歷程：依買入／加碼日期與除息截算日分批起算配息 ====================
   function getMonthlyTimelineData() {
     if (!holdings || holdings.length === 0) return [];
 
@@ -2150,34 +2169,24 @@
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-12
 
-    // 取得每檔標的最早買進時間 (若無則預設為當前時間或月初)
-    const holdingDates = holdings.map(h => {
-      let d = h.purchaseDate || h.createdAt || h.updatedAt;
-      if (!d) d = new Date().toISOString();
-      const pDate = new Date(d);
-      return {
-        holding: h,
-        purchaseDate: isNaN(pDate.getTime()) ? new Date() : pDate
-      };
-    });
-
-    // 找出所有標的最早買進日期
+    // 找出所有批次中最早買進日期
     let earliestDate = now;
-    holdingDates.forEach(item => {
-      if (item.purchaseDate < earliestDate) earliestDate = item.purchaseDate;
+    holdings.forEach(h => {
+      const lots = getHoldingLots(h);
+      lots.forEach(l => {
+        const d = new Date((l.buyDate || '') + 'T00:00:00');
+        if (!isNaN(d.getTime()) && d < earliestDate) earliestDate = d;
+      });
     });
 
     const earliestYear = earliestDate.getFullYear();
     const earliestMonth = earliestDate.getMonth() + 1;
-
-    // 計算月份跨度 (最多回溯 12 個月，至少當前月 1 個月)
     const monthDiff = (currentYear - earliestYear) * 12 + (currentMonth - earliestMonth);
     const totalMonths = Math.max(1, Math.min(12, monthDiff + 1));
 
     let rawList = [];
     let runningCumulative = 0;
 
-    // 從歷史最早月份依序往當前月份推算 (以利正確累計加總)
     for (let offset = totalMonths - 1; offset >= 0; offset--) {
       let targetM = currentMonth - offset;
       let targetY = currentYear;
@@ -2187,29 +2196,39 @@
       }
 
       const monthTitle = `${targetY}年 ${String(targetM).padStart(2, '0')}月`;
-      // 當月結束日 (次月 0 號 23:59:59)
-      const monthEnd = new Date(targetY, targetM, 0, 23, 59, 59);
 
-      // 【核心邏輯】：僅篩選出「買入日期 <= 該月結束日」之已買入持股！
-      const activeHoldingsInMonth = holdingDates
-        .filter(item => item.purchaseDate <= monthEnd)
-        .map(item => item.holding);
-
-      // 若該月份尚未買入任何持股，則跳過 (不顯示無持股月份)
-      if (activeHoldingsInMonth.length === 0) continue;
-
-      // 依 DividendSource 智慧推算當月已買入標的之配息
       let monthDiv = 0;
-      activeHoldingsInMonth.forEach(h => {
-        const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
-        const monthly = (h.shares * h.currentPrice * p.yield) / 12;
-        monthDiv += monthly;
+      let pendingNextDiv = 0;
+      let pendingSharesCount = 0;
+      let mVal = 0;
+      let mCost = 0;
+      let ownedCount = 0;
+      const divActiveSymbols = [];
+      const pendingSymbols = [];
+
+      holdings.forEach(h => {
+        const owned = getOwnedSharesInMonth(h, targetY, targetM);
+        if (owned <= 0) return;
+        ownedCount++;
+        mVal += owned * h.currentPrice;
+        mCost += getHoldingCostInMonth(h, targetY, targetM);
+
+        const eligible = getEligibleSharesForMonth(h, targetY, targetM);
+        const pending = Math.max(0, owned - eligible);
+        if (eligible > 0) {
+          monthDiv += calculateMonthlyDivForShares(h, eligible);
+          divActiveSymbols.push(h.symbol);
+        }
+        if (pending > 0) {
+          pendingNextDiv += calculateMonthlyDivForShares(h, pending);
+          pendingSharesCount += pending;
+          pendingSymbols.push(h.symbol);
+        }
       });
+
+      if (ownedCount === 0) continue;
       monthDiv = Math.round(monthDiv);
       runningCumulative += monthDiv;
-
-      const mVal = activeHoldingsInMonth.reduce((s, h) => s + (h.shares * h.currentPrice), 0);
-      const mCost = activeHoldingsInMonth.reduce((s, h) => s + (h.shares * h.averageCost), 0);
       const mProfit = mVal - mCost;
 
       rawList.push({
@@ -2219,15 +2238,15 @@
         profit: Math.round(mProfit),
         div: monthDiv,
         cumulativeDiv: runningCumulative,
-        activeSymbols: activeHoldingsInMonth.map(h => h.symbol),
-        activeCount: activeHoldingsInMonth.length
+        activeSymbols: divActiveSymbols,
+        activeCount: ownedCount,
+        pendingNextDiv: Math.round(pendingNextDiv),
+        pendingSharesCount,
+        pendingSymbols
       });
     }
 
-    // 依月份新到舊排序 (近月排前面)
     let result = rawList.reverse();
-
-    // 排除使用者滑動刪除之月份
     result = result.filter(item => !deletedTimelineMonths.has(item.month));
     return result;
   }
@@ -2393,9 +2412,14 @@
 
                       <!-- 買入後生效計息之持股標籤 -->
                       ${t.activeSymbols && t.activeSymbols.length > 0 ? `
-                        <div style="font-size: 10px; color: #666; margin-bottom: 8px;">
+                        <div style="font-size: 10px; color: #666; margin-bottom: 6px;">
                           <span style="color: #8E8E93;">計息標的: </span>
-                          <b style="color: #5856D6;">${t.activeSymbols.join(', ')}</b> (${t.activeCount}檔已買入)
+                          <b style="color: #5856D6;">${t.activeSymbols.join(', ')}</b> (${t.activeSymbols.length}檔生效)
+                        </div>
+                      ` : ''}
+                      ${t.pendingSharesCount > 0 ? `
+                        <div style="font-size: 10px; color: #9A3412; background: rgba(245,158,11,0.12); border-radius: 6px; padding: 4px 7px; margin-bottom: 8px; font-weight: 600;">
+                          ⏳ ${t.pendingSymbols.join(', ')} 除息後加碼 ${t.pendingSharesCount.toLocaleString()} 股，須待下月配息公布才領取（預估 +$${t.pendingNextDiv.toLocaleString()}）
                         </div>
                       ` : ''}
 
@@ -2527,38 +2551,84 @@
     };
   }
 
+  function getHoldingLots(h) {
+    if (Array.isArray(h.lots) && h.lots.length > 0) {
+      return h.lots.slice().sort((a, b) => (a.buyDate || '').localeCompare(b.buyDate || ''));
+    }
+    const fallbackDate = (h.purchaseDate || h.createdAt || h.updatedAt || new Date().toISOString()).slice(0, 10);
+    return h.shares > 0 ? [{ id: 'init', buyDate: fallbackDate, shares: h.shares, price: h.averageCost, note: '初始買入' }] : [];
+  }
+
+  function getExDividendCutoffDateStr(symbol, year, month) {
+    const ymPrefix = `${year}-${String(month).padStart(2, '0')}`;
+    const exEvt = (events || []).find(e => e.symbol === symbol && e.type === '除息日' && (e.date || '').startsWith(ymPrefix));
+    if (exEvt && exEvt.date) return exEvt.date.slice(0, 10);
+    const lastEvt = (events || []).find(e => e.symbol === symbol && e.type === '最後購買日' && (e.date || '').startsWith(ymPrefix));
+    if (lastEvt && lastEvt.date) {
+      const d = new Date(lastEvt.date + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+    return `${ymPrefix}-03`;
+  }
+
+  function getOwnedSharesInMonth(h, year, month) {
+    const endDay = new Date(year, month, 0);
+    const endStr = `${year}-${String(month).padStart(2, '0')}-${String(endDay.getDate()).padStart(2, '0')}`;
+    return getHoldingLots(h)
+      .filter(l => (l.buyDate || '9999-12-31').slice(0, 10) <= endStr)
+      .reduce((s, l) => s + (Number(l.shares) || 0), 0);
+  }
+
+  function getHoldingCostInMonth(h, year, month) {
+    const endDay = new Date(year, month, 0);
+    const endStr = `${year}-${String(month).padStart(2, '0')}-${String(endDay.getDate()).padStart(2, '0')}`;
+    return getHoldingLots(h)
+      .filter(l => (l.buyDate || '9999-12-31').slice(0, 10) <= endStr)
+      .reduce((s, l) => s + (Number(l.shares) || 0) * (Number(l.price) || h.averageCost), 0);
+  }
+
+  function getEligibleSharesForMonth(h, year, month) {
+    const cutoff = getExDividendCutoffDateStr(h.symbol, year, month);
+    return getHoldingLots(h)
+      .filter(l => (l.buyDate || '9999-12-31').slice(0, 10) < cutoff)
+      .reduce((s, l) => s + (Number(l.shares) || 0), 0);
+  }
+
+  function calculateMonthlyDivForShares(h, shares) {
+    if (!shares || shares <= 0) return 0;
+    const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
+    if (p.dps && p.dps > 0) {
+      if (h.frequency === '月配') return shares * p.dps;
+      if (h.frequency === '雙月配') return (shares * p.dps * 6) / 12;
+      if (h.frequency === '季配') return (shares * p.dps * 4) / 12;
+      if (h.frequency === '半年配') return (shares * p.dps * 2) / 12;
+      return (shares * p.dps) / 12;
+    }
+    return (shares * h.currentPrice * p.yield) / 12;
+  }
+
   function analyzePortfolioDividendSources(items) {
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
     const calcs = items.map(h => {
       const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
       const val = h.shares * h.currentPrice;
-      let annual, monthly;
-      if (p.dps && p.dps > 0) {
-        if (h.frequency === '月配') {
-          monthly = h.shares * p.dps;
-          annual = monthly * 12;
-        } else if (h.frequency === '雙月配') {
-          annual = h.shares * p.dps * 6;
-          monthly = annual / 12;
-        } else if (h.frequency === '季配') {
-          annual = h.shares * p.dps * 4;
-          monthly = annual / 12;
-        } else if (h.frequency === '半年配') {
-          annual = h.shares * p.dps * 2;
-          monthly = annual / 12;
-        } else {
-          annual = h.shares * p.dps;
-          monthly = annual / 12;
-        }
-      } else {
-        annual = val * p.yield;
-        monthly = annual / 12;
-      }
+      const eligibleSharesNow = getEligibleSharesForMonth(h, curY, curM);
+      const pendingNextMonthShares = Math.max(0, h.shares - eligibleSharesNow);
+      const monthly = calculateMonthlyDivForShares(h, eligibleSharesNow);
+      const fullMonthly = calculateMonthlyDivForShares(h, h.shares);
+      const annual = fullMonthly * 12;
       const effYield = val > 0 ? (annual / val) : p.yield;
       return {
         holding: h,
         profile: p,
+        eligibleSharesNow,
+        pendingNextMonthShares,
         annual,
         monthly,
+        fullMonthly,
         effectiveYield: effYield,
         amt76: monthly * p.ratio76,
         amt54C: monthly * p.ratio54C,
@@ -2569,7 +2639,10 @@
     });
 
     const totalMonthly = calcs.reduce((s, c) => s + c.monthly, 0);
-    const totalAnnual = totalMonthly * 12;
+    const totalFullMonthly = calcs.reduce((s, c) => s + c.fullMonthly, 0);
+    const totalPendingMonthly = Math.max(0, totalFullMonthly - totalMonthly);
+    const totalPendingShares = calcs.reduce((s, c) => s + c.pendingNextMonthShares, 0);
+    const totalAnnual = totalFullMonthly * 12;
     const total76 = calcs.reduce((s, c) => s + c.amt76, 0);
     const total54C = calcs.reduce((s, c) => s + c.amt54C, 0);
     const totalReserve = calcs.reduce((s, c) => s + c.amtReserve, 0);
@@ -2588,6 +2661,9 @@
       totalMonthly,
       totalAnnual,
       totalMonthlyDividend: totalMonthly,
+      totalFullMonthlyDividend: totalFullMonthly,
+      totalPendingMonthlyDividend: totalPendingMonthly,
+      totalPendingShares,
       totalAnnualDividend: totalAnnual,
       total76, total54C, totalReserve, totalSurplus,
       pct76, pct54C, pctReserve, pctSurplus,
@@ -2775,6 +2851,7 @@
   // 新增存股 Sheet
   function openAddHoldingSheet(presetSymbol = '') {
     const presets = [
+      { sym: '00406A', name: '主動中信台灣收益', freq: '月配', price: 7.54 },
       { sym: '0056', name: '元大高股息', freq: '季配', price: 37.5 },
       { sym: '00878', name: '國泰永續高股息', freq: '季配', price: 22.8 },
       { sym: '00919', name: '群益台灣精選高息', freq: '季配', price: 24.2 },
@@ -2782,6 +2859,8 @@
       { sym: '0050', name: '元大台灣50', freq: '半年配', price: 195 },
       { sym: '2330', name: '台積電', freq: '季配', price: 1050 }
     ];
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isExisting = !!(presetSymbol && holdings.some(h => h.symbol === presetSymbol));
 
     openSheet(`
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -2791,7 +2870,7 @@
 
       <div class="form-group">
         <label>🔍 搜尋全台股標的 (2,400+ 檔上市/上櫃/全部ETF)</label>
-        <input class="form-input" id="searchStockInput" placeholder="輸入代號或名稱 (例: 2330, 台積, 00929, 3293)" oninput="searchTaiwanStocks(this.value)">
+        <input class="form-input" id="searchStockInput" placeholder="輸入代號或名稱 (例: 00406A, 2330, 台積, 00929)" oninput="searchTaiwanStocks(this.value)">
         <div id="searchResultsBox" style="max-height: 180px; overflow-y: auto; background: #F2F2F7; border-radius: 8px; margin-top: 4px; display: none;"></div>
       </div>
 
@@ -2808,11 +2887,11 @@
 
       <div class="form-group">
         <label>股票代號</label>
-        <input class="form-input" id="newSymbol" value="${presetSymbol}" placeholder="例: 0056">
+        <input class="form-input" id="newSymbol" value="${presetSymbol}" placeholder="例: 00406A" oninput="updateBuyDateEligPreview()">
       </div>
       <div class="form-group">
         <label>股票名稱</label>
-        <input class="form-input" id="newName" placeholder="例: 元大高股息">
+        <input class="form-input" id="newName" placeholder="例: 主動中信台灣收益">
       </div>
       <div class="form-group">
         <label>配息頻率</label>
@@ -2823,6 +2902,11 @@
           <option>半年配</option>
           <option>年配</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label id="newBuyDateLabel">${isExisting ? '📅 加碼日期' : '📅 買入日期'}</label>
+        <input class="form-input" id="newBuyDate" type="date" value="${todayStr}" onchange="updateBuyDateEligPreview()">
+        <div id="newBuyDateHint" style="font-size: 11px; font-weight: 700; margin-top: 4px;"></div>
       </div>
       <div class="form-group">
         <label>往來證券商</label>
@@ -2843,13 +2927,35 @@
       </div>
       <div class="form-group">
         <label>買入成交價 (元)</label>
-        <input class="form-input" id="newPrice" type="number" step="0.01" placeholder="例: 37.5">
+        <input class="form-input" id="newPrice" type="number" step="0.01" placeholder="例: 7.54">
       </div>
 
       <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="saveNewHolding()">
         確認儲存 / 加碼
       </button>
     `);
+    setTimeout(updateBuyDateEligPreview, 20);
+  }
+
+  function updateBuyDateEligPreview() {
+    const symEl = document.getElementById('newSymbol');
+    const dateEl = document.getElementById('newBuyDate');
+    const lblEl = document.getElementById('newBuyDateLabel');
+    const hintEl = document.getElementById('newBuyDateHint');
+    if (!dateEl || !hintEl) return;
+    const sym = (symEl ? symEl.value : '').trim().toUpperCase();
+    const isExist = sym && holdings.some(h => h.symbol === sym);
+    if (lblEl) lblEl.innerText = isExist ? '📅 加碼日期' : '📅 買入日期';
+    const dStr = (dateEl.value || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const now = new Date();
+    const cutoff = getExDividendCutoffDateStr(sym, now.getFullYear(), now.getMonth() + 1);
+    if (dStr < cutoff) {
+      hintEl.style.color = '#15803D';
+      hintEl.innerText = `✓ 趕上本月除息基準 (${cutoff} 前)，計入本月可領股息`;
+    } else {
+      hintEl.style.color = '#C2410C';
+      hintEl.innerText = `⏳ 已過本月除息截算 (${cutoff})，配息須待下月公布後方可領取`;
+    }
   }
 
   function selectPreset(sym, name, freq, price) {
@@ -2859,6 +2965,7 @@
     if (document.getElementById('newPrice')) document.getElementById('newPrice').value = price;
     const box = document.getElementById('searchResultsBox');
     if (box) box.style.display = 'none';
+    updateBuyDateEligPreview();
   }
 
   function searchTaiwanStocks(query) {
@@ -3534,10 +3641,13 @@
   }
 
   function saveNewHolding() {
-    const sym = document.getElementById('newSymbol').value.trim();
+    const sym = document.getElementById('newSymbol').value.trim().toUpperCase();
     const name = document.getElementById('newName').value.trim() || sym;
-    const freq = document.getElementById('newFreq').value;
+    const freq = (sym === '00406A' || sym === '00406' || name.includes('中信台灣收益')) ? '月配' : document.getElementById('newFreq').value;
     const brokerage = document.getElementById('newBrokerage') ? document.getElementById('newBrokerage').value : '元大證券';
+    const buyDate = (document.getElementById('newBuyDate') && document.getElementById('newBuyDate').value)
+      ? document.getElementById('newBuyDate').value
+      : new Date().toISOString().substring(0, 10);
     const shares = parseInt(document.getElementById('newShares').value) || 0;
     const price = parseFloat(document.getElementById('newPrice').value) || 0;
 
@@ -3548,12 +3658,21 @@
 
     const existing = holdings.find(h => h.symbol === sym);
     if (existing) {
-      // 加碼存股：加權重新計算均價
-      const oldCost = existing.shares * existing.averageCost;
-      const addCost = shares * price;
-      const totalS = existing.shares + shares;
-      existing.averageCost = +((oldCost + addCost) / totalS).toFixed(2);
+      // 加碼存股：保留加碼日期批次並加權重新計算均價
+      existing.lots = getHoldingLots(existing);
+      existing.lots.push({
+        id: 'lot_' + Date.now(),
+        buyDate,
+        shares,
+        price,
+        note: '加碼買進'
+      });
+      existing.lots.sort((a, b) => (a.buyDate || '').localeCompare(b.buyDate || ''));
+      const totalS = existing.lots.reduce((s, l) => s + (Number(l.shares) || 0), 0);
+      const totalC = existing.lots.reduce((s, l) => s + (Number(l.shares) || 0) * (Number(l.price) || 0), 0);
       existing.shares = totalS;
+      existing.averageCost = totalS > 0 ? +(totalC / totalS).toFixed(2) : price;
+      existing.purchaseDate = existing.lots[0].buyDate;
       existing.currentPrice = price;
       existing.brokerage = brokerage;
     } else {
@@ -3567,26 +3686,29 @@
         currentPrice: price,
         totalDividends: 0,
         count: 0,
-        brokerage: brokerage
+        brokerage: brokerage,
+        purchaseDate: buyDate,
+        lots: [{ id: 'lot_' + Date.now(), buyDate, shares, price, note: '初始買入' }]
       });
     }
 
-    // 同步記錄日記
+    // 同步記錄日記 (使用實際買入／加碼日期)
     journals.unshift({
       id: Date.now().toString(),
       symbol: sym,
       name: name,
       type: '買',
-      date: new Date().toISOString().substring(0, 10),
+      date: buyDate,
       price: price,
       shares: shares,
       note: existing ? '加碼存股' : '初次建倉'
     });
+    journals.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     saveState();
     closeSheet();
     renderApp();
-    triggerNotification('✅ 存股成功', `已將 ${sym} ${name} 記入持股與買賣日記！`);
+    triggerNotification('✅ 存股成功', `已將 ${buyDate} ${sym} ${shares.toLocaleString()} 股記入持股與買賣日記！`);
   }
 
   function openDCA(symbol) {
@@ -3597,13 +3719,86 @@
         document.getElementById('newName').value = existing.name;
         document.getElementById('newFreq').value = existing.frequency;
         document.getElementById('newPrice').value = existing.currentPrice;
+        updateBuyDateEligPreview();
       }, 50);
     }
+  }
+
+  let editLotsDraft = [];
+
+  function syncEditLotsFromInputs() {
+    editLotsDraft = editLotsDraft.map((lot, idx) => {
+      const dEl = document.getElementById(`editLotDate_${idx}`);
+      const sEl = document.getElementById(`editLotShares_${idx}`);
+      const pEl = document.getElementById(`editLotPrice_${idx}`);
+      return {
+        ...lot,
+        buyDate: dEl ? dEl.value : lot.buyDate,
+        shares: sEl ? (parseInt(sEl.value, 10) || 0) : lot.shares,
+        price: pEl ? (parseFloat(pEl.value) || 0) : lot.price
+      };
+    });
+    const totalS = editLotsDraft.reduce((s, l) => s + (l.shares || 0), 0);
+    const totalC = editLotsDraft.reduce((s, l) => s + (l.shares || 0) * (l.price || 0), 0);
+    const shEl = document.getElementById('editShares');
+    const coEl = document.getElementById('editCost');
+    if (shEl && totalS > 0) shEl.value = totalS;
+    if (coEl && totalS > 0) coEl.value = (totalC / totalS).toFixed(2);
+  }
+
+  function renderEditLotsContainer(symbol) {
+    const box = document.getElementById('editLotsList');
+    if (!box) return;
+    const nowObj = new Date();
+    const cutoff = getExDividendCutoffDateStr(symbol, nowObj.getFullYear(), nowObj.getMonth() + 1);
+    box.innerHTML = editLotsDraft.map((lot, idx) => {
+      const isElig = (lot.buyDate || '') < cutoff;
+      return `
+        <div style="background: #F2F2F7; border-radius: 10px; padding: 8px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: 800; color: #007AFF;">第 ${idx + 1} 筆（${lot.note || '買入'}）</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 10px; font-weight: 700; color: ${isElig ? '#15803D' : '#C2410C'};">${isElig ? '✓ 計入本月息' : '⏳ 待下月公布'}</span>
+              ${editLotsDraft.length > 1 ? `<button type="button" style="border:none; background:none; color:#FF3B30; font-weight:800; cursor:pointer;" onclick="removeEditLotRow('${symbol}', ${idx})">✕</button>` : ''}
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr 0.9fr; gap: 6px;">
+            <input class="form-input" id="editLotDate_${idx}" type="date" value="${lot.buyDate}" style="padding: 5px 6px; font-size: 11px;" onchange="syncEditLotsFromInputs(); renderEditLotsContainer('${symbol}')">
+            <input class="form-input" id="editLotShares_${idx}" type="number" value="${lot.shares}" placeholder="股數" style="padding: 5px 6px; font-size: 11px;" oninput="syncEditLotsFromInputs()">
+            <input class="form-input" id="editLotPrice_${idx}" type="number" step="0.01" value="${lot.price}" placeholder="單價" style="padding: 5px 6px; font-size: 11px;" oninput="syncEditLotsFromInputs()">
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function addEditLotRow(symbol) {
+    syncEditLotsFromInputs();
+    const h = holdings.find(item => item.symbol === symbol);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    editLotsDraft.push({
+      id: 'lot_' + Date.now(),
+      buyDate: todayStr,
+      shares: 10000,
+      price: h ? h.currentPrice : 10,
+      note: '加碼買進'
+    });
+    renderEditLotsContainer(symbol);
+    syncEditLotsFromInputs();
+  }
+
+  function removeEditLotRow(symbol, idx) {
+    syncEditLotsFromInputs();
+    if (editLotsDraft.length <= 1) return;
+    editLotsDraft.splice(idx, 1);
+    renderEditLotsContainer(symbol);
+    syncEditLotsFromInputs();
   }
 
   function openEditHolding(symbol) {
     const h = holdings.find(item => item.symbol === symbol);
     if (!h) return;
+    editLotsDraft = getHoldingLots(h).map(l => ({ ...l }));
 
     openSheet(`
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -3611,12 +3806,25 @@
         <button class="nav-btn" onclick="closeSheet()">關閉</button>
       </div>
       <div class="form-group"><label>名稱</label><input class="form-input" id="editName" value="${resolveStockName(h)}"></div>
-      <div class="form-group"><label>股數</label><input class="form-input" id="editShares" type="number" value="${h.shares}"></div>
-      <div class="form-group"><label>買入均價</label><input class="form-input" id="editCost" type="number" step="0.01" value="${h.averageCost}"></div>
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="margin: 0;">📅 買入與加碼日期明細</label>
+          <button type="button" class="sim-btn" style="padding: 4px 9px; font-size: 11px; background: rgba(0,122,255,0.12); color: #007AFF; font-weight: 700;" onclick="addEditLotRow('${h.symbol}')">＋ 新增加碼日期</button>
+        </div>
+        <div id="editLotsList"></div>
+        <div style="font-size: 10px; color: #8E8E93;">💡 例：00406A 若 10/20 買 10,000 股、11/04 加碼 100,000 股，11 月僅計息 10,000 股（$1,380），其餘待 12 月配息公布領取。</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div class="form-group"><label>總股數</label><input class="form-input" id="editShares" type="number" value="${h.shares}"></div>
+        <div class="form-group"><label>買入均價</label><input class="form-input" id="editCost" type="number" step="0.01" value="${h.averageCost}"></div>
+      </div>
       <div class="form-group"><label>目前現價</label><input class="form-input" id="editPrice" type="number" step="0.01" value="${h.currentPrice}"></div>
-      <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px;" onclick="saveEdit('${h.symbol}')">儲存修改</button>
+      <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 8px;" onclick="saveEdit('${h.symbol}')">儲存修改</button>
       <button class="sim-btn" style="width: 100%; justify-content: center; padding: 10px; margin-top: 8px; background: #F2F2F7; color: #007AFF; font-weight: 700;" onclick="openDCA('${h.symbol}')">➕ 加碼買進此檔存股</button>
     `);
+    renderEditLotsContainer(h.symbol);
   }
 
   function openHoldingDividendDetail(symbol) {
@@ -3631,6 +3839,9 @@
     const hProfile = getHoldingDividendProfile(h.symbol, displayName, h.stockType);
     const defaultDps = hProfile && hProfile.dps ? hProfile.dps : '';
     const todayStr = new Date().toISOString().slice(0, 10);
+    const nowY = new Date().getFullYear();
+    const nowM = new Date().getMonth() + 1;
+    const defaultEligShares = getEligibleSharesForMonth(h, nowY, nowM);
 
     openSheet(`
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
@@ -3664,7 +3875,7 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
           <div>
             <label style="font-size: 11px; color: #666; display: block; margin-bottom: 2px;">股利發放日</label>
-            <input class="form-input" id="divRecDate" type="date" value="${todayStr}" style="padding: 6px 8px; font-size: 12px;">
+            <input class="form-input" id="divRecDate" type="date" value="${todayStr}" style="padding: 6px 8px; font-size: 12px;" onchange="updateDivRecEligibleShares('${h.symbol}')">
           </div>
           <div>
             <label style="font-size: 11px; color: #666; display: block; margin-bottom: 2px;">每股配息 (元)</label>
@@ -3672,8 +3883,8 @@
           </div>
         </div>
         <div style="margin-bottom: 8px;">
-          <label style="font-size: 11px; color: #666; display: block; margin-bottom: 2px;">除息股數</label>
-          <input class="form-input" id="divRecShares" type="number" value="${h.shares}" style="padding: 6px 8px; font-size: 12px;">
+          <label style="font-size: 11px; color: #666; display: block; margin-bottom: 2px;">當期可領除息股數（依買入日自動帶入）</label>
+          <input class="form-input" id="divRecShares" type="number" value="${defaultEligShares}" style="padding: 6px 8px; font-size: 12px;">
         </div>
         <button class="sim-btn primary" style="width: 100%; justify-content: center; padding: 8px; font-size: 12px;" onclick="addHoldingDividendRecord('${h.symbol}')">儲存這筆配息紀錄</button>
       </div>
@@ -3707,6 +3918,19 @@
   function toggleAddDividendRecordForm() {
     const box = document.getElementById('addDivRecordBox');
     if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function updateDivRecEligibleShares(symbol) {
+    const h = holdings.find(item => item.symbol === symbol);
+    const dEl = document.getElementById('divRecDate');
+    const sEl = document.getElementById('divRecShares');
+    if (!h || !dEl || !sEl || !dEl.value) return;
+    const parts = dEl.value.split('-');
+    if (parts.length >= 2) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (y && m) sEl.value = getEligibleSharesForMonth(h, y, m);
+    }
   }
 
   function addHoldingDividendRecord(symbol) {
@@ -3751,10 +3975,35 @@
   function saveEdit(symbol) {
     const h = holdings.find(item => item.symbol === symbol);
     if (!h) return;
+    syncEditLotsFromInputs();
+    const validLots = editLotsDraft.filter(l => l.shares > 0).sort((a, b) => (a.buyDate || '').localeCompare(b.buyDate || ''));
     h.name = document.getElementById('editName').value;
-    h.shares = parseInt(document.getElementById('editShares').value) || h.shares;
-    h.averageCost = parseFloat(document.getElementById('editCost').value) || h.averageCost;
     h.currentPrice = parseFloat(document.getElementById('editPrice').value) || h.currentPrice;
+    if (validLots.length > 0) {
+      h.lots = validLots;
+      h.shares = validLots.reduce((s, l) => s + l.shares, 0);
+      const totalC = validLots.reduce((s, l) => s + l.shares * l.price, 0);
+      h.averageCost = +(totalC / h.shares).toFixed(2);
+      h.purchaseDate = validLots[0].buyDate;
+      // 同步買進交易日記
+      journals = journals.filter(j => !(j.symbol === h.symbol && j.type === '買'));
+      validLots.forEach(l => {
+        journals.push({
+          id: 'j_' + l.id,
+          symbol: h.symbol,
+          name: h.name,
+          type: '買',
+          date: l.buyDate,
+          price: l.price,
+          shares: l.shares,
+          note: l.note || '存股買入'
+        });
+      });
+      journals.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    } else {
+      h.shares = parseInt(document.getElementById('editShares').value) || h.shares;
+      h.averageCost = parseFloat(document.getElementById('editCost').value) || h.averageCost;
+    }
     saveState();
     closeSheet();
     renderApp();

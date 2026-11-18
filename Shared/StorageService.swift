@@ -8,10 +8,13 @@ public struct MonthlyTimelineSummary: Identifiable, Codable {
     public let totalCost: Double         // 總成本
     public let priceGainProfit: Double   // 價差獲利
     public let totalFee: Double          // 手續費
-    public let monthDividend: Double     // 當月股息
+    public let monthDividend: Double     // 當月已參與除息可領股息
     public let cumulativeDividend: Double // 截至該月累計配息加總
-    public let activeHoldingCount: Int    // 該月份已買入計息持股數
-    public let activeSymbols: [String]    // 該月份已買入計息標的
+    public let activeHoldingCount: Int    // 該月份已買入持有標的數
+    public let activeSymbols: [String]    // 該月份有配息生效之標的
+    public let pendingNextDividend: Double // 本月除息後加碼、須待下月配息公布才領取之預估金額
+    public let pendingSharesCount: Int     // 本月除息後才買進／加碼之股數
+    public let pendingSymbols: [String]    // 須待下月公布領取之標的
     
     public init(
         monthKey: String,
@@ -22,7 +25,10 @@ public struct MonthlyTimelineSummary: Identifiable, Codable {
         monthDividend: Double,
         cumulativeDividend: Double = 0.0,
         activeHoldingCount: Int = 0,
-        activeSymbols: [String] = []
+        activeSymbols: [String] = [],
+        pendingNextDividend: Double = 0.0,
+        pendingSharesCount: Int = 0,
+        pendingSymbols: [String] = []
     ) {
         self.monthKey = monthKey
         self.totalMarketValue = totalMarketValue
@@ -33,6 +39,9 @@ public struct MonthlyTimelineSummary: Identifiable, Codable {
         self.cumulativeDividend = cumulativeDividend
         self.activeHoldingCount = activeHoldingCount
         self.activeSymbols = activeSymbols
+        self.pendingNextDividend = pendingNextDividend
+        self.pendingSharesCount = pendingSharesCount
+        self.pendingSymbols = pendingSymbols
     }
 }
 
@@ -108,46 +117,96 @@ public final class StorageService {
         return list
     }
     
-    // 新增或加碼存股
-    public func addOrUpdateHolding(_ newHolding: StockHolding, isDCA: Bool = false, autoAddJournal: Bool = true) {
+    // 新增或加碼存股 (精準寫入買入日期與加碼日期批次)
+    public func addOrUpdateHolding(
+        _ newHolding: StockHolding,
+        isDCA: Bool = false,
+        buyDate: Date? = nil,
+        autoAddJournal: Bool = true
+    ) {
+        let effectiveDate = buyDate ?? newHolding.purchaseDate
         var current = loadHoldings()
         if let idx = current.firstIndex(where: { $0.symbol == newHolding.symbol }) {
             if isDCA {
-                // 定期定額加碼存股：加權重新計算均價與總股數
-                current[idx].addDCA(newShares: newHolding.shares, buyPrice: newHolding.averageCost)
+                // 定期定額 / 單筆加碼存股：保留加碼日期批次並加權重新計算均價與總股數
+                current[idx].addDCA(
+                    newShares: newHolding.shares,
+                    buyPrice: newHolding.averageCost,
+                    buyDate: effectiveDate,
+                    note: "加碼存股"
+                )
             } else {
                 // 直接更新或覆蓋
-                current[idx] = newHolding
+                var updated = newHolding
+                if buyDate != nil {
+                    updated.purchaseDate = effectiveDate
+                    if updated.lots.count <= 1 {
+                        updated.lots = updated.shares > 0
+                            ? [HoldingLot(buyDate: effectiveDate, shares: updated.shares, price: updated.averageCost, note: "初始買入")]
+                            : []
+                    }
+                }
+                current[idx] = updated
             }
         } else {
-            current.append(newHolding)
+            var created = newHolding
+            if buyDate != nil {
+                created.purchaseDate = effectiveDate
+                created.lots = created.shares > 0
+                    ? [HoldingLot(buyDate: effectiveDate, shares: created.shares, price: created.averageCost, note: "初始買入")]
+                    : []
+            }
+            current.append(created)
         }
         saveHoldings(current)
         
-        // 若勾選自動建立日記
+        // 若勾選自動建立日記：使用實際買入／加碼日期
         if autoAddJournal && newHolding.shares > 0 {
             var journals = loadJournals()
             let journal = JournalEntry(
                 symbol: newHolding.symbol,
                 name: newHolding.name,
                 type: .buy,
-                date: Date(),
+                date: effectiveDate,
                 price: newHolding.averageCost,
                 shares: newHolding.shares,
                 fee: newHolding.buyFee,
-                note: isDCA ? "定期定額加碼存股" : "建立初始持股"
+                note: isDCA ? "加碼存股" : "建立初始持股"
             )
             journals.insert(journal, at: 0)
+            journals.sort { $0.date > $1.date }
             saveJournals(journals)
         }
     }
     
-    // 修改持股資料
-    public func updateHolding(_ updated: StockHolding) {
+    // 修改持股資料（同步批次買入與加碼日記）
+    public func updateHolding(_ updated: StockHolding, syncLotsToJournal: Bool = true) {
         var current = loadHoldings()
-        if let idx = current.firstIndex(where: { $0.id == updated.id || $0.symbol == updated.symbol }) {
-            current[idx] = updated
+        var target = updated
+        if !target.lots.isEmpty {
+            target.syncFromLots()
+        }
+        if let idx = current.firstIndex(where: { $0.id == target.id || $0.symbol == target.symbol }) {
+            current[idx] = target
             saveHoldings(current)
+            if syncLotsToJournal && !target.lots.isEmpty {
+                var journals = loadJournals().filter { !($0.symbol == target.symbol && $0.type == .buy) }
+                for lot in target.lots {
+                    let fee = max(20.0, (Double(lot.shares) * lot.price * 0.001425 * target.brokerFeeDiscount).rounded())
+                    journals.append(JournalEntry(
+                        symbol: target.symbol,
+                        name: target.name,
+                        type: .buy,
+                        date: lot.buyDate,
+                        price: lot.price,
+                        shares: lot.shares,
+                        fee: fee,
+                        note: lot.note
+                    ))
+                }
+                journals.sort { $0.date > $1.date }
+                saveJournals(journals)
+            }
         }
     }
     
@@ -448,7 +507,7 @@ public final class StorageService {
         userDefaults?.removeObject(forKey: deletedTimelineMonthKeysKey)
     }
     
-    // MARK: - 股息歷程時間軸數據 (依持股買入日期起算當月配息，連動真實持股)
+    // MARK: - 股息歷程時間軸數據 (依每筆買入／加碼日期與除息截算日分批起算配息)
     public func getMonthlyTimelineSummaries(holdings: [StockHolding]? = nil) -> [MonthlyTimelineSummary] {
         let activeHoldings = holdings ?? loadHoldings()
         guard !activeHoldings.isEmpty else {
@@ -456,18 +515,17 @@ public final class StorageService {
         }
         
         let journals = loadJournals()
+        let events = loadEvents()
         let calendar = Calendar.current
         let now = Date()
         
-        // 1. 找出每檔持股的最早買進日期 (若有日記買進紀錄優先取日記，否則取 updatedAt)
+        // 1. 找出每檔持股的最早買進日期（優先取批次 lots / holding.purchaseDate / 買進日記）
         var holdingPurchaseDates: [String: Date] = [:]
         for h in activeHoldings {
-            let buyJournals = journals.filter { $0.symbol == h.symbol && $0.type == .buy }
-            if let earliestJournal = buyJournals.map({ $0.date }).min() {
-                holdingPurchaseDates[h.symbol] = earliestJournal
-            } else {
-                holdingPurchaseDates[h.symbol] = h.updatedAt
-            }
+            let earliestLot = h.lots.map { $0.buyDate }.min()
+            let earliestJournal = journals.filter { $0.symbol == h.symbol && $0.type == .buy }.map { $0.date }.min()
+            let candidates = [earliestLot, h.purchaseDate, earliestJournal].compactMap { $0 }
+            holdingPurchaseDates[h.symbol] = candidates.min() ?? h.updatedAt
         }
         
         // 2. 找出全體持股中最先買入的日期
@@ -488,37 +546,55 @@ public final class StorageService {
         var rawSummaries: [MonthlyTimelineSummary] = []
         var runningCumulativeDividend: Double = 0.0
         
-        // 4. 從歷史最早月份依序往當前月份推算 (以利精確累計配息加總)
+        // 4. 從歷史最早月份依序往當前月份推算 (依當月實際可領除息股數計算)
         for offset in (0..<totalMonths).reversed() {
             guard let monthDate = calendar.date(byAdding: .month, value: -offset, to: now) else { continue }
             let monthTitle = monthFormatter.string(from: monthDate)
+            let y = calendar.component(.year, from: monthDate)
+            let m = calendar.component(.month, from: monthDate)
             
-            // 該月的結束時間點 (當月最後一天)
-            guard let monthInterval = calendar.dateInterval(of: .month, for: monthDate) else { continue }
-            let monthEnd = monthInterval.end
-            
-            // 【核心邏輯】：僅篩選出「買入日期 <= 該月結束日」之已買入持股！
-            let holdingsBoughtByThisMonth = activeHoldings.filter { h in
-                let pDate = holdingPurchaseDates[h.symbol] ?? h.updatedAt
-                return pDate <= monthEnd
-            }
-            
-            // 若該月尚未買進任何持股，則不計入歷程
-            guard !holdingsBoughtByThisMonth.isEmpty else { continue }
-            
-            // 計算該月已買入標的之配息 (精準使用 DividendSourceService 智慧推算每檔月息)
             var monthDividendSum: Double = 0.0
-            for h in holdingsBoughtByThisMonth {
-                let calc = DividendSourceService.shared.calculateHoldingDividend(holding: h)
-                monthDividendSum += calc.monthlyDividend
+            var pendingDividendSum: Double = 0.0
+            var pendingSharesTotal = 0
+            var monthVal: Double = 0.0
+            var monthCost: Double = 0.0
+            var monthFee: Double = 0.0
+            var ownedHoldingsCount = 0
+            var divActiveSymbols: [String] = []
+            var pendingSymbols: [String] = []
+            
+            for h in activeHoldings {
+                let owned = h.ownedShares(asOfEndOfYear: y, month: m)
+                guard owned > 0 else { continue }
+                ownedHoldingsCount += 1
+                
+                let principal = h.costPrincipal(asOfEndOfYear: y, month: m)
+                let fee = max(20.0, (principal * 0.001425 * h.brokerFeeDiscount).rounded())
+                monthCost += (principal + fee)
+                monthFee += fee
+                monthVal += Double(owned) * h.currentPrice
+                
+                // 【核心邏輯】：僅計算「buyDate < 該月除息截算日」的有效參與除息股數！
+                let eligible = h.eligibleSharesForMonth(year: y, month: m, events: events)
+                let pending = max(0, owned - eligible)
+                
+                if eligible > 0 {
+                    let amt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: eligible)
+                    monthDividendSum += amt
+                    divActiveSymbols.append(h.symbol)
+                }
+                if pending > 0 {
+                    let pendingAmt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: pending)
+                    pendingDividendSum += pendingAmt
+                    pendingSharesTotal += pending
+                    pendingSymbols.append(h.symbol)
+                }
             }
+            
+            guard ownedHoldingsCount > 0 else { continue }
             monthDividendSum = (monthDividendSum * 10.0).rounded() / 10.0
             runningCumulativeDividend += monthDividendSum
-            
-            let monthVal = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.marketValue }
-            let monthCost = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.totalCostWithFee }
-            let monthProfit = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.unrealizedProfit }
-            let monthFee = holdingsBoughtByThisMonth.reduce(0.0) { $0 + $1.buyFee }
+            let monthProfit = monthVal - monthCost
             
             rawSummaries.append(
                 MonthlyTimelineSummary(
@@ -529,8 +605,11 @@ public final class StorageService {
                     totalFee: monthFee.rounded(),
                     monthDividend: monthDividendSum.rounded(),
                     cumulativeDividend: runningCumulativeDividend.rounded(),
-                    activeHoldingCount: holdingsBoughtByThisMonth.count,
-                    activeSymbols: holdingsBoughtByThisMonth.map { $0.symbol }
+                    activeHoldingCount: ownedHoldingsCount,
+                    activeSymbols: divActiveSymbols,
+                    pendingNextDividend: pendingDividendSum.rounded(),
+                    pendingSharesCount: pendingSharesTotal,
+                    pendingSymbols: pendingSymbols
                 )
             )
         }

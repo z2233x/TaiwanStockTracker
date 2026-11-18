@@ -589,29 +589,44 @@ struct DividendSourceBreakdownCard: View {
                 }
             }
             
-            // 股息總覽金額
+            // 股息總覽金額（區分本月可領 vs 除息後新加碼待下月公布）
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("持股逐檔推算月被動現金流")
+                    Text(summary.totalPendingShares > 0 ? "本月實際可領推算 (依買入日期篩選)" : "持股逐檔推算月被動現金流")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text("$\(Int(summary.totalMonthlyDividend).formatted())")
                             .font(.system(size: 26, weight: .heavy, design: .rounded))
                             .foregroundColor(Color(hex: "#007AFF"))
-                        Text("/ 月")
+                        Text("/ 本月")
                             .font(.caption.bold())
                             .foregroundColor(.secondary)
                     }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("推算年領股息")
+                    Text(summary.totalPendingShares > 0 ? "滿倉預估月息" : "推算年領股息")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("$\(Int(summary.totalAnnualDividend).formatted())")
+                    Text(summary.totalPendingShares > 0
+                         ? "$\(Int(summary.totalFullPositionMonthlyDividend).formatted()) /月"
+                         : "$\(Int(summary.totalAnnualDividend).formatted())")
                         .font(.subheadline.bold())
                 }
+            }
+
+            if summary.totalPendingShares > 0 {
+                HStack(spacing: 6) {
+                    Text("⏳")
+                    Text("本月除息後新買／加碼 \(summary.totalPendingShares.formatted()) 股（+$\(Int(summary.totalPendingMonthlyDividend).formatted())/月），須待下月配息公布後方可領取。")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color(hex: "#9A3412"))
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.12))
+                .cornerRadius(8)
             }
             
             // 四色股息來源比例長條圖
@@ -745,12 +760,18 @@ struct DividendSourceBreakdownCard: View {
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("約 $\(Int(c.monthlyDividend).formatted()) /月")
+                                    Text("本月 $\(Int(c.monthlyDividend).formatted())")
                                         .font(.caption.bold())
                                         .foregroundColor(Color(hex: "#007AFF"))
-                                    Text("免稅比例 \(String(format: "%.0f", c.taxExemptPercentage))%")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(c.taxExemptPercentage >= 60 ? .green : .secondary)
+                                    if c.pendingNextMonthShares > 0 {
+                                        Text("⏳ \(c.pendingNextMonthShares.formatted()) 股待下月公布")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(Color(hex: "#EA580C"))
+                                    } else {
+                                        Text("免稅比例 \(String(format: "%.0f", c.taxExemptPercentage))%")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(c.taxExemptPercentage >= 60 ? .green : .secondary)
+                                    }
                                 }
                             }
                             .padding(8)
@@ -1362,10 +1383,20 @@ struct DividendTimelineView: View {
                                                 Text(item.activeSymbols.joined(separator: ", "))
                                                     .font(.caption2.bold())
                                                     .foregroundColor(Color(hex: "#5856D6"))
-                                                Text("(\(item.activeHoldingCount)檔)")
+                                                Text("(\(item.activeSymbols.count)檔)")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
                                             }
+                                        }
+
+                                        if item.pendingSharesCount > 0 {
+                                            Text("⏳ \(item.pendingSymbols.joined(separator: ", ")) 除息後買進 \(item.pendingSharesCount.formatted()) 股，須待下月配息公布才領取（預估 +$\(Int(item.pendingNextDividend).formatted())）")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundColor(Color(hex: "#9A3412"))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.orange.opacity(0.12))
+                                                .cornerRadius(6)
                                         }
                                         
                                         Divider().padding(.vertical, 1)
@@ -1562,16 +1593,53 @@ struct StockHoldingRowView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     
-                    // 股息來源與掩護性買權推算
-                    let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item)
+                    // 股息來源與掩護性買權推算（依買入／加碼日期區分本月可領 vs 待下月公布）
+                    let allEvents = StorageService.shared.loadEvents()
+                    let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item, events: allEvents)
+                    let curY = Calendar.current.component(.year, from: Date())
+                    let curM = Calendar.current.component(.month, from: Date())
+                    let cutoffNow = StockHolding.exDividendCutoffDate(for: item.symbol, year: curY, month: curM, events: allEvents)
+
+                    if !item.lots.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("買入與加碼批次明細 (\(item.lots.count) 筆)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+                            ForEach(item.lots) { lot in
+                                let isElig = Calendar.current.startOfDay(for: lot.buyDate) < cutoffNow
+                                HStack(spacing: 6) {
+                                    Text(lot.shortDateString)
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.primary)
+                                    Text(lot.lotsText)
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("@ $\(String(format: "%.2f", lot.price))")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(isElig ? "✓ 本月計息" : "⏳ 待下月公布")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(isElig ? Color.green.opacity(0.14) : Color.orange.opacity(0.14))
+                                        .foregroundColor(isElig ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+                                        .cornerRadius(4)
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             if let dps = calc.profile.defaultCashDividendPerShare {
-                                Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (每股 \(String(format: "%.3f", dps)) 元，年化 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
+                                Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (\(calc.eligibleSharesNow.formatted())股 × $\(String(format: "%.3f", dps)))")
                                     .font(.caption.bold())
                                     .foregroundColor(Color(hex: "#007AFF"))
                             } else {
-                                Text("💡 預估月息: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
+                                Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
                                     .font(.caption.bold())
                                     .foregroundColor(Color(hex: "#007AFF"))
                             }
@@ -1579,6 +1647,12 @@ struct StockHoldingRowView: View {
                             Text("免稅比 \(String(format: "%.0f", calc.taxExemptPercentage))%")
                                 .font(.caption.bold())
                                 .foregroundColor(.green)
+                        }
+
+                        if calc.pendingNextMonthShares > 0 {
+                            Text("⏳ 本月除息後加碼 \(calc.pendingNextMonthShares.formatted()) 股須待下月配息公布領取（下期滿倉預估 $\(Int(calc.fullMonthlyDividend).formatted()) /月）")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Color(hex: "#C2410C"))
                         }
                         
                         // 來源百分比拆解
@@ -1983,7 +2057,7 @@ struct HoldingsListView: View {
     }
 }
 
-// 編輯持股 Sheet
+// 編輯持股 Sheet（支援編輯初始買入日期與多筆加碼日期明細）
 struct EditHoldingSheet: View {
     @Environment(\.dismiss) var dismiss
     let holding: StockHolding
@@ -1998,7 +2072,22 @@ struct EditHoldingSheet: View {
     @State private var currentPrice: String = ""
     @State private var totalDividends: String = ""
     @State private var dividendCount: String = ""
+    @State private var editableLots: [HoldingLot] = []
+    @State private var newLotDate: Date = Date()
+    @State private var newLotShares: String = "10000"
+    @State private var newLotPrice: String = ""
+    @State private var showAddLotBox: Bool = false
     @State private var showDeleteConfirm = false
+
+    private func recalculateFromLots() {
+        let valid = editableLots.filter { $0.shares > 0 }
+        let total = valid.reduce(0) { $0 + $1.shares }
+        let cost = valid.reduce(0.0) { $0 + Double($1.shares) * $1.price }
+        shares = "\(total)"
+        if total > 0 {
+            averageCost = String(format: "%.2f", cost / Double(total))
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -2014,10 +2103,101 @@ struct EditHoldingSheet: View {
                         }
                     }
                 }
+
+                Section {
+                    ForEach($editableLots) { $lot in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(lot.note)
+                                    .font(.caption.bold())
+                                    .foregroundColor(Color(hex: "#007AFF"))
+                                Spacer()
+                                if editableLots.count > 1 {
+                                    Button(role: .destructive) {
+                                        editableLots.removeAll { $0.id == lot.id }
+                                        recalculateFromLots()
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                            DatePicker("買入 / 加碼日期", selection: $lot.buyDate, displayedComponents: .date)
+                                .font(.caption)
+                            HStack(spacing: 10) {
+                                HStack(spacing: 4) {
+                                    Text("股數").font(.caption).foregroundColor(.secondary)
+                                    TextField("股數", value: $lot.shares, format: .number)
+                                        .keyboardType(.numberPad)
+                                        .multilineTextAlignment(.trailing)
+                                        .onChange(of: lot.shares) { _ in recalculateFromLots() }
+                                }
+                                Divider()
+                                HStack(spacing: 4) {
+                                    Text("單價").font(.caption).foregroundColor(.secondary)
+                                    TextField("價格", value: $lot.price, format: .number)
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                        .onChange(of: lot.price) { _ in recalculateFromLots() }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    if showAddLotBox {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("新增一筆加碼紀錄")
+                                .font(.caption.bold())
+                                .foregroundColor(Color(hex: "#FF9500"))
+                            DatePicker("加碼日期", selection: $newLotDate, displayedComponents: .date)
+                                .font(.caption)
+                            TextField("加碼股數 (例: 100000 = 100張)", text: $newLotShares)
+                                .keyboardType(.numberPad)
+                            TextField("加碼成交價 (元)", text: $newLotPrice)
+                                .keyboardType(.decimalPad)
+                            HStack {
+                                Button("取消") { showAddLotBox = false }
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Button("加入此筆加碼") {
+                                    let s = Int(newLotShares) ?? 0
+                                    let p = Double(newLotPrice) ?? (Double(currentPrice) ?? holding.currentPrice)
+                                    if s > 0 {
+                                        editableLots.append(HoldingLot(buyDate: newLotDate, shares: s, price: p, note: "加碼買進"))
+                                        editableLots.sort { $0.buyDate < $1.buyDate }
+                                        recalculateFromLots()
+                                        showAddLotBox = false
+                                    }
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(Color(hex: "#007AFF"))
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        Button {
+                            newLotDate = Date()
+                            newLotPrice = currentPrice
+                            newLotShares = "1000"
+                            showAddLotBox = true
+                        } label: {
+                            Label("新增一筆買入 / 加碼日期紀錄", systemImage: "plus.circle.fill")
+                                .font(.subheadline.bold())
+                                .foregroundColor(Color(hex: "#007AFF"))
+                        }
+                    }
+                } header: {
+                    Text("買入與加碼日期明細 (決定各月除息可領股數)")
+                } footer: {
+                    Text("例：00406A 若 10/20 買 10,000 股、11/04 加碼 100,000 股，11 月僅以 10,000 股計息（約 $1,380），11/04 加碼須待 12 月配息公布後方可領取。")
+                        .font(.caption2)
+                }
                 
-                Section("持股與成本") {
+                Section("總持股與現價") {
                     HStack {
-                        Text("持有股數")
+                        Text("持有總股數")
                         Spacer()
                         TextField("股數", text: $shares).keyboardType(.numberPad).multilineTextAlignment(.trailing)
                     }
@@ -2067,13 +2247,19 @@ struct EditHoldingSheet: View {
                         var updated = holding
                         updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                         updated.frequency = frequency
-                        updated.shares = Int(shares) ?? holding.shares
-                        updated.averageCost = Double(averageCost) ?? holding.averageCost
                         updated.currentPrice = Double(currentPrice) ?? holding.currentPrice
                         updated.totalDividendsReceived = Double(totalDividends) ?? holding.totalDividendsReceived
                         updated.dividendCount = Int(dividendCount) ?? holding.dividendCount
                         updated.brokerage = brokerage
-                        updated.updatedAt = Date()
+                        let cleanLots = editableLots.filter { $0.shares > 0 }.sorted { $0.buyDate < $1.buyDate }
+                        if !cleanLots.isEmpty {
+                            updated.lots = cleanLots
+                            updated.syncFromLots()
+                        } else {
+                            updated.shares = Int(shares) ?? holding.shares
+                            updated.averageCost = Double(averageCost) ?? holding.averageCost
+                            updated.updatedAt = Date()
+                        }
                         onSave(updated)
                         dismiss()
                     }
@@ -2100,6 +2286,11 @@ struct EditHoldingSheet: View {
                 currentPrice = String(format: "%.2f", holding.currentPrice)
                 totalDividends = "\(Int(holding.totalDividendsReceived))"
                 dividendCount = "\(holding.dividendCount)"
+                if holding.lots.isEmpty && holding.shares > 0 {
+                    editableLots = [HoldingLot(buyDate: holding.purchaseDate, shares: holding.shares, price: holding.averageCost, note: "初始買入")]
+                } else {
+                    editableLots = holding.lots.sorted { $0.buyDate < $1.buyDate }
+                }
             }
         }
     }
@@ -2724,6 +2915,7 @@ struct AddHoldingSheet: View {
     @State private var shares = "1000"
     @State private var cost = ""
     @State private var brokerage: String = "元大證券"
+    @State private var buyDate: Date = Date()
     @State private var isDCAMode = true
     @State private var autoAddJournal = true
     
@@ -2878,6 +3070,27 @@ struct AddHoldingSheet: View {
                 }
                 
                 Section(existingHolding != nil && isDCAMode ? "本次買進加碼規格" : "持股與成本") {
+                    DatePicker(
+                        existingHolding != nil && isDCAMode ? "加碼日期" : "買入日期",
+                        selection: $buyDate,
+                        displayedComponents: .date
+                    )
+                    let curY = Calendar.current.component(.year, from: Date())
+                    let curM = Calendar.current.component(.month, from: Date())
+                    let cleanSym = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    let cutoffNow = StockHolding.exDividendCutoffDate(
+                        for: cleanSym,
+                        year: curY,
+                        month: curM,
+                        events: StorageService.shared.loadEvents()
+                    )
+                    let eligibleThisMonth = Calendar.current.startOfDay(for: buyDate) < cutoffNow
+                    Text(eligibleThisMonth
+                         ? "✓ 該日期趕上本月除息基準，計入本月可領股息"
+                         : "⏳ 該日期已過本月除息截算日，配息須待下月公布後方可領取")
+                        .font(.caption2.bold())
+                        .foregroundColor(eligibleThisMonth ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+
                     Picker("往來證券商", selection: $brokerage) {
                         ForEach(BrokerageAccount.defaultBrokerages) { b in
                             Text(b.name).tag(b.name)
@@ -2900,7 +3113,8 @@ struct AddHoldingSheet: View {
                             averageCost: Double(cost) ?? 0,
                             currentPrice: Double(cost) ?? 0,
                             stockType: stockType,
-                            brokerage: brokerage
+                            brokerage: brokerage,
+                            purchaseDate: buyDate
                         )
                         onSave(h, existingHolding != nil && isDCAMode)
                         dismiss()
