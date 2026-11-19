@@ -423,18 +423,17 @@ public final class StorageService {
 
                     if let histIdx = histories.firstIndex(where: {
                         $0.symbol.uppercased() == sym &&
-                        cal.component(.year, from: $0.exDividendDate) == y &&
-                        cal.component(.month, from: $0.exDividendDate) == m
+                        cal.component(.year, from: $0.paymentDate) == y &&
+                        cal.component(.month, from: $0.paymentDate) == m
                     }) {
                         if histories[histIdx].sharesSnapshot != eligible ||
                            abs(histories[histIdx].dividendPerShare - item.cashPerShare) > 0.0001 {
                             histories[histIdx] = HoldingDividendHistory(
                                 id: histories[histIdx].id,
                                 symbol: h.symbol,
-                                exDividendDate: item.exDate,
+                                paymentDate: item.exDate,
                                 dividendPerShare: item.cashPerShare,
-                                sharesSnapshot: eligible,
-                                priceAtExDate: h.currentPrice
+                                sharesSnapshot: eligible
                             )
                             historiesChanged = true
                             creditedCount += 1
@@ -442,10 +441,9 @@ public final class StorageService {
                     } else {
                         histories.append(HoldingDividendHistory(
                             symbol: h.symbol,
-                            exDividendDate: item.exDate,
+                            paymentDate: item.exDate,
                             dividendPerShare: item.cashPerShare,
-                            sharesSnapshot: eligible,
-                            priceAtExDate: h.currentPrice
+                            sharesSnapshot: eligible
                         ))
                         historiesChanged = true
                         creditedCount += 1
@@ -456,7 +454,7 @@ public final class StorageService {
             // 3. 重新彙整該持股已除息入帳之累計股息與次數
             let symHistories = histories.filter { $0.symbol.uppercased() == sym }
             if !symHistories.isEmpty {
-                let sumDiv = symHistories.reduce(0.0) { $0 + $1.totalAmount }.rounded()
+                let sumDiv = symHistories.reduce(0.0) { $0 + $1.totalReceived }.rounded()
                 let cnt = symHistories.count
                 if abs(h.totalDividendsReceived - sumDiv) > 0.5 || h.dividendCount != cnt {
                     h.totalDividendsReceived = sumDiv
@@ -469,7 +467,7 @@ public final class StorageService {
 
         if eventsChanged { saveEvents(events) }
         if historiesChanged {
-            histories.sort { $0.exDividendDate > $1.exDividendDate }
+            histories.sort { $0.paymentDate > $1.paymentDate }
             saveHoldingHistories(histories)
         }
         if holdingsChanged { saveHoldings(holdings) }
