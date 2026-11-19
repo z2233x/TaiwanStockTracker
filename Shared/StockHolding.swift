@@ -241,6 +241,32 @@ public struct StockHolding: Identifiable, Codable, Equatable {
     }
 
     // MARK: - 除息基準日與可參與配息股數計算
+    /// 查詢該標的於指定年月是否有官方或行事曆公布之除權息日與每股配息金額
+    public static func announcedDividendInMonth(
+        for symbol: String,
+        year: Int,
+        month: Int,
+        events: [DividendEvent] = []
+    ) -> (exDate: Date, exDateString: String, cashPerShare: Double)? {
+        let cal = Calendar.current
+        let clean = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let exEvt = events.first(where: {
+            $0.symbol.uppercased() == clean &&
+            ($0.eventType == .exDividendDate || $0.eventType == .exRightsDate) &&
+            cal.component(.year, from: $0.targetDate) == year &&
+            cal.component(.month, from: $0.targetDate) == month
+        }) {
+            let d = cal.startOfDay(for: exEvt.targetDate)
+            let offCash = StockQuoteService.shared.officialDividend(for: clean, year: year, month: month)?.cashPerShare ?? 0
+            let cash = exEvt.cashPerShare > 0 ? exEvt.cashPerShare : offCash
+            return (d, exEvt.dateString, cash)
+        }
+        if let official = StockQuoteService.shared.officialDividend(for: clean, year: year, month: month) {
+            return (cal.startOfDay(for: official.exDate), official.exDateString, official.cashPerShare)
+        }
+        return nil
+    }
+
     /// 取得該標的於指定年月的除息截算日（須於此日「前」買進，才計入該月配息）
     public static func exDividendCutoffDate(
         for symbol: String,
@@ -249,16 +275,12 @@ public struct StockHolding: Identifiable, Codable, Equatable {
         events: [DividendEvent] = []
     ) -> Date {
         let cal = Calendar.current
-        if let exEvt = events.first(where: {
-            $0.symbol == symbol &&
-            $0.eventType == .exDividendDate &&
-            cal.component(.year, from: $0.targetDate) == year &&
-            cal.component(.month, from: $0.targetDate) == month
-        }) {
-            return cal.startOfDay(for: exEvt.targetDate)
+        let clean = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let announced = announcedDividendInMonth(for: clean, year: year, month: month, events: events) {
+            return announced.exDate
         }
         if let lastEvt = events.first(where: {
-            $0.symbol == symbol &&
+            $0.symbol.uppercased() == clean &&
             $0.eventType == .lastBuyDate &&
             cal.component(.year, from: $0.targetDate) == year &&
             cal.component(.month, from: $0.targetDate) == month

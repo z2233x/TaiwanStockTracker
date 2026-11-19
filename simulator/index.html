@@ -1746,8 +1746,14 @@
       const cutoffNow = getExDividendCutoffDateStr(h.symbol, curY, curM);
       const eligibleShares = getEligibleSharesForMonth(h, curY, curM);
       const pendingShares = Math.max(0, h.shares - eligibleShares);
-      const hMonthlyDiv = calculateMonthlyDivForShares(h, eligibleShares);
-      const hFullMonthlyDiv = calculateMonthlyDivForShares(h, h.shares);
+      const actualMonth = calculateActualMonthDividendSim(h, curY, curM, eligibleShares, nowObj);
+      const hMonthlyDiv = actualMonth.exDateStr
+        ? (actualMonth.isReached ? actualMonth.realizedInMonth : (h.frequency === '月配' ? actualMonth.upcomingInMonth : 0))
+        : (h.frequency === '月配' ? calculateMonthlyDivForShares(h, eligibleShares) : 0);
+      const hFullMonthlyDiv = actualMonth.exDateStr
+        ? h.shares * (actualMonth.cashPerShare || 0)
+        : calculateMonthlyDivForShares(h, h.shares);
+      const effDps = actualMonth.cashPerShare || hProfile.dps;
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
@@ -1792,7 +1798,7 @@
               </div>
               ${lots.length > 0 ? `
                 <div style="background: #F9F9FB; border: 1px solid #EFEFF4; border-radius: 8px; padding: 7px 9px; margin-bottom: 8px; font-size: 11px;">
-                  <div style="font-size: 10px; font-weight: 700; color: #8E8E93; margin-bottom: 4px;">買入與加碼批次 (${lots.length} 筆)</div>
+                  <div style="font-size: 10px; font-weight: 700; color: #8E8E93; margin-bottom: 4px;">買入與加碼批次 (${lots.length} 筆) · 本月除權息日 ${cutoffNow}</div>
                   ${lots.map(l => {
                     const isElig = (l.buyDate || '').slice(0, 10) < cutoffNow;
                     const badgeTxt = isElig ? '✓ 本月計息' : (isMidMonthAnnounced ? `📢 領 ${nextMNum} 月息(已公布)` : `⏳ 待 ${nextMNum} 月公布`);
@@ -1808,8 +1814,15 @@
                 </div>
               ` : ''}
               <div style="background: #F2F2F7; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px;">
+                ${actualMonth.exDateStr ? `
+                  <div style="background: ${actualMonth.isReached ? 'rgba(52,199,89,0.14)' : 'rgba(0,122,255,0.12)'}; color: ${actualMonth.isReached ? '#15803D' : '#1D4ED8'}; padding: 4px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 800; margin-bottom: 5px;">
+                    ${actualMonth.isReached
+                      ? `📢 本月除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · ✓ 已除息增加 ${curM} 月股息 (+$${Math.round(actualMonth.realizedInMonth).toLocaleString()})`
+                      : `📅 本月預定除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · 到期將增加 ${curM} 月股息 (+$${Math.round(actualMonth.upcomingInMonth).toLocaleString()})`}
+                  </div>
+                ` : ''}
                 <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--ios-blue); margin-bottom: 4px;">
-                  <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${hProfile.dps ? `(${eligibleShares.toLocaleString()}股 × $${hProfile.dps})` : ''}</span>
+                  <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${effDps ? `(${eligibleShares.toLocaleString()}股 × $${effDps})` : ''}</span>
                   <span style="color: #34C759;">免稅比 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>
                 </div>
                 ${pendingShares > 0 ? `<div style="color: ${isMidMonthAnnounced ? '#1D4ED8' : '#C2410C'}; font-size: 10.5px; font-weight: 700; margin-bottom: 3px;">${isMidMonthAnnounced ? `📢 ${nextMNum} 月配息已公布：此筆 ${pendingShares.toLocaleString()} 股將於 ${nextMNum} 月除息領取（下月合計 $${Math.round(hFullMonthlyDiv).toLocaleString()}）` : `⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待本月中旬公布 ${nextMNum} 月配息領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）`}</div>` : ''}
@@ -2233,11 +2246,20 @@
         const eligible = getEligibleSharesForMonth(h, targetY, targetM);
         const pending = Math.max(0, owned - eligible);
         if (eligible > 0) {
-          monthDiv += calculateMonthlyDivForShares(h, eligible);
-          divActiveSymbols.push(h.symbol);
+          const actual = calculateActualMonthDividendSim(h, targetY, targetM, eligible, now);
+          const amt = actual.realizedInMonth > 0
+            ? actual.realizedInMonth
+            : (h.frequency === '月配' ? actual.upcomingInMonth : 0);
+          if (amt > 0) {
+            monthDiv += amt;
+            divActiveSymbols.push(h.symbol);
+          }
         }
         if (pending > 0) {
-          pendingNextDiv += calculateMonthlyDivForShares(h, pending);
+          const ann = getAnnouncedDividendInMonth(h.symbol, targetY, targetM);
+          pendingNextDiv += (ann && ann.cashPerShare > 0)
+            ? (pending * ann.cashPerShare)
+            : calculateMonthlyDivForShares(h, pending);
           pendingSharesCount += pending;
           pendingSymbols.push(h.symbol);
         }
@@ -2556,13 +2578,13 @@
 
     // 2. 主流高股息 ETF (提供最新每股配息 dps)
     const highDivProfiles = {
-      '00919': { yield: 0.102, dps: 0.72,  ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅' },
-      '00929': { yield: 0.082, dps: 0.11,  ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '科技優息月月配，平準金機制穩定配息' },
-      '0056':  { yield: 0.085, dps: 1.07,  ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '老牌高股息，資本利得與平準金合計免稅達 65%' },
-      '00878': { yield: 0.078, dps: 0.55,  ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: 'ESG 穩健息收與平準金保護' },
-      '00915': { yield: 0.095, dps: 0.82,  ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: '高資本利得成分，免稅比重高' },
-      '00713': { yield: 0.072, dps: 1.50,  ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '低波動防禦型，配息平準金兼備' },
-      '00940': { yield: 0.065, dps: 0.04,  ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '價值選股月配' },
+      '00919': { yield: 0.102, dps: 1.10,  ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅' },
+      '00929': { yield: 0.082, dps: 0.38,  ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '科技優息月月配，平準金機制穩定配息' },
+      '0056':  { yield: 0.085, dps: 1.72,  ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '老牌高股息，資本利得與平準金合計免稅達 65%' },
+      '00878': { yield: 0.078, dps: 1.25,  ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: 'ESG 穩健息收與平準金保護' },
+      '00915': { yield: 0.095, dps: 0.60,  ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: '高資本利得成分，免稅比重高' },
+      '00713': { yield: 0.072, dps: 1.25,  ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: '低波動防禦型，配息平準金兼備' },
+      '00940': { yield: 0.065, dps: 0.06,  ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: '價值選股月配' },
       '00939': { yield: 0.062, dps: 0.063, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: '動能選股月配' }
     };
     if (highDivProfiles[sym]) {
@@ -2582,7 +2604,7 @@
 
     // 3. 市值型 ETF
     if (['0050', '006208', '00692', '00850'].includes(sym)) {
-      const dps = sym === '006208' ? 0.783 : (sym === '0050' ? 1.0 : null);
+      const dps = sym === '006208' ? 3.88 : (sym === '0050' ? 1.0 : null);
       return {
         strategy: '市值指數型',
         color: '#007AFF',
@@ -2636,10 +2658,90 @@
     return h.shares > 0 ? [{ id: 'init', buyDate: fallbackDate, shares: h.shares, price: h.averageCost, note: '初始買入' }] : [];
   }
 
-  function getExDividendCutoffDateStr(symbol, year, month) {
+  // 台股官方已公告之除權息日與每股配息表 (證交所 TWT48U_ALL + Yahoo Finance events=div 同步)
+  const OFFICIAL_DIVIDEND_SCHEDULES = {
+    '006208': [
+      { exDate: '2025-11-18', cash: 3.448 },
+      { exDate: '2026-07-16', cash: 4.750 },
+      { exDate: '2026-11-17', cash: 3.880 }
+    ],
+    '00406A': [
+      { exDate: '2026-09-02', cash: 0.138 },
+      { exDate: '2026-10-05', cash: 0.138 },
+      { exDate: '2026-11-03', cash: 0.138 },
+      { exDate: '2026-12-02', cash: 0.138 }
+    ],
+    '00878': [
+      { exDate: '2026-02-24', cash: 0.500 },
+      { exDate: '2026-05-19', cash: 0.660 },
+      { exDate: '2026-08-18', cash: 1.010 },
+      { exDate: '2026-11-17', cash: 1.250 }
+    ],
+    '00929': [
+      { exDate: '2026-08-18', cash: 0.180 },
+      { exDate: '2026-09-17', cash: 0.380 },
+      { exDate: '2026-10-21', cash: 0.380 },
+      { exDate: '2026-11-18', cash: 0.380 }
+    ],
+    '00940': [
+      { exDate: '2026-08-08', cash: 0.050 },
+      { exDate: '2026-09-08', cash: 0.055 },
+      { exDate: '2026-10-07', cash: 0.055 },
+      { exDate: '2026-11-10', cash: 0.060 }
+    ],
+    '0056': [
+      { exDate: '2026-01-17', cash: 1.070 },
+      { exDate: '2026-04-23', cash: 1.000 },
+      { exDate: '2026-07-21', cash: 1.350 },
+      { exDate: '2026-10-22', cash: 1.720 }
+    ],
+    '00919': [
+      { exDate: '2026-03-17', cash: 0.780 },
+      { exDate: '2026-06-16', cash: 1.000 },
+      { exDate: '2026-09-16', cash: 1.100 }
+    ],
+    '0050': [
+      { exDate: '2026-01-22', cash: 1.000 },
+      { exDate: '2026-07-21', cash: 0.600 }
+    ],
+    '00713': [
+      { exDate: '2026-03-20', cash: 0.780 },
+      { exDate: '2026-06-22', cash: 1.000 },
+      { exDate: '2026-09-21', cash: 1.250 }
+    ],
+    '00915': [
+      { exDate: '2026-03-17', cash: 0.750 },
+      { exDate: '2026-06-16', cash: 0.450 },
+      { exDate: '2026-08-18', cash: 0.320 },
+      { exDate: '2026-09-16', cash: 0.600 }
+    ],
+    '2330': [
+      { exDate: '2026-03-17', cash: 6.000 },
+      { exDate: '2026-06-11', cash: 6.000 },
+      { exDate: '2026-09-16', cash: 7.000 }
+    ]
+  };
+
+  function getAnnouncedDividendInMonth(symbol, year, month) {
+    const cleanSym = (symbol || '').trim().toUpperCase();
     const ymPrefix = `${year}-${String(month).padStart(2, '0')}`;
-    const exEvt = (events || []).find(e => e.symbol === symbol && e.type === '除息日' && (e.date || '').startsWith(ymPrefix));
-    if (exEvt && exEvt.date) return exEvt.date.slice(0, 10);
+    const exEvt = (events || []).find(e => (e.symbol || '').toUpperCase() === cleanSym && e.type === '除息日' && (e.date || '').startsWith(ymPrefix));
+    const officialList = OFFICIAL_DIVIDEND_SCHEDULES[cleanSym] || [];
+    const officialItem = officialList.find(it => (it.exDate || '').startsWith(ymPrefix));
+    if (exEvt && exEvt.date) {
+      const cash = (Number(exEvt.cashPerShare) > 0) ? Number(exEvt.cashPerShare) : (officialItem ? officialItem.cash : 0);
+      return { exDateStr: exEvt.date.slice(0, 10), cashPerShare: cash };
+    }
+    if (officialItem) {
+      return { exDateStr: officialItem.exDate, cashPerShare: officialItem.cash };
+    }
+    return null;
+  }
+
+  function getExDividendCutoffDateStr(symbol, year, month) {
+    const ann = getAnnouncedDividendInMonth(symbol, year, month);
+    if (ann && ann.exDateStr) return ann.exDateStr;
+    const ymPrefix = `${year}-${String(month).padStart(2, '0')}`;
     const lastEvt = (events || []).find(e => e.symbol === symbol && e.type === '最後購買日' && (e.date || '').startsWith(ymPrefix));
     if (lastEvt && lastEvt.date) {
       const d = new Date(lastEvt.date + 'T00:00:00');
@@ -2647,6 +2749,104 @@
       return d.toISOString().slice(0, 10);
     }
     return `${ymPrefix}-03`;
+  }
+
+  function calculateActualMonthDividendSim(h, year, month, eligibleShares, asOfDate = new Date()) {
+    const todayStr = asOfDate.toISOString().slice(0, 10);
+    const todayY = asOfDate.getFullYear();
+    const todayM = asOfDate.getMonth() + 1;
+    const isPastMonth = (year < todayY) || (year === todayY && month < todayM);
+    const ann = getAnnouncedDividendInMonth(h.symbol, year, month);
+    if (ann && ann.cashPerShare > 0) {
+      const amt = Math.max(0, eligibleShares) * ann.cashPerShare;
+      const isReached = isPastMonth || (year === todayY && month === todayM && todayStr >= ann.exDateStr);
+      return {
+        realizedInMonth: isReached ? amt : 0,
+        upcomingInMonth: isReached ? 0 : amt,
+        exDateStr: ann.exDateStr,
+        cashPerShare: ann.cashPerShare,
+        isReached
+      };
+    }
+    if (h.frequency === '月配') {
+      const p = getHoldingDividendProfile(h.symbol, h.name, h.stockType);
+      const amt = calculateMonthlyDivForShares(h, eligibleShares);
+      return {
+        realizedInMonth: amt,
+        upcomingInMonth: 0,
+        exDateStr: null,
+        cashPerShare: p.dps,
+        isReached: true
+      };
+    }
+    return { realizedInMonth: 0, upcomingInMonth: 0, exDateStr: null, cashPerShare: null, isReached: false };
+  }
+
+  function syncOfficialDividendsSim() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    holdings.forEach(h => {
+      const sym = (h.symbol || '').trim().toUpperCase();
+      const schedule = OFFICIAL_DIVIDEND_SCHEDULES[sym] || [];
+      if (!schedule.length) return;
+      if (!holdingHistories[sym]) holdingHistories[sym] = [];
+
+      schedule.forEach(item => {
+        const ymPrefix = item.exDate.slice(0, 7);
+        const [yStr, mStr] = item.exDate.split('-');
+        const y = Number(yStr);
+        const m = Number(mStr);
+
+        // 1. 同步至日曆 events
+        const existingEv = (events || []).find(e => (e.symbol || '').toUpperCase() === sym && e.type === '除息日' && (e.date || '').startsWith(ymPrefix));
+        if (existingEv) {
+          existingEv.date = item.exDate;
+          existingEv.cashPerShare = item.cash;
+        } else {
+          events.push({
+            id: 'ev_' + sym + '_' + item.exDate,
+            symbol: h.symbol,
+            name: h.name,
+            freq: h.frequency,
+            type: '除息日',
+            date: item.exDate,
+            cashPerShare: item.cash,
+            note: `公告除權息日 ${item.exDate} (每股配 $${item.cash})`
+          });
+        }
+
+        // 2. 若已到達除權息日 (today >= exDate)，計算除息前有效股數並自動入帳增加股息
+        if (todayStr >= item.exDate) {
+          const elig = getEligibleSharesForMonth(h, y, m);
+          if (elig > 0) {
+            const totalRec = Math.round(item.cash * elig);
+            const existingHist = holdingHistories[sym].find(r => ((r.exDate || r.paymentDate || '')).startsWith(ymPrefix));
+            if (existingHist) {
+              existingHist.exDate = item.exDate;
+              existingHist.paymentDate = item.exDate;
+              existingHist.dps = item.cash;
+              existingHist.shares = elig;
+              existingHist.totalReceived = totalRec;
+            } else {
+              holdingHistories[sym].push({
+                id: 'auto_' + sym + '_' + item.exDate,
+                exDate: item.exDate,
+                paymentDate: item.exDate,
+                dps: item.cash,
+                shares: elig,
+                totalReceived: totalRec,
+                price: h.currentPrice
+              });
+            }
+          }
+        }
+      });
+
+      if (holdingHistories[sym].length > 0) {
+        holdingHistories[sym].sort((a, b) => ((b.paymentDate || b.exDate || '')).localeCompare((a.paymentDate || a.exDate || '')));
+        h.totalDividends = Math.round(holdingHistories[sym].reduce((s, r) => s + (Number(r.totalReceived) || (r.dps * r.shares) || 0), 0));
+        h.count = holdingHistories[sym].length;
+      }
+    });
   }
 
   function getOwnedSharesInMonth(h, year, month) {
@@ -2694,9 +2894,27 @@
       const val = h.shares * h.currentPrice;
       const eligibleSharesNow = getEligibleSharesForMonth(h, curY, curM);
       const pendingNextMonthShares = Math.max(0, h.shares - eligibleSharesNow);
-      const monthly = calculateMonthlyDivForShares(h, eligibleSharesNow);
-      const fullMonthly = calculateMonthlyDivForShares(h, h.shares);
-      const annual = fullMonthly * 12;
+      const actualMonth = calculateActualMonthDividendSim(h, curY, curM, eligibleSharesNow, now);
+      const runRateEligible = calculateMonthlyDivForShares(h, eligibleSharesNow);
+      const runRateFull = calculateMonthlyDivForShares(h, h.shares);
+      let monthly = 0;
+      let fullMonthly = 0;
+      if (actualMonth.exDateStr) {
+        if (actualMonth.isReached) {
+          monthly = actualMonth.realizedInMonth;
+          fullMonthly = h.shares * (actualMonth.cashPerShare || 0);
+        } else if (h.frequency === '月配') {
+          monthly = actualMonth.upcomingInMonth;
+          fullMonthly = h.shares * (actualMonth.cashPerShare || 0);
+        } else {
+          monthly = 0;
+          fullMonthly = runRateFull;
+        }
+      } else {
+        monthly = h.frequency === '月配' ? runRateEligible : 0;
+        fullMonthly = h.frequency === '月配' ? runRateFull : 0;
+      }
+      const annual = runRateFull * 12;
       const effYield = val > 0 ? (annual / val) : p.yield;
       return {
         holding: h,
@@ -3063,6 +3281,14 @@
     setTimeout(updateBuyDateEligPreview, 20);
   }
 
+  function setPreExBuyDateSim(preDateStr) {
+    const dateEl = document.getElementById('newBuyDate');
+    if (dateEl) {
+      dateEl.value = preDateStr;
+      updateBuyDateEligPreview();
+    }
+  }
+
   function updateBuyDateEligPreview() {
     const symEl = document.getElementById('newSymbol');
     const dateEl = document.getElementById('newBuyDate');
@@ -3074,13 +3300,22 @@
     if (lblEl) lblEl.innerText = isExist ? '📅 加碼日期' : '📅 買入日期';
     const dStr = (dateEl.value || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const now = new Date();
-    const cutoff = getExDividendCutoffDateStr(sym, now.getFullYear(), now.getMonth() + 1);
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
+    const ann = getAnnouncedDividendInMonth(sym, curY, curM);
+    const cutoff = getExDividendCutoffDateStr(sym, curY, curM);
+    const annBanner = ann
+      ? `<div style="color:#1D4ED8; margin-bottom:3px;">📅 ${sym} 本月公告除權息日：${ann.exDateStr}（每股配 $${ann.cashPerShare}）</div>`
+      : '';
     if (dStr < cutoff) {
       hintEl.style.color = '#15803D';
-      hintEl.innerText = `✓ 趕上本月除息基準 (${cutoff} 前)，計入本月可領股息`;
+      hintEl.innerHTML = `${annBanner}✓ 該日期在除權息日 (${cutoff}) 前買進，計入本月可領股息`;
     } else {
+      const preD = new Date(cutoff + 'T00:00:00');
+      preD.setDate(preD.getDate() - 1);
+      const preStr = preD.toISOString().slice(0, 10);
       hintEl.style.color = '#C2410C';
-      hintEl.innerText = `⏳ 已過本月除息截算 (${cutoff})，配息須待下月公布後方可領取`;
+      hintEl.innerHTML = `${annBanner}<div style="display:flex; justify-content:space-between; align-items:center; gap:6px;"><span>⏳ 已達或超過本月除權息日 (${cutoff})，將計入下期</span><button type="button" class="sim-btn" style="padding:2px 7px; font-size:10px; font-weight:700; background:#15803D; color:#FFF; border-radius:6px;" onclick="setPreExBuyDateSim('${preStr}')">⚡ 設為除息前買入 (${preStr.slice(5)})</button></div>`;
     }
   }
 
@@ -4130,6 +4365,7 @@
       h.shares = parseInt(document.getElementById('editShares').value) || h.shares;
       h.averageCost = parseFloat(document.getElementById('editCost').value) || h.averageCost;
     }
+    syncOfficialDividendsSim();
     saveState();
     closeSheet();
     renderApp();
@@ -4170,7 +4406,8 @@
     alert('已將完整備份 JSON 複製至剪貼簿！');
   }
 
-  // 初次啟動渲染
+  // 初次啟動同步公告除權息並渲染
+  syncOfficialDividendsSim();
   renderApp();
 </script>
 </body>

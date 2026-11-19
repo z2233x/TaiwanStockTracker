@@ -1527,6 +1527,7 @@ struct DividendTimelineView: View {
                 }
             }
             .onAppear {
+                StorageService.shared.syncAnnouncedDividends()
                 holdings = StorageService.shared.loadHoldings()
                 monthlySummaries = StorageService.shared.getMonthlyTimelineSummaries(holdings: holdings)
                 nextForecast = StorageService.shared.getNextMonthDividendForecast(holdings: holdings)
@@ -1724,8 +1725,22 @@ struct StockHoldingRowView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
+                        if let exStr = calc.announcedExDateString, let cash = calc.announcedCashPerShare {
+                            HStack(spacing: 4) {
+                                Text(calc.isExDividendReachedInMonth
+                                     ? "📢 本月除權息日 \(exStr) · 每股配 $\(String(format: "%.3f", cash)) · ✓ 已除息增加 \(curM) 月股息 (+$\(Int(calc.monthlyDividend).formatted()))"
+                                     : "📅 本月預定除權息日 \(exStr) · 每股配 $\(String(format: "%.3f", cash)) · 到期將增加 \(curM) 月股息 (+$\(Int(calc.upcomingExDividendAmountInMonth).formatted()))")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(Color(hex: calc.isExDividendReachedInMonth ? "#15803D" : "#1D4ED8"))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background((calc.isExDividendReachedInMonth ? Color.green : Color.blue).opacity(0.12))
+                            .cornerRadius(6)
+                        }
+
                         HStack {
-                            if let dps = calc.profile.defaultCashDividendPerShare {
+                            if let dps = calc.announcedCashPerShare ?? calc.profile.defaultCashDividendPerShare {
                                 Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (\(calc.eligibleSharesNow.formatted())股 × $\(String(format: "%.3f", dps)))")
                                     .font(.caption.bold())
                                     .foregroundColor(Color(hex: "#007AFF"))
@@ -2183,6 +2198,7 @@ struct HoldingsListView: View {
     }
     
     private func reloadAllData() {
+        StorageService.shared.syncAnnouncedDividends()
         holdings = StorageService.shared.loadHoldings()
     }
     
@@ -3227,18 +3243,42 @@ struct AddHoldingSheet: View {
                     let curY = Calendar.current.component(.year, from: Date())
                     let curM = Calendar.current.component(.month, from: Date())
                     let cleanSym = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    let loadedEvents = StorageService.shared.loadEvents()
+                    let announcedThisMonth = StockHolding.announcedDividendInMonth(
+                        for: cleanSym,
+                        year: curY,
+                        month: curM,
+                        events: loadedEvents
+                    )
                     let cutoffNow = StockHolding.exDividendCutoffDate(
                         for: cleanSym,
                         year: curY,
                         month: curM,
-                        events: StorageService.shared.loadEvents()
+                        events: loadedEvents
                     )
                     let eligibleThisMonth = Calendar.current.startOfDay(for: buyDate) < cutoffNow
-                    Text(eligibleThisMonth
-                         ? "✓ 該日期趕上本月除息基準，計入本月可領股息"
-                         : "⏳ 該日期已過本月除息截算日，配息須待下月公布後方可領取")
-                        .font(.caption2.bold())
-                        .foregroundColor(eligibleThisMonth ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+                    if let ann = announcedThisMonth {
+                        Text("📅 \(cleanSym) 本月公告除權息日：\(ann.exDateString)（每股配 $\(String(format: "%.3f", ann.cashPerShare))）")
+                            .font(.caption2.bold())
+                            .foregroundColor(Color(hex: "#1D4ED8"))
+                    }
+                    HStack {
+                        Text(eligibleThisMonth
+                             ? "✓ 該日期在除權息日 (\(announcedThisMonth?.exDateString ?? "本月截算日")) 前買進，計入本月配息"
+                             : "⏳ 該日期已達或超過本月除權息日，配息將計入下期")
+                            .font(.caption2.bold())
+                            .foregroundColor(eligibleThisMonth ? Color(hex: "#15803D") : Color(hex: "#C2410C"))
+                        Spacer()
+                        if !eligibleThisMonth,
+                           let preExDate = Calendar.current.date(byAdding: .day, value: -1, to: cutoffNow) {
+                            Button("⚡ 設為除息前買入") {
+                                buyDate = preExDate
+                            }
+                            .font(.caption2.bold())
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color(hex: "#15803D"))
+                        }
+                    }
 
                     Picker("往來證券商", selection: $brokerage) {
                         ForEach(BrokerageAccount.defaultBrokerages) { b in

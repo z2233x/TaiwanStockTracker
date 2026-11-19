@@ -110,7 +110,7 @@ public struct HoldingDividendCalculation: Identifiable {
     public let profile: HoldingDividendProfile
     public let eligibleSharesNow: Int        // 本月已趕上除息基準日之有效股數
     public let pendingNextMonthShares: Int   // 本月除息後加碼、須待下月配息公布領取之股數
-    public let monthlyDividend: Double       // 本月實際可領預估月股息 (依 eligibleSharesNow)
+    public let monthlyDividend: Double       // 本月實際可領預估月股息 (依 eligibleSharesNow，含當月已除權息配息)
     public let fullMonthlyDividend: Double   // 下期含新加碼滿倉預估月股息
     public let annualDividend: Double        // 滿倉推算年化股息
     public let effectiveAnnualYield: Double  // 實質年化殖利率
@@ -121,6 +121,10 @@ public struct HoldingDividendCalculation: Identifiable {
     public let taxExemptPercentage: Double   // 免稅比例 (%)
     public let singleDistribution54C: Double // 單次配息推算 54C 金額 (檢測二代健保)
     public let isAboveNhiThreshold: Bool     // 是否單筆 54C 達 2 萬二代健保門檻
+    public let announcedExDateString: String?          // 本月公告之除權息日 (如 "2026-11-17")
+    public let announcedCashPerShare: Double?          // 本月公告之每股配息金額 (如 3.88)
+    public let isExDividendReachedInMonth: Bool        // 本月除權息日是否已到並計入當月股息
+    public let upcomingExDividendAmountInMonth: Double // 本月已公告但尚未到達除權息日之待除息金額
 }
 
 // MARK: - 全體持股投資組合股息來源彙整報告
@@ -184,25 +188,25 @@ public final class DividendSourceService {
         // 2. 知名高股息 ETF (含收益平準金與資本利得拆解，提供最新每股配息)
         switch sym {
         case "00919":
-            return HoldingDividendProfile(symbol: sym, name: "群益台灣精選高息", strategy: .highDividend, estimatedYield: 0.102, defaultCashDividendPerShare: 0.72, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅負擔")
+            return HoldingDividendProfile(symbol: sym, name: "群益台灣精選高息", strategy: .highDividend, estimatedYield: 0.102, defaultCashDividendPerShare: 1.10, ratio76: 0.28, ratio54C: 0.32, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "收益平準金與已實現資本利得佔比達 68%，有效降低 54C 綜所稅負擔")
         case "00929":
-            return HoldingDividendProfile(symbol: sym, name: "復華台灣科技優息", strategy: .highDividend, estimatedYield: 0.082, defaultCashDividendPerShare: 0.11, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "月月配息，平準金機制平衡發放穩定度")
+            return HoldingDividendProfile(symbol: sym, name: "復華台灣科技優息", strategy: .highDividend, estimatedYield: 0.082, defaultCashDividendPerShare: 0.38, ratio76: 0.20, ratio54C: 0.40, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "月月配息，平準金機制平衡發放穩定度")
         case "0056":
-            return HoldingDividendProfile(symbol: sym, name: "元大高股息", strategy: .highDividend, estimatedYield: 0.085, defaultCashDividendPerShare: 1.07, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "老牌高股息，資本利得與平準金合計免稅達 65%")
+            return HoldingDividendProfile(symbol: sym, name: "元大高股息", strategy: .highDividend, estimatedYield: 0.085, defaultCashDividendPerShare: 1.72, ratio76: 0.30, ratio54C: 0.35, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "老牌高股息，資本利得與平準金合計免稅達 65%")
         case "00878":
-            return HoldingDividendProfile(symbol: sym, name: "國泰永續高股息", strategy: .highDividend, estimatedYield: 0.078, defaultCashDividendPerShare: 0.55, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: "ESG 兼顧穩健息收與平準金保護")
+            return HoldingDividendProfile(symbol: sym, name: "國泰永續高股息", strategy: .highDividend, estimatedYield: 0.078, defaultCashDividendPerShare: 1.25, ratio76: 0.22, ratio54C: 0.42, ratioReserve: 0.34, ratioSurplus: 0.02, notes: "ESG 兼顧穩健息收與平準金保護")
         case "00915":
-            return HoldingDividendProfile(symbol: sym, name: "凱基優選高股息30", strategy: .highDividend, estimatedYield: 0.095, defaultCashDividendPerShare: 0.82, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: "高資本利得成分，免稅比重高")
+            return HoldingDividendProfile(symbol: sym, name: "凱基優選高股息30", strategy: .highDividend, estimatedYield: 0.095, defaultCashDividendPerShare: 0.60, ratio76: 0.35, ratio54C: 0.28, ratioReserve: 0.35, ratioSurplus: 0.02, notes: "高資本利得成分，免稅比重高")
         case "00713":
-            return HoldingDividendProfile(symbol: sym, name: "元大台灣高息低波", strategy: .highDividend, estimatedYield: 0.072, defaultCashDividendPerShare: 1.50, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "低波動防禦型，配息平準金兼備")
+            return HoldingDividendProfile(symbol: sym, name: "元大台灣高息低波", strategy: .highDividend, estimatedYield: 0.072, defaultCashDividendPerShare: 1.25, ratio76: 0.25, ratio54C: 0.40, ratioReserve: 0.33, ratioSurplus: 0.02, notes: "低波動防禦型，配息平準金兼備")
         case "00940":
-            return HoldingDividendProfile(symbol: sym, name: "元大台灣價值高息", strategy: .highDividend, estimatedYield: 0.065, defaultCashDividendPerShare: 0.04, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "巴菲特價值選股月配")
+            return HoldingDividendProfile(symbol: sym, name: "元大台灣價值高息", strategy: .highDividend, estimatedYield: 0.065, defaultCashDividendPerShare: 0.06, ratio76: 0.15, ratio54C: 0.45, ratioReserve: 0.38, ratioSurplus: 0.02, notes: "巴菲特價值選股月配")
         case "00939":
             return HoldingDividendProfile(symbol: sym, name: "統一台灣高息動能", strategy: .highDividend, estimatedYield: 0.062, defaultCashDividendPerShare: 0.063, ratio76: 0.18, ratio54C: 0.44, ratioReserve: 0.36, ratioSurplus: 0.02, notes: "夏普值動能選股月配")
             
         // 3. 市值型 ETF (如 0050, 006208)
         case "0050", "006208", "00692", "00850":
-            let dps: Double? = (sym == "006208" ? 0.783 : (sym == "0050" ? 1.0 : nil))
+            let dps: Double? = (sym == "006208" ? 3.88 : (sym == "0050" ? 1.0 : nil))
             return HoldingDividendProfile(symbol: sym, name: cleanName.isEmpty ? "市值指數ETF" : cleanName, strategy: .marketWeight, estimatedYield: 0.035, defaultCashDividendPerShare: dps, ratio76: 0.08, ratio54C: 0.90, ratioReserve: 0.0, ratioSurplus: 0.02, notes: "以成分股現股現金股利 (54C) 為主要收益來源")
             
         default:
@@ -248,7 +252,7 @@ public final class DividendSourceService {
         }
     }
     
-    /// 依指定股數計算該標的等效單月股息（給各月份股息歷程與當月實領計算共用）
+    /// 依指定股數計算該標的等效單月股息（年化均攤基準）
     public func calculateMonthlyDividendAmount(for holding: StockHolding, shares: Int) -> Double {
         guard shares > 0 else { return 0.0 }
         let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
@@ -269,7 +273,42 @@ public final class DividendSourceService {
         return (Double(shares) * holding.currentPrice * profile.estimatedYield) / 12.0
     }
 
-    /// 計算單一持股之預估股息與各項來源 (納入買入／加碼日期，區分「本月已參與除息」與「待下月公布領取」)
+    /// 依標的在特定 (year, month) 自己公布的除權息日與每股配息，計算當月實際配息金額
+    /// - 當該月有公告除權息日（例如 006208 於 2026-11-17 除息 $3.88），且日期已到達除權息日 (`today >= exDate` 或過去月份)，當月直接計入實際除權息配息金額 `eligibleShares * cashPerShare`！
+    public func calculateActualMonthDividend(
+        for holding: StockHolding,
+        year: Int,
+        month: Int,
+        eligibleShares: Int,
+        events: [DividendEvent] = [],
+        asOf today: Date = Date()
+    ) -> (realizedInMonth: Double, upcomingInMonth: Double, exDateString: String?, cashPerShare: Double?, isExDateReached: Bool) {
+        let cal = Calendar.current
+        let todayY = cal.component(.year, from: today)
+        let todayM = cal.component(.month, from: today)
+        let isPastMonth = (year < todayY) || (year == todayY && month < todayM)
+
+        if let announced = StockHolding.announcedDividendInMonth(for: holding.symbol, year: year, month: month, events: events),
+           announced.cashPerShare > 0 {
+            let amt = Double(max(0, eligibleShares)) * announced.cashPerShare
+            let isReached = isPastMonth || (year == todayY && month == todayM && cal.startOfDay(for: today) >= cal.startOfDay(for: announced.exDate))
+            if isReached {
+                return (amt, 0.0, announced.exDateString, announced.cashPerShare, true)
+            } else {
+                return (0.0, amt, announced.exDateString, announced.cashPerShare, false)
+            }
+        }
+
+        // 若該月無特定公告除息事件：月配息標的按單月常態配息計；季配/半年配/年配則該月無除息為 0
+        if holding.frequency == .monthly {
+            let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
+            let amt = calculateMonthlyDividendAmount(for: holding, shares: eligibleShares)
+            return (amt, 0.0, nil, profile.defaultCashDividendPerShare, true)
+        }
+        return (0.0, 0.0, nil, nil, false)
+    }
+
+    /// 計算單一持股之預估股息與各項來源 (納入買入／加碼日期 + 該股自訂公告除權息日，當月到除權息日即增加當月配息金額)
     public func calculateHoldingDividend(
         holding: StockHolding,
         asOf date: Date = Date(),
@@ -283,9 +322,39 @@ public final class DividendSourceService {
         let pendingShares = max(0, holding.shares - eligibleShares)
         let totalVal = holding.marketValue
 
-        let monthly = calculateMonthlyDividendAmount(for: holding, shares: eligibleShares)
-        let fullMonthly = calculateMonthlyDividendAmount(for: holding, shares: holding.shares)
-        let annual = fullMonthly * 12.0
+        let actualMonth = calculateActualMonthDividend(
+            for: holding,
+            year: y,
+            month: m,
+            eligibleShares: eligibleShares,
+            events: events,
+            asOf: date
+        )
+        let runRateEligible = calculateMonthlyDividendAmount(for: holding, shares: eligibleShares)
+        let runRateFull = calculateMonthlyDividendAmount(for: holding, shares: holding.shares)
+
+        // 當月實際可領股息：
+        // - 若當月有該股公告之除權息且已達除權息日 (如 006208 於 11/17 除息)，直接計入當月除息金額 (eligibleShares * cashPerShare)
+        // - 若為月配息且本月除息日尚未到，仍顯示本月應領金額；若為季配/半年配/年配且本月無除息，當月實領為 0 (年化仍計入 annualDividend)
+        let monthly: Double
+        let fullMonthly: Double
+        if actualMonth.exDateString != nil {
+            if actualMonth.isExDateReached {
+                monthly = actualMonth.realizedInMonth
+                fullMonthly = Double(holding.shares) * (actualMonth.cashPerShare ?? 0)
+            } else if holding.frequency == .monthly {
+                monthly = actualMonth.upcomingInMonth
+                fullMonthly = Double(holding.shares) * (actualMonth.cashPerShare ?? 0)
+            } else {
+                monthly = 0.0
+                fullMonthly = runRateFull
+            }
+        } else {
+            monthly = (holding.frequency == .monthly) ? runRateEligible : 0.0
+            fullMonthly = (holding.frequency == .monthly) ? runRateFull : 0.0
+        }
+
+        let annual = runRateFull * 12.0
         let effYield = totalVal > 0 ? (annual / totalVal) : profile.estimatedYield
 
         let amt76 = monthly * profile.ratio76
@@ -320,7 +389,11 @@ public final class DividendSourceService {
             amountSurplusMonthly: amtSurplus,
             taxExemptPercentage: exemptPct,
             singleDistribution54C: singleDist54C,
-            isAboveNhiThreshold: isAboveNhi
+            isAboveNhiThreshold: isAboveNhi,
+            announcedExDateString: actualMonth.exDateString,
+            announcedCashPerShare: actualMonth.cashPerShare,
+            isExDividendReachedInMonth: actualMonth.isExDateReached,
+            upcomingExDividendAmountInMonth: actualMonth.upcomingInMonth
         )
     }
 

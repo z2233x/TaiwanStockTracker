@@ -186,6 +186,7 @@ public final class StorageService {
             journals.sort { $0.date > $1.date }
             saveJournals(journals)
         }
+        syncAnnouncedDividends()
     }
     
     // 修改持股資料（同步批次買入與加碼日記）
@@ -216,6 +217,7 @@ public final class StorageService {
                 journals.sort { $0.date > $1.date }
                 saveJournals(journals)
             }
+            syncAnnouncedDividends()
         }
     }
     
@@ -289,10 +291,11 @@ public final class StorageService {
         saveHoldings(current)
         saveJournals(journals)
         syncMajorCalendarEventsForHoldings()
+        syncAnnouncedDividends()
         return count
     }
     
-    // MARK: - 即時報價更新 (證交所 MIS 即時行情 + Yahoo Finance 併發備援)
+    // MARK: - 即時報價與除權息公告同步 (證交所 MIS + TWT48U_ALL + Yahoo Finance 併發備援)
     private let lastQuoteUpdatedKey = "last_quote_updated_ts_v1"
 
     public var lastQuoteUpdatedAt: Date? {
@@ -305,7 +308,10 @@ public final class StorageService {
         guard !current.isEmpty else { return (0, 0) }
         
         let symbols = current.map { $0.symbol }
-        let quoteMap = await StockQuoteService.shared.fetchQuotes(symbols: symbols)
+        async let quotesTask = StockQuoteService.shared.fetchQuotes(symbols: symbols)
+        async let divsTask = StockQuoteService.shared.fetchDividendAnnouncements(symbols: symbols)
+        let quoteMap = await quotesTask
+        let divMap = await divsTask
         
         var success = 0
         var failed = 0
@@ -327,7 +333,147 @@ public final class StorageService {
             userDefaults?.set(Date().timeIntervalSince1970, forKey: lastQuoteUpdatedKey)
             saveHoldings(current)
         }
+        syncAnnouncedDividends(fetchedMap: divMap)
         return (success, failed)
+    }
+
+    /// 自動找尋各持股已公布的除權息日，同步至日曆，並在到達當月除權息日時自動入帳增加股息（例如 006208 於 11/17 除權息，11 月自動增加配息金額）
+    @discardableResult
+    public func syncAnnouncedDividends(
+        fetchedMap: [String: [StockQuoteService.AnnouncedDividendItem]]? = nil,
+        asOf today: Date = Date()
+    ) -> Int {
+        var holdings = loadHoldings()
+        guard !holdings.isEmpty else { return 0 }
+        var events = loadEvents()
+        var histories = loadHoldingHistories()
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: today)
+
+        let fmt = DateFormatter()
+        fmt.calendar = Calendar(identifier: .gregorian)
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd"
+
+        var eventsChanged = false
+        var historiesChanged = false
+        var holdingsChanged = false
+        var creditedCount = 0
+
+        for i in 0..<holdings.count {
+            var h = holdings[i]
+            let sym = h.symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            var byDate: [String: StockQuoteService.AnnouncedDividendItem] = [:]
+            for item in StockQuoteService.shared.knownDividends(for: sym) {
+                byDate[item.exDateString] = item
+            }
+            if let fetched = fetchedMap?[sym] {
+                for item in fetched {
+                    byDate[item.exDateString] = item
+                }
+            }
+            let items = byDate.values.sorted { $0.exDate < $1.exDate }
+            guard !items.isEmpty else { continue }
+
+            for item in items {
+                let y = cal.component(.year, from: item.exDate)
+                let m = cal.component(.month, from: item.exDate)
+
+                // 1. 同步至台股日曆 (.exDividendDate)
+                if let evIdx = events.firstIndex(where: {
+                    $0.symbol.uppercased() == sym &&
+                    $0.eventType == .exDividendDate &&
+                    cal.component(.year, from: $0.targetDate) == y &&
+                    cal.component(.month, from: $0.targetDate) == m
+                }) {
+                    if abs(events[evIdx].cashPerShare - item.cashPerShare) > 0.0001 ||
+                       fmt.string(from: events[evIdx].targetDate) != item.exDateString {
+                        events[evIdx] = DividendEvent(
+                            id: events[evIdx].id,
+                            symbol: h.symbol,
+                            name: h.name,
+                            frequency: h.frequency,
+                            eventType: .exDividendDate,
+                            targetDate: item.exDate,
+                            cashPerShare: item.cashPerShare,
+                            sharesSnapshot: h.shares,
+                            note: "公告除權息日 \(item.exDateString) (每股配 $\(String(format: "%.3f", item.cashPerShare)))"
+                        )
+                        eventsChanged = true
+                    }
+                } else {
+                    events.append(DividendEvent(
+                        symbol: h.symbol,
+                        name: h.name,
+                        frequency: h.frequency,
+                        eventType: .exDividendDate,
+                        targetDate: item.exDate,
+                        cashPerShare: item.cashPerShare,
+                        sharesSnapshot: h.shares,
+                        note: "公告除權息日 \(item.exDateString) (每股配 $\(String(format: "%.3f", item.cashPerShare)))"
+                    ))
+                    eventsChanged = true
+                }
+
+                // 2. 若已到達該股除權息日 (today >= exDate)，檢查除息前有效股數並自動計入當月股息紀錄
+                let exStart = cal.startOfDay(for: item.exDate)
+                if todayStart >= exStart {
+                    let eligible = h.eligibleSharesForMonth(year: y, month: m, events: events)
+                    guard eligible > 0 else { continue }
+
+                    if let histIdx = histories.firstIndex(where: {
+                        $0.symbol.uppercased() == sym &&
+                        cal.component(.year, from: $0.exDividendDate) == y &&
+                        cal.component(.month, from: $0.exDividendDate) == m
+                    }) {
+                        if histories[histIdx].sharesSnapshot != eligible ||
+                           abs(histories[histIdx].dividendPerShare - item.cashPerShare) > 0.0001 {
+                            histories[histIdx] = HoldingDividendHistory(
+                                id: histories[histIdx].id,
+                                symbol: h.symbol,
+                                exDividendDate: item.exDate,
+                                dividendPerShare: item.cashPerShare,
+                                sharesSnapshot: eligible,
+                                priceAtExDate: h.currentPrice
+                            )
+                            historiesChanged = true
+                            creditedCount += 1
+                        }
+                    } else {
+                        histories.append(HoldingDividendHistory(
+                            symbol: h.symbol,
+                            exDividendDate: item.exDate,
+                            dividendPerShare: item.cashPerShare,
+                            sharesSnapshot: eligible,
+                            priceAtExDate: h.currentPrice
+                        ))
+                        historiesChanged = true
+                        creditedCount += 1
+                    }
+                }
+            }
+
+            // 3. 重新彙整該持股已除息入帳之累計股息與次數
+            let symHistories = histories.filter { $0.symbol.uppercased() == sym }
+            if !symHistories.isEmpty {
+                let sumDiv = symHistories.reduce(0.0) { $0 + $1.totalAmount }.rounded()
+                let cnt = symHistories.count
+                if abs(h.totalDividendsReceived - sumDiv) > 0.5 || h.dividendCount != cnt {
+                    h.totalDividendsReceived = sumDiv
+                    h.dividendCount = cnt
+                    holdings[i] = h
+                    holdingsChanged = true
+                }
+            }
+        }
+
+        if eventsChanged { saveEvents(events) }
+        if historiesChanged {
+            histories.sort { $0.exDividendDate > $1.exDividendDate }
+            saveHoldingHistories(histories)
+        }
+        if holdingsChanged { saveHoldings(holdings) }
+        return creditedCount
     }
     
     // MARK: - 日記紀錄
@@ -591,17 +737,36 @@ public final class StorageService {
                 monthFee += fee
                 monthVal += Double(owned) * h.currentPrice
                 
-                // 【核心邏輯】：僅計算「buyDate < 該月除息截算日」的有效參與除息股數！
+                // 【核心邏輯】：僅計算「buyDate < 該股該月自己公布的除權息日」的有效參與除息股數！
                 let eligible = h.eligibleSharesForMonth(year: y, month: m, events: events)
                 let pending = max(0, owned - eligible)
                 
                 if eligible > 0 {
-                    let amt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: eligible)
-                    monthDividendSum += amt
-                    divActiveSymbols.append(h.symbol)
+                    let actual = DividendSourceService.shared.calculateActualMonthDividend(
+                        for: h,
+                        year: y,
+                        month: m,
+                        eligibleShares: eligible,
+                        events: events,
+                        asOf: now
+                    )
+                    // 當月已達除權息日（如 006208 於 11/17 除息），直接將實際除息金額加入該月股息！
+                    let amt = actual.realizedInMonth > 0
+                        ? actual.realizedInMonth
+                        : (h.frequency == .monthly ? actual.upcomingInMonth : 0.0)
+                    if amt > 0 {
+                        monthDividendSum += amt
+                        divActiveSymbols.append(h.symbol)
+                    }
                 }
                 if pending > 0 {
-                    let pendingAmt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: pending)
+                    let pendingAmt: Double
+                    if let announced = StockHolding.announcedDividendInMonth(for: h.symbol, year: y, month: m, events: events),
+                       announced.cashPerShare > 0 {
+                        pendingAmt = Double(pending) * announced.cashPerShare
+                    } else {
+                        pendingAmt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: pending)
+                    }
                     pendingDividendSum += pendingAmt
                     pendingSharesTotal += pending
                     pendingSymbols.append(h.symbol)
@@ -679,10 +844,25 @@ public final class StorageService {
             let nextElig = h.eligibleSharesForMonth(year: nextY, month: nextM, events: events)
             let curElig = h.eligibleSharesForMonth(year: curY, month: curM, events: events)
             if nextElig > 0 {
-                totalDiv += DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: nextElig)
-                totalElig += nextElig
-                totalPendingAdded += max(0, nextElig - curElig)
-                symbols.append(h.symbol)
+                let actualNext = DividendSourceService.shared.calculateActualMonthDividend(
+                    for: h,
+                    year: nextY,
+                    month: nextM,
+                    eligibleShares: nextElig,
+                    events: events,
+                    asOf: nextMonthDate
+                )
+                let nextAmt = actualNext.realizedInMonth > 0
+                    ? actualNext.realizedInMonth
+                    : (actualNext.upcomingInMonth > 0
+                        ? actualNext.upcomingInMonth
+                        : (h.frequency == .monthly ? DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: nextElig) : 0.0))
+                if nextAmt > 0 {
+                    totalDiv += nextAmt
+                    totalElig += nextElig
+                    totalPendingAdded += max(0, nextElig - curElig)
+                    symbols.append(h.symbol)
+                }
             }
         }
 
