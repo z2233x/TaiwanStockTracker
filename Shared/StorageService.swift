@@ -363,6 +363,26 @@ public final class StorageService {
         for i in 0..<holdings.count {
             var h = holdings[i]
             let sym = h.symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+
+            // 若為今年無發放股息之個股（如 7781 昕力資），清除誤寫入之股息紀錄與日曆除息事件，確保股息為 $0
+            if StockQuoteService.shared.isZeroDividendStock(symbol: sym, name: h.name) {
+                let beforeEvCount = events.count
+                events.removeAll { $0.symbol.uppercased() == sym && $0.eventType.isDividendRelated }
+                if events.count != beforeEvCount { eventsChanged = true }
+
+                let beforeHistCount = histories.count
+                histories.removeAll { $0.symbol.uppercased() == sym }
+                if histories.count != beforeHistCount { historiesChanged = true }
+
+                if h.totalDividendsReceived != 0 || h.dividendCount != 0 {
+                    h.totalDividendsReceived = 0
+                    h.dividendCount = 0
+                    holdings[i] = h
+                    holdingsChanged = true
+                }
+                continue
+            }
+
             var byDate: [String: StockQuoteService.AnnouncedDividendItem] = [:]
             for item in StockQuoteService.shared.knownDividends(for: sym) {
                 byDate[item.exDateString] = item
@@ -765,9 +785,11 @@ public final class StorageService {
                     } else {
                         pendingAmt = DividendSourceService.shared.calculateMonthlyDividendAmount(for: h, shares: pending)
                     }
-                    pendingDividendSum += pendingAmt
-                    pendingSharesTotal += pending
-                    pendingSymbols.append(h.symbol)
+                    if pendingAmt > 0 {
+                        pendingDividendSum += pendingAmt
+                        pendingSharesTotal += pending
+                        pendingSymbols.append(h.symbol)
+                    }
                 }
             }
             

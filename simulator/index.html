@@ -1083,6 +1083,7 @@
       }
 
       let autoX = 0, autoY = 0, hopY = 0, roll = 0, yaw = 0, pitch = 0, sX = 1, sY = 1;
+      const breath = Math.sin(t * 2.8);
       const sp = petState.species || 'cat';
       if (sp === 'cat') {
         const wc = t * 0.65;
@@ -1090,24 +1091,26 @@
         autoX = Math.sin(wc) * maxX * 0.78;
         const stepWave = Math.abs(Math.sin(t * 5.2));
         const mw = Math.min(1, Math.abs(vel) * 1.4);
-        hopY = -stepWave * 7.5 * mw;
-        roll = Math.sin(t * 5.2) * 4.2 * mw + vel * 4.5;
-        yaw = vel * 14;
-        pitch = -stepWave * 4 * mw;
-        sY = 1 - mw * stepWave * 0.045;
-        sX = 1 + mw * stepWave * 0.03;
+        hopY = -stepWave * 8.5 * mw;
+        roll = Math.sin(t * 5.2) * 4.5 * mw + vel * 4.5 + Math.sin(t * 1.9) * 1.8;
+        yaw = vel * 15;
+        pitch = -stepWave * 4.2 * mw;
+        sY = 1 - mw * stepWave * 0.05 + breath * 0.018;
+        sX = 1 + mw * stepWave * 0.035 - breath * 0.014;
         if (swoopActive) {
-          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3)) * 22 * swoopEnv;
-          yaw += Math.sin(swoopU * Math.PI * 4) * 14 * swoopEnv;
+          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3)) * 24 * swoopEnv;
+          yaw += Math.sin(swoopU * Math.PI * 4) * 15 * swoopEnv;
         }
       } else if (sp === 'bird') {
         const ft = t * 0.92;
         const velX = Math.cos(ft);
         autoX = Math.sin(ft) * maxX * 0.86;
         autoY = -18 + Math.sin(ft * 2 + 0.3) * 20 + Math.cos(t * 1.35) * 6;
-        roll = velX * 15 + Math.sin(t * 3) * 3;
-        yaw = velX * 19;
+        roll = velX * 16 + Math.sin(t * 3) * 3.5;
+        yaw = velX * 20;
         pitch = Math.cos(ft * 2 + 0.3) * 10;
+        sY = 1 + Math.sin(t * 11.5) * 0.025;
+        sX = 1 - Math.sin(t * 11.5) * 0.02;
         if (swoopActive) {
           autoX += Math.sin(swoopU * Math.PI * 2) * 32 * swoopEnv;
           autoY -= swoopEnv * 26;
@@ -1116,23 +1119,25 @@
       } else {
         if (isDogSitting) {
           autoX = Math.sin(t * 0.25) * 10;
-          hopY = Math.sin(t * 2.4) * 1.5;
-          roll = Math.sin(t * 1.4) * 1.8;
-          yaw = Math.sin(t * 0.8) * 6;
+          hopY = Math.sin(t * 2.4) * 1.8;
+          roll = Math.sin(t * 1.4) * 2.2;
+          yaw = Math.sin(t * 0.8) * 6.5;
+          sY = 1 + breath * 0.022;
+          sX = 1 - breath * 0.016;
         } else {
           const tt = t * 0.88 + 0.28 * Math.sin(t * 0.42);
           const tv = Math.cos(tt);
           autoX = Math.sin(tt) * maxX * 0.82;
           const bnc = Math.abs(Math.sin(t * 7.6));
           const mw = Math.min(1, Math.abs(tv) * 1.5);
-          hopY = -bnc * 7 * mw;
-          roll = tv * 6 + Math.sin(t * 7.6) * 3.2 * mw;
+          hopY = -bnc * 8 * mw;
+          roll = tv * 6 + Math.sin(t * 7.6) * 3.5 * mw;
           yaw = tv * 17;
-          sY = 1 - mw * bnc * 0.04;
-          sX = 1 + mw * bnc * 0.03;
+          sY = 1 - mw * bnc * 0.045 + breath * 0.018;
+          sX = 1 + mw * bnc * 0.032 - breath * 0.014;
         }
         if (swoopActive) {
-          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3.5)) * 24 * swoopEnv;
+          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3.5)) * 25 * swoopEnv;
           yaw += Math.sin(swoopU * Math.PI * 4) * 16 * swoopEnv;
         }
       }
@@ -1754,80 +1759,85 @@
         ? h.shares * (actualMonth.cashPerShare || 0)
         : calculateMonthlyDivForShares(h, h.shares);
       const effDps = actualMonth.cashPerShare || hProfile.dps;
+      const isNoDivStock = isZeroDividendStockSim(h.symbol, h.name) || (hMonthlyDiv <= 0 && hFullMonthlyDiv <= 0 && !actualMonth.exDateStr && (!hProfile.yield || hProfile.yield <= 0) && (!effDps || effDps <= 0));
       const val = h.shares * h.currentPrice;
       const cost = h.shares * h.averageCost;
       const profit = val - cost;
       const profitRate = cost > 0 ? ((profit / cost) * 100).toFixed(2) : '0.00';
       const brokerageTag = h.brokerage || '元大證券';
       return `
-        <div class="card" style="margin-bottom: 10px;">
+        <div class="card" style="margin-bottom: 12px; padding: 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 16px; font-weight: 800;">${h.symbol}</span>
-              <span class="badge ${h.frequency === '月配' ? 'badge-monthly' : 'badge-quarterly'}">${h.frequency}</span>
-              <span style="font-size: 10px; background: #E5E5EA; color: #555; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${brokerageTag}</span>
-              <span style="font-size: 9px; background: ${hProfile.color}22; color: ${hProfile.color}; padding: 2px 5px; border-radius: 4px; font-weight: 700;">${hProfile.strategy}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px; font-weight: 800;">${h.symbol}</span>
+              <span class="badge ${isNoDivStock ? '' : (h.frequency === '月配' ? 'badge-monthly' : 'badge-quarterly')}" style="font-size: 12px; padding: 3px 8px; ${isNoDivStock ? 'background:#E5E5EA; color:#666;' : ''}">${isNoDivStock ? '今年無配息' : h.frequency}</span>
+              <span style="font-size: 12px; background: #E5E5EA; color: #555; padding: 3px 7px; border-radius: 6px; font-weight: 600;">${brokerageTag}</span>
             </div>
-            <span style="cursor: pointer; color: #8E8E93; font-size: 12px;" onclick="toggleExpand('${h.symbol}')">
+            <span style="cursor: pointer; color: #8E8E93; font-size: 13px; font-weight: 700;" onclick="toggleExpand('${h.symbol}')">
               ${isExpanded ? '▲ 收合' : '▼ 展開'}
             </span>
           </div>
-          <div style="font-size: 13px; color: #666; margin: 2px 0 8px 0;">${resolveStockName(h)}</div>
+          <div style="font-size: 15px; color: #555; font-weight: 600; margin: 4px 0 10px 0;">${resolveStockName(h)}</div>
           
-          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-            <div><span style="color:#8E8E93;">總成本: </span><b>$${Math.round(cost).toLocaleString()}</b></div>
-            <div><span style="color:#8E8E93;">總股數: </span><b>${h.shares.toLocaleString()}股</b></div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px;">
+            <div><span style="color:#8E8E93;">總成本: </span><b style="font-size: 15px;">$${Math.round(cost).toLocaleString()}</b></div>
+            <div><span style="color:#8E8E93;">總股數: </span><b style="font-size: 15px;">${h.shares.toLocaleString()} 股</b></div>
           </div>
-          <div style="display: flex; justify-content: space-between; font-size: 12px; align-items: center;">
+          <div style="display: flex; justify-content: space-between; font-size: 14px; align-items: center;">
             <div style="display: flex; align-items: center; gap: 6px;">
               <span style="color:#8E8E93;">總損益: </span>
-              <b style="color:${profit >= 0 ? '#FF3B30' : '#34C759'};">${profit >= 0 ? '+' : ''}$${Math.round(profit).toLocaleString()}</b>
-              <span style="font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: ${profit >= 0 ? 'rgba(255,59,48,0.12)' : 'rgba(52,199,89,0.12)'}; color: ${profit >= 0 ? '#FF3B30' : '#34C759'};">
+              <b style="font-size: 15px; color:${profit >= 0 ? '#FF3B30' : '#34C759'};">${profit >= 0 ? '+' : ''}$${Math.round(profit).toLocaleString()}</b>
+              <span style="font-size: 13px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: ${profit >= 0 ? 'rgba(255,59,48,0.12)' : 'rgba(52,199,89,0.12)'}; color: ${profit >= 0 ? '#FF3B30' : '#34C759'};">
                 ${profit >= 0 ? '+' : ''}${profitRate}%
               </span>
             </div>
-            <div style="color: #8E8E93;">(領息${h.count}次)</div>
+            <div style="color: #8E8E93; font-size: 13px; font-weight: 600;">${isNoDivStock ? '無配息' : `領息 ${h.count} 次`}</div>
           </div>
 
           ${isExpanded ? `
-            <div style="margin-top: 10px; border-top: 1px solid #EEE; padding-top: 8px;">
-              <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8E8E93; margin-bottom: 8px;">
+            <div style="margin-top: 12px; border-top: 1px solid #EEE; padding-top: 10px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; color: #666; font-weight: 600; margin-bottom: 10px;">
                 <span>現值: $${Math.round(val).toLocaleString()}</span>
                 <span>均價: $${h.averageCost}</span>
                 <span>現價: $${h.currentPrice}</span>
               </div>
               ${lots.length > 0 ? `
-                <div style="background: #F9F9FB; border: 1px solid #EFEFF4; border-radius: 8px; padding: 7px 9px; margin-bottom: 8px; font-size: 11px;">
-                  <div style="font-size: 10px; font-weight: 700; color: #8E8E93; margin-bottom: 4px;">買入與加碼批次 (${lots.length} 筆) · 本月除權息日 ${cutoffNow}</div>
+                <div style="background: #F9F9FB; border: 1px solid #EFEFF4; border-radius: 10px; padding: 9px 11px; margin-bottom: 10px; font-size: 13px;">
+                  <div style="font-size: 12px; font-weight: 700; color: #8E8E93; margin-bottom: 6px;">買入與加碼批次 (${lots.length} 筆)${isNoDivStock ? '' : ` · 本月除權息日 ${cutoffNow}`}</div>
                   ${lots.map(l => {
                     const isElig = (l.buyDate || '').slice(0, 10) < cutoffNow;
-                    const badgeTxt = isElig ? '✓ 本月計息' : (isMidMonthAnnounced ? `📢 領 ${nextMNum} 月息(已公布)` : `⏳ 待 ${nextMNum} 月公布`);
-                    const badgeBg = isElig ? 'rgba(52,199,89,0.14)' : (isMidMonthAnnounced ? 'rgba(0,122,255,0.12)' : 'rgba(245,158,11,0.16)');
-                    const badgeCol = isElig ? '#15803D' : (isMidMonthAnnounced ? '#1D4ED8' : '#C2410C');
+                    const badgeTxt = isNoDivStock ? '⚪ 今年無配息' : (isElig ? '✓ 本月計息' : (isMidMonthAnnounced ? `📢 領 ${nextMNum} 月息` : `⏳ 待 ${nextMNum} 月公布`));
+                    const badgeBg = isNoDivStock ? '#E5E5EA' : (isElig ? 'rgba(52,199,89,0.14)' : (isMidMonthAnnounced ? 'rgba(0,122,255,0.12)' : 'rgba(245,158,11,0.16)'));
+                    const badgeCol = isNoDivStock ? '#666' : (isElig ? '#15803D' : (isMidMonthAnnounced ? '#1D4ED8' : '#C2410C'));
                     return `
-                      <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; padding: 3px 0;">
                         <span><b>${(l.buyDate || '').slice(5, 10).replace('-', '/')}</b> · ${Number(l.shares).toLocaleString()}股 <span style="color:#8E8E93;">@$${l.price}</span></span>
-                        <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: ${badgeBg}; color: ${badgeCol};">${badgeTxt}</span>
+                        <span style="font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: ${badgeBg}; color: ${badgeCol};">${badgeTxt}</span>
                       </div>
                     `;
                   }).join('')}
                 </div>
               ` : ''}
-              <div style="background: #F2F2F7; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px;">
-                ${actualMonth.exDateStr ? `
-                  <div style="background: ${actualMonth.isReached ? 'rgba(52,199,89,0.14)' : 'rgba(0,122,255,0.12)'}; color: ${actualMonth.isReached ? '#15803D' : '#1D4ED8'}; padding: 4px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 800; margin-bottom: 5px;">
-                    ${actualMonth.isReached
-                      ? `📢 本月除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · ✓ 已除息增加 ${curM} 月股息 (+$${Math.round(actualMonth.realizedInMonth).toLocaleString()})`
-                      : `📅 本月預定除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · 到期將增加 ${curM} 月股息 (+$${Math.round(actualMonth.upcomingInMonth).toLocaleString()})`}
-                  </div>
-                ` : ''}
-                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--ios-blue); margin-bottom: 4px;">
-                  <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${effDps ? `(${eligibleShares.toLocaleString()}股 × $${effDps})` : ''}</span>
-                  <span style="color: #34C759;">免稅比 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>
+              ${isNoDivStock ? `
+                <div style="background: #F2F2F7; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; font-weight: 700; color: #666;">
+                  ⚪ ${resolveStockName(h)} 今年無發放現金股息 ($0)
                 </div>
-                ${pendingShares > 0 ? `<div style="color: ${isMidMonthAnnounced ? '#1D4ED8' : '#C2410C'}; font-size: 10.5px; font-weight: 700; margin-bottom: 3px;">${isMidMonthAnnounced ? `📢 ${nextMNum} 月配息已公布：此筆 ${pendingShares.toLocaleString()} 股將於 ${nextMNum} 月除息領取（下月合計 $${Math.round(hFullMonthlyDiv).toLocaleString()}）` : `⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待本月中旬公布 ${nextMNum} 月配息領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）`}</div>` : ''}
-                <div style="color: #666; font-size: 10px;">${hProfile.notes}</div>
-              </div>
+              ` : `
+                <div style="background: #F2F2F7; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px; font-size: 13px;">
+                  ${actualMonth.exDateStr ? `
+                    <div style="background: ${actualMonth.isReached ? 'rgba(52,199,89,0.14)' : 'rgba(0,122,255,0.12)'}; color: ${actualMonth.isReached ? '#15803D' : '#1D4ED8'}; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 800; margin-bottom: 6px;">
+                      ${actualMonth.isReached
+                        ? `📢 本月除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · ✓ 已除息增加 ${curM} 月股息 (+$${Math.round(actualMonth.realizedInMonth).toLocaleString()})`
+                        : `📅 本月預定除權息日 ${actualMonth.exDateStr} · 每股配 $${actualMonth.cashPerShare} · 到期將增加 ${curM} 月股息 (+$${Math.round(actualMonth.upcomingInMonth).toLocaleString()})`}
+                    </div>
+                  ` : ''}
+                  <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; color: var(--ios-blue); margin-bottom: 4px;">
+                    <span>💡 本月可領: $${Math.round(hMonthlyDiv).toLocaleString()} ${effDps ? `(${eligibleShares.toLocaleString()}股 × $${effDps})` : ''}</span>
+                    ${(hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) > 0 ? `<span style="color: #34C759; font-size: 13px;">免稅 ${Math.round((hProfile.ratio76 + hProfile.ratioReserve + hProfile.ratioSurplus) * 100)}%</span>` : ''}
+                  </div>
+                  ${pendingShares > 0 ? `<div style="color: ${isMidMonthAnnounced ? '#1D4ED8' : '#C2410C'}; font-size: 12.5px; font-weight: 700; margin-top: 4px;">${isMidMonthAnnounced ? `📢 ${nextMNum} 月配息已公布：此筆 ${pendingShares.toLocaleString()} 股將於 ${nextMNum} 月除息領取（下月合計 $${Math.round(hFullMonthlyDiv).toLocaleString()}）` : `⏳ 除息後加碼 ${pendingShares.toLocaleString()} 股待本月中旬公布 ${nextMNum} 月配息領取（下期滿倉 $${Math.round(hFullMonthlyDiv).toLocaleString()}）`}</div>` : ''}
+                </div>
+              `}
               <div style="display: flex; gap: 8px; margin-top: 2px;">
                 <button class="sim-btn" style="flex: 1; padding: 7px 6px; font-size: 12px; font-weight: 700; justify-content: center; background: #E5E5EA; color: #1C1C1E; border-radius: 8px;" onclick="openEditHolding('${h.symbol}')">✏️ 編輯</button>
                 <button class="sim-btn" style="flex: 1; padding: 7px 6px; font-size: 12px; font-weight: 700; justify-content: center; background: #007AFF; color: #FFF; border-radius: 8px;" onclick="openHoldingDividendDetail('${h.symbol}')">📊 股息紀錄</button>
@@ -2618,22 +2628,36 @@
       };
     }
 
-    // 4. 一般個股
-    if (stockType === '一般個股' || (!sym.startsWith('00') && sym.length === 4)) {
-      let estYield = 0.045;
-      if (sym.startsWith('28')) estYield = 0.048;
-      else if (sym === '2330') estYield = 0.018;
-      else if (sym === '2454') estYield = 0.042;
+    // 4. 一般個股：若為今年無發放股息個股（如 7781 昕力資）或未公告配息之一般個股，股息率為 0，不再虛構 4.5% 殖利率！
+    if (isZeroDividendStockSim(sym, cleanName)) {
       return {
-        strategy: '一般現股 (100% 54C)',
-        color: '#5856D6',
-        yield: estYield,
-        dps: null,
+        strategy: '今年無配息',
+        color: '#8E8E93',
+        yield: 0.0,
+        dps: 0.0,
         ratio76: 0.0,
         ratio54C: 1.0,
         ratioReserve: 0.0,
         ratioSurplus: 0.0,
-        notes: '個別上市公司現金股利，100% 全額屬 54C 股利所得'
+        notes: '今年無發放現金股息 ($0)'
+      };
+    }
+    if (stockType === '一般個股' || (!sym.startsWith('00') && sym.length === 4)) {
+      const knownList = OFFICIAL_DIVIDEND_SCHEDULES[sym] || [];
+      const latestKnownDps = knownList.length > 0 ? knownList[knownList.length - 1].cash : null;
+      const estYield = sym === '2330' ? 0.018 : 0.0;
+      return {
+        strategy: latestKnownDps > 0 ? '一般現股 (100% 54C)' : '今年無配息',
+        color: latestKnownDps > 0 ? '#5856D6' : '#8E8E93',
+        yield: estYield,
+        dps: latestKnownDps,
+        ratio76: 0.0,
+        ratio54C: 1.0,
+        ratioReserve: 0.0,
+        ratioSurplus: 0.0,
+        notes: latestKnownDps > 0
+          ? '個別上市公司現金股利，100% 全額屬 54C 股利所得'
+          : '今年尚無公告配息紀錄 ($0)'
       };
     }
 
@@ -2656,6 +2680,15 @@
     }
     const fallbackDate = (h.purchaseDate || h.createdAt || h.updatedAt || new Date().toISOString()).slice(0, 10);
     return h.shares > 0 ? [{ id: 'init', buyDate: fallbackDate, shares: h.shares, price: h.averageCost, note: '初始買入' }] : [];
+  }
+
+  // 官方已確認今年無發放現金股息之個股（如 7781 昕力資）
+  const ZERO_DIVIDEND_SYMBOLS = new Set(['7781']);
+  function isZeroDividendStockSim(symbol, name = '') {
+    const clean = (symbol || '').trim().toUpperCase();
+    if (ZERO_DIVIDEND_SYMBOLS.has(clean)) return true;
+    if ((name || '').includes('昕力')) return true;
+    return false;
   }
 
   // 台股官方已公告之除權息日與每股配息表 (證交所 TWT48U_ALL + Yahoo Finance events=div 同步)
@@ -2786,6 +2819,13 @@
     const todayStr = new Date().toISOString().slice(0, 10);
     holdings.forEach(h => {
       const sym = (h.symbol || '').trim().toUpperCase();
+      if (isZeroDividendStockSim(sym, h.name)) {
+        events = (events || []).filter(e => !((e.symbol || '').toUpperCase() === sym && e.type === '除息日'));
+        delete holdingHistories[sym];
+        h.totalDividends = 0;
+        h.count = 0;
+        return;
+      }
       const schedule = OFFICIAL_DIVIDEND_SCHEDULES[sym] || [];
       if (!schedule.length) return;
       if (!holdingHistories[sym]) holdingHistories[sym] = [];

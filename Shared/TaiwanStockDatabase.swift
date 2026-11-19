@@ -37,13 +37,29 @@ public final class TaiwanStockDatabase {
     }
     
     private func loadDatabase() {
+        let ensureBuiltInStocks: ([StockMetaItem]) -> [StockMetaItem] = { list in
+            var merged = list
+            if !merged.contains(where: { $0.symbol == "7781" }) {
+                merged.append(StockMetaItem(
+                    symbol: "7781",
+                    name: "昕力資",
+                    market: "興櫃",
+                    stockType: .stock,
+                    frequency: .annual,
+                    referencePrice: 25.0
+                ))
+            }
+            return merged
+        }
+
         // 1. 嘗試從 App Bundle 載入全台股 2,400+ 標的 JSON
         if let url = Bundle.main.url(forResource: "TaiwanStocks", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let list = try? JSONDecoder().decode([StockMetaItem].self, from: data),
            !list.isEmpty {
-            self.allStocks = list
-            self.symbolMap = Dictionary(list.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
+            let finalList = ensureBuiltInStocks(list)
+            self.allStocks = finalList
+            self.symbolMap = Dictionary(finalList.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
             return
         }
         
@@ -52,13 +68,14 @@ public final class TaiwanStockDatabase {
         if let data = try? Data(contentsOf: URL(fileURLWithPath: localPath)),
            let list = try? JSONDecoder().decode([StockMetaItem].self, from: data),
            !list.isEmpty {
-            self.allStocks = list
-            self.symbolMap = Dictionary(list.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
+            let finalList = ensureBuiltInStocks(list)
+            self.allStocks = finalList
+            self.symbolMap = Dictionary(finalList.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
             return
         }
         
         // 3. Fallback: 核心熱門標的
-        self.allStocks = PopularStockPreset.allPresets.map {
+        self.allStocks = ensureBuiltInStocks(PopularStockPreset.allPresets.map {
             StockMetaItem(
                 symbol: $0.symbol,
                 name: $0.name,
@@ -67,7 +84,7 @@ public final class TaiwanStockDatabase {
                 frequency: $0.frequency,
                 referencePrice: $0.defaultPrice
             )
-        }
+        })
         self.symbolMap = Dictionary(self.allStocks.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
     }
     

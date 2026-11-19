@@ -210,29 +210,44 @@ public final class DividendSourceService {
             return HoldingDividendProfile(symbol: sym, name: cleanName.isEmpty ? "市值指數ETF" : cleanName, strategy: .marketWeight, estimatedYield: 0.035, defaultCashDividendPerShare: dps, ratio76: 0.08, ratio54C: 0.90, ratioReserve: 0.0, ratioSurplus: 0.02, notes: "以成分股現股現金股利 (54C) 為主要收益來源")
             
         default:
-            // 4. 一般個股 / 金融股 / 科技股 (2330, 2454, 金融股等)
+            // 4. 一般個股：僅於確有公告除權息或歷史配息時才計息，若今年無發股息（如 7781 昕力資或未公告配息個股）則為 $0，不再虛構 4.5% 殖利率！
+            if StockQuoteService.shared.isZeroDividendStock(symbol: sym, name: cleanName) {
+                return HoldingDividendProfile(
+                    symbol: sym,
+                    name: cleanName.isEmpty ? sym : cleanName,
+                    strategy: .equityStock,
+                    estimatedYield: 0.0,
+                    defaultCashDividendPerShare: 0.0,
+                    ratio76: 0.0,
+                    ratio54C: 1.0,
+                    ratioReserve: 0.0,
+                    ratioSurplus: 0.0,
+                    notes: "今年無發放股息 ($0)"
+                )
+            }
             if stockType == .stock || (!sym.hasPrefix("00") && sym.count == 4) {
+                let knownDivs = StockQuoteService.shared.knownDividends(for: sym)
+                let latestDps = knownDivs.last?.cashPerShare
+                let hasAnnouncedDiv = (latestDps ?? 0) > 0
                 let estYield: Double
-                if sym.hasPrefix("28") {
-                    estYield = 0.048 // 金融股平均約 4.8%
-                } else if sym == "2330" {
-                    estYield = 0.018 // 台積電約 1.8%
-                } else if sym == "2454" {
-                    estYield = 0.042 // 聯發科約 4.2%
+                if sym == "2330" {
+                    estYield = 0.018
                 } else {
-                    estYield = 0.045 // 一般現股預設 4.5%
+                    estYield = 0.0 // 未公告除權息之一般個股不自動虛構股息
                 }
                 return HoldingDividendProfile(
                     symbol: sym,
                     name: cleanName.isEmpty ? "上市櫃現股" : cleanName,
                     strategy: .equityStock,
                     estimatedYield: estYield,
-                    defaultCashDividendPerShare: nil,
+                    defaultCashDividendPerShare: latestDps,
                     ratio76: 0.0,
-                    ratio54C: 1.0, // 個股 100% 均為 54C 股利所得
+                    ratio54C: 1.0,
                     ratioReserve: 0.0,
                     ratioSurplus: 0.0,
-                    notes: "個別上市公司發放之現金股利，100% 全額屬 54C 股利所得"
+                    notes: hasAnnouncedDiv
+                        ? "個別上市公司發放之現金股利，100% 全額屬 54C 股利所得"
+                        : "今年尚無公告配息紀錄 ($0)"
                 )
             } else {
                 // 一般其他 ETF 預設
@@ -252,11 +267,15 @@ public final class DividendSourceService {
         }
     }
     
-    /// 依指定股數計算該標的等效單月股息（年化均攤基準）
+    /// 依指定股數計算該標的等效單月股息（年化均攤基準；若為零配息個股如 7781 昕力資則嚴格為 0）
     public func calculateMonthlyDividendAmount(for holding: StockHolding, shares: Int) -> Double {
         guard shares > 0 else { return 0.0 }
+        if StockQuoteService.shared.isZeroDividendStock(symbol: holding.symbol, name: holding.name) {
+            return 0.0
+        }
         let profile = getProfile(for: holding.symbol, name: holding.name, stockType: holding.stockType)
-        if let dps = profile.defaultCashDividendPerShare, dps > 0 {
+        if let dps = profile.defaultCashDividendPerShare {
+            guard dps > 0 else { return 0.0 }
             switch holding.frequency {
             case .monthly:
                 return Double(shares) * dps
@@ -270,6 +289,7 @@ public final class DividendSourceService {
                 return (Double(shares) * dps) / 12.0
             }
         }
+        guard profile.estimatedYield > 0 else { return 0.0 }
         return (Double(shares) * holding.currentPrice * profile.estimatedYield) / 12.0
     }
 

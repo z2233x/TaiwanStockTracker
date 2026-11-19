@@ -21,6 +21,18 @@ public final class StockQuoteService {
         public let source: String
     }
 
+    /// 官方已確認當年度無發放現金股利之標的（如 7781 昕力資）
+    public static let knownZeroDividendSymbols: Set<String> = [
+        "7781"
+    ]
+
+    public func isZeroDividendStock(symbol: String, name: String = "") -> Bool {
+        let clean = symbol.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if Self.knownZeroDividendSymbols.contains(clean) { return true }
+        if name.contains("昕力") { return true }
+        return false
+    }
+
     /// 內建已驗證之 2025-2026 台股／ETF 官方公布除權息日與每股配息基準表（離線即時可用，連線時自動與證交所 TWT48U_ALL 及 Yahoo Finance 合併更新）
     public static let knownOfficialDividends: [String: [(date: String, cash: Double)]] = [
         "006208": [("2025-11-18", 3.448), ("2026-07-16", 4.75), ("2026-11-17", 3.88)],

@@ -153,15 +153,15 @@ struct DashboardView: View {
                                 Button {
                                     isShowingRankSheet = true
                                 } label: {
-                                    HStack(spacing: 3) {
+                                    HStack(spacing: 4) {
                                         Text(rank.badge)
                                         Text("Lv.\(rank.level) \(rank.title)")
-                                            .font(.system(size: 11, weight: .bold))
+                                            .font(.system(size: 13, weight: .bold))
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 8, weight: .bold))
+                                            .font(.system(size: 10, weight: .bold))
                                     }
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
                                     .background(Color.white.opacity(0.22))
                                     .foregroundColor(.white)
                                     .clipShape(Capsule())
@@ -1556,38 +1556,30 @@ struct StockHoldingRowView: View {
     let onDelete: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let isZeroDivStock = StockQuoteService.shared.isZeroDividendStock(symbol: item.symbol, name: item.name)
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                // 標的代號 + 頻率Badge + 股息策略Badge + 券商Badge
-                HStack(spacing: 6) {
+                // 標的代號 + 頻率Badge + 券商Badge (清爽不擁擠、字體放大易讀)
+                HStack(spacing: 8) {
                     Text(item.symbol)
-                        .font(.headline.bold())
+                        .font(.system(size: 19, weight: .heavy, design: .rounded))
                     
-                    Text(item.frequency.rawValue)
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(hex: item.frequency.badgeColorHex).opacity(0.15))
-                        .foregroundColor(Color(hex: item.frequency.badgeColorHex))
-                        .cornerRadius(4)
-                    
-                    let profile = DividendSourceService.shared.getProfile(for: item.symbol, name: item.name, stockType: item.stockType)
-                    Text(profile.strategy.rawValue)
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color(hex: profile.strategy.badgeColorHex).opacity(0.15))
-                        .foregroundColor(Color(hex: profile.strategy.badgeColorHex))
-                        .cornerRadius(4)
+                    Text(isZeroDivStock ? "今年無配息" : item.frequency.rawValue)
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background((isZeroDivStock ? Color.secondary : Color(hex: item.frequency.badgeColorHex)).opacity(0.15))
+                        .foregroundColor(isZeroDivStock ? .secondary : Color(hex: item.frequency.badgeColorHex))
+                        .cornerRadius(6)
                     
                     if !item.brokerage.isEmpty {
                         Text(item.brokerage)
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
                             .background(Color(.systemGray5))
                             .foregroundColor(.secondary)
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                 }
                 
@@ -1596,65 +1588,65 @@ struct StockHoldingRowView: View {
                 // 展開收合箭頭
                 Button(action: onToggleExpand) {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.bold())
+                        .font(.subheadline.bold())
                         .foregroundColor(.secondary)
-                        .padding(6)
+                        .padding(8)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
             }
             
             Text(item.name)
-                .font(.subheadline)
+                .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.secondary)
             
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("總成本")
-                        .font(.caption).foregroundColor(.secondary)
+                        .font(.system(size: 13)).foregroundColor(.secondary)
                     Text("$\(Int(item.totalCostWithFee).formatted())")
-                        .font(.subheadline.bold())
+                        .font(.system(size: 16, weight: .bold))
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 3) {
                     Text("總股數")
-                        .font(.caption).foregroundColor(.secondary)
-                    Text("\(item.shares.formatted())股")
-                        .font(.subheadline.bold())
+                        .font(.system(size: 13)).foregroundColor(.secondary)
+                    Text("\(item.shares.formatted()) 股")
+                        .font(.system(size: 16, weight: .bold))
                 }
             }
             
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("總損益")
-                        .font(.caption).foregroundColor(.secondary)
+                        .font(.system(size: 13)).foregroundColor(.secondary)
                     HStack(spacing: 6) {
                         Text("\(item.unrealizedProfit >= 0 ? "+" : "")$\(Int(item.unrealizedProfit).formatted())")
-                            .font(.subheadline.bold())
-                            .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF6961") : Color(hex: "#77DD77"))
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(item.unrealizedProfit >= 0 ? Color(hex: "#FF3B30") : Color(hex: "#34C759"))
                         
                         Text(profitRateText)
-                            .font(.system(size: 11, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .font(.system(size: 13, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
                             .background(profitBadgeBg)
                             .foregroundColor(profitTextColor)
                             .cornerRadius(6)
                     }
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 3) {
                     Text("已領息")
-                        .font(.caption).foregroundColor(.secondary)
-                    Text("(領息\(item.dividendCount)次)")
-                        .font(.caption)
+                        .font(.system(size: 13)).foregroundColor(.secondary)
+                    Text(isZeroDivStock ? "無配息" : "領息 \(item.dividendCount) 次")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
             }
             
             // 展開內容：現值、均價、現價、多功能操作區
             if isExpanded {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     Divider()
 
                     HStack {
@@ -1670,17 +1662,17 @@ struct StockHoldingRowView: View {
                                 .foregroundColor(.primary)
                             if item.previousClose > 0 && abs(diff) >= 0.005 {
                                 Text(String(format: "(%@%.2f%%)", diff >= 0 ? "▲" : "▼", abs(diffPct)))
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(diff >= 0 ? Color(hex: "#FF3B30") : Color(hex: "#34C759"))
                             }
                         }
                     }
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
                     
-                    // 股息來源與掩護性買權推算（依買入／加碼日期＋中旬公告期區分本月可領 vs 下月已公布領取）
                     let allEvents = StorageService.shared.loadEvents()
                     let calc = DividendSourceService.shared.calculateHoldingDividend(holding: item, events: allEvents)
+                    let isNoDividendThisYear = isZeroDivStock || (calc.annualDividend <= 0 && calc.monthlyDividend <= 0 && calc.upcomingExDividendAmountInMonth <= 0)
                     let cal = Calendar.current
                     let todayNow = Date()
                     let curY = cal.component(.year, from: todayNow)
@@ -1690,110 +1682,100 @@ struct StockHoldingRowView: View {
                     let cutoffNow = StockHolding.exDividendCutoffDate(for: item.symbol, year: curY, month: curM, events: allEvents)
 
                     if !item.lots.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("買入與加碼批次明細 (\(item.lots.count) 筆)")
-                                .font(.system(size: 10, weight: .bold))
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("買入與加碼批次 (\(item.lots.count) 筆)")
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(.secondary)
                             ForEach(item.lots) { lot in
                                 let isElig = cal.startOfDay(for: lot.buyDate) < cutoffNow
-                                let badgeText = isElig ? "✓ 本月計息" : (isMidMonthAnnounced ? "📢 領 \(nextM) 月息(已公布)" : "⏳ 待 \(nextM) 月公布")
-                                let badgeBg = isElig ? Color.green.opacity(0.14) : (isMidMonthAnnounced ? Color.blue.opacity(0.14) : Color.orange.opacity(0.14))
-                                let badgeFg = isElig ? Color(hex: "#15803D") : (isMidMonthAnnounced ? Color(hex: "#1D4ED8") : Color(hex: "#C2410C"))
+                                let badgeText = isNoDividendThisYear
+                                    ? "⚪ 今年無配息"
+                                    : (isElig ? "✓ 本月計息" : (isMidMonthAnnounced ? "📢 領 \(nextM) 月息" : "⏳ 待 \(nextM) 月公布"))
+                                let badgeBg = isNoDividendThisYear
+                                    ? Color(.systemGray5)
+                                    : (isElig ? Color.green.opacity(0.14) : (isMidMonthAnnounced ? Color.blue.opacity(0.14) : Color.orange.opacity(0.14)))
+                                let badgeFg = isNoDividendThisYear
+                                    ? Color.secondary
+                                    : (isElig ? Color(hex: "#15803D") : (isMidMonthAnnounced ? Color(hex: "#1D4ED8") : Color(hex: "#C2410C")))
                                 HStack(spacing: 6) {
                                     Text(lot.shortDateString)
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
                                         .foregroundColor(.primary)
                                     Text(lot.lotsText)
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.system(size: 13, weight: .bold))
                                     Text("@ $\(String(format: "%.2f", lot.price))")
-                                        .font(.system(size: 10))
+                                        .font(.system(size: 12))
                                         .foregroundColor(.secondary)
                                     Spacer()
                                     Text(badgeText)
-                                        .font(.system(size: 10, weight: .bold))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
                                         .background(badgeBg)
                                         .foregroundColor(badgeFg)
-                                        .cornerRadius(4)
+                                        .cornerRadius(6)
                                 }
                             }
                         }
-                        .padding(8)
+                        .padding(10)
                         .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                        .cornerRadius(10)
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let exStr = calc.announcedExDateString, let cash = calc.announcedCashPerShare {
-                            HStack(spacing: 4) {
+                    if isNoDividendThisYear {
+                        HStack {
+                            Text("⚪ \(item.name) 今年無發放現金股息 ($0)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if let exStr = calc.announcedExDateString, let cash = calc.announcedCashPerShare {
                                 Text(calc.isExDividendReachedInMonth
                                      ? "📢 本月除權息日 \(exStr) · 每股配 $\(String(format: "%.3f", cash)) · ✓ 已除息增加 \(curM) 月股息 (+$\(Int(calc.monthlyDividend).formatted()))"
                                      : "📅 本月預定除權息日 \(exStr) · 每股配 $\(String(format: "%.3f", cash)) · 到期將增加 \(curM) 月股息 (+$\(Int(calc.upcomingExDividendAmountInMonth).formatted()))")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(Color(hex: calc.isExDividendReachedInMonth ? "#15803D" : "#1D4ED8"))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background((calc.isExDividendReachedInMonth ? Color.green : Color.blue).opacity(0.12))
+                                    .cornerRadius(8)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background((calc.isExDividendReachedInMonth ? Color.green : Color.blue).opacity(0.12))
-                            .cornerRadius(6)
-                        }
 
-                        HStack {
-                            if let dps = calc.announcedCashPerShare ?? calc.profile.defaultCashDividendPerShare {
-                                Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (\(calc.eligibleSharesNow.formatted())股 × $\(String(format: "%.3f", dps)))")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Color(hex: "#007AFF"))
-                            } else {
-                                Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
-                                    .font(.caption.bold())
-                                    .foregroundColor(Color(hex: "#007AFF"))
+                            HStack {
+                                if let dps = calc.announcedCashPerShare ?? calc.profile.defaultCashDividendPerShare {
+                                    Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (\(calc.eligibleSharesNow.formatted())股 × $\(String(format: "%.3f", dps)))")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(Color(hex: "#007AFF"))
+                                } else {
+                                    Text("💡 本月可領: $\(Int(calc.monthlyDividend).formatted()) (年殖利率 \(String(format: "%.1f", calc.effectiveAnnualYield * 100))%)")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(Color(hex: "#007AFF"))
+                                }
+                                Spacer()
+                                if calc.taxExemptPercentage > 0 {
+                                    Text("免稅 \(String(format: "%.0f", calc.taxExemptPercentage))%")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundColor(.green)
+                                }
                             }
-                            Spacer()
-                            Text("免稅比 \(String(format: "%.0f", calc.taxExemptPercentage))%")
-                                .font(.caption.bold())
-                                .foregroundColor(.green)
-                        }
 
-                        if calc.pendingNextMonthShares > 0 {
-                            Text(isMidMonthAnnounced
-                                 ? "📢 \(nextM) 月配息已公布：此筆 \(calc.pendingNextMonthShares.formatted()) 股將於 \(nextM) 月除息領取（下月合計 $\(Int(calc.fullMonthlyDividend).formatted()) /月）"
-                                 : "⏳ 本月除息後加碼 \(calc.pendingNextMonthShares.formatted()) 股待本月中旬公布 \(nextM) 月配息後領取（下期滿倉預估 $\(Int(calc.fullMonthlyDividend).formatted()) /月）")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Color(hex: isMidMonthAnnounced ? "#1D4ED8" : "#C2410C"))
-                        }
-                        
-                        // 來源百分比拆解
-                        HStack(spacing: 8) {
-                            if calc.profile.ratio76 > 0 {
-                                Text("76權利金 \(Int(calc.profile.ratio76 * 100))%")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(Color(hex: "#AF52DE"))
-                            }
-                            if calc.profile.ratio54C > 0 {
-                                Text("54C股利 \(Int(calc.profile.ratio54C * 100))%")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(Color(hex: "#007AFF"))
-                            }
-                            if calc.profile.ratioReserve > 0 {
-                                Text("平準金 \(Int(calc.profile.ratioReserve * 100))%")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(Color(hex: "#FF9500"))
-                            }
-                            if calc.profile.ratioSurplus > 0 {
-                                Text("公積 \(Int(calc.profile.ratioSurplus * 100))%")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(Color(hex: "#34C759"))
+                            if calc.pendingNextMonthShares > 0 {
+                                Text(isMidMonthAnnounced
+                                     ? "📢 \(nextM) 月配息已公布：此筆 \(calc.pendingNextMonthShares.formatted()) 股將於 \(nextM) 月除息領取（下月合計 $\(Int(calc.fullMonthlyDividend).formatted())）"
+                                     : "⏳ 除息後加碼 \(calc.pendingNextMonthShares.formatted()) 股待月中旬公布 \(nextM) 月配息領取（下期滿倉 $\(Int(calc.fullMonthlyDividend).formatted())）")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Color(hex: isMidMonthAnnounced ? "#1D4ED8" : "#C2410C"))
                             }
                         }
-                        
-                        Text(calc.profile.notes)
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
                     }
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
                     
                     // 操作按鈕組（在 List row 內必須使用 .buttonStyle(.borderless)，避免點擊整列觸發所有按鈕）
                     HStack(spacing: 8) {
@@ -3654,9 +3636,12 @@ struct AnimatedPetModelView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate * motionSpeed
-            let beck = pow(0.5 - 0.5 * cos(t * 3.1), 1.35)
-            let flap = 0.5 - 0.5 * cos(t * 10.5)
-            let wag = sin(t * (isSitting ? 11.0 : 14.5))
+            let beck = pow(0.5 - 0.5 * cos(t * 3.4), 1.3)
+            let flap = 0.5 - 0.5 * cos(t * 11.5)
+            let wag = sin(t * (isSitting ? 12.0 : 16.0))
+            // 呼吸彈性縮放 (Squash & Stretch) 與自然歪頭韻律，讓寵物更生動靈活
+            let breath = sin(t * 2.8)
+            let headTilt = sin(t * 1.9 + 0.4) * 2.4
             let pxLimbX = parallaxX * 5.0
             let pxLimbY = parallaxY * 4.0
             let pxBodyX = parallaxX * 1.8
@@ -3668,50 +3653,54 @@ struct AnimatedPetModelView: View {
                     Image("pet_cat_body")
                         .resizable()
                         .scaledToFit()
+                        .scaleEffect(x: 1.0 - 0.018 * breath, y: 1.0 + 0.022 * breath, anchor: .bottom)
+                        .rotationEffect(.degrees(headTilt), anchor: UnitPoint(x: 0.5, y: 0.72))
                         .offset(x: pxBodyX, y: pxBodyY)
                     Image("pet_cat_paw")
                         .resizable()
                         .scaledToFit()
                         .scaleEffect(
-                            x: 1.0 + 0.03 * beck,
-                            y: 1.0 - 0.22 * beck,
+                            x: 1.0 + 0.04 * beck,
+                            y: 1.0 - 0.25 * beck,
                             anchor: UnitPoint(x: 0.253, y: 0.492)
                         )
                         .rotationEffect(
-                            .degrees(4.5 * beck - 2.0),
+                            .degrees(5.5 * beck - 2.0 + headTilt * 0.6),
                             anchor: UnitPoint(x: 0.253, y: 0.492)
                         )
                         .rotation3DEffect(
-                            .degrees(-46.0 * beck),
+                            .degrees(-50.0 * beck),
                             axis: (x: 1, y: 0, z: 0),
                             anchor: UnitPoint(x: 0.253, y: 0.492),
                             perspective: 0.62
                         )
-                        .offset(x: pxLimbX, y: pxLimbY + size * 0.008 * beck)
+                        .offset(x: pxLimbX, y: pxLimbY + size * 0.01 * beck)
                 case .bird:
                     Image("pet_bird_body")
                         .resizable()
                         .scaledToFit()
-                        .offset(x: pxBodyX, y: pxBodyY - 2.4 * sin(t * 10.5))
+                        .scaleEffect(x: 1.0 - 0.02 * sin(t * 11.5), y: 1.0 + 0.025 * sin(t * 11.5))
+                        .rotationEffect(.degrees(headTilt * 1.1))
+                        .offset(x: pxBodyX, y: pxBodyY - 3.0 * sin(t * 11.5))
                     Image("pet_bird_wing")
                         .resizable()
                         .scaledToFit()
                         .scaleEffect(
                             x: 1.0,
-                            y: 0.78 + 0.26 * flap,
+                            y: 0.74 + 0.32 * flap,
                             anchor: UnitPoint(x: 0.572, y: 0.459)
                         )
                         .rotationEffect(
-                            .degrees(-18.0 + 30.0 * flap),
+                            .degrees(-22.0 + 36.0 * flap),
                             anchor: UnitPoint(x: 0.572, y: 0.459)
                         )
-                        .offset(x: pxLimbX, y: pxLimbY - 2.4 * sin(t * 10.5))
+                        .offset(x: pxLimbX, y: pxLimbY - 3.0 * sin(t * 11.5))
                 case .dog:
                     Image(isSitting ? "pet_dog_sit_tail" : "pet_dog_tail")
                         .resizable()
                         .scaledToFit()
                         .rotationEffect(
-                            .degrees(18.0 * wag),
+                            .degrees(22.0 * wag),
                             anchor: isSitting
                                 ? UnitPoint(x: 0.806, y: 0.750)
                                 : UnitPoint(x: 0.850, y: 0.603)
@@ -3720,6 +3709,8 @@ struct AnimatedPetModelView: View {
                     Image(isSitting ? "pet_dog_sit_body" : "pet_dog_body")
                         .resizable()
                         .scaledToFit()
+                        .scaleEffect(x: 1.0 - 0.018 * breath, y: 1.0 + 0.024 * breath, anchor: .bottom)
+                        .rotationEffect(.degrees(headTilt * 0.8), anchor: .bottom)
                         .offset(x: pxBodyX, y: pxBodyY)
                 }
             }
@@ -3848,16 +3839,16 @@ struct PetCompanionBannerCard: View {
                 }
             }
 
-            // 右側：開放式對話氣泡 + 進度條 + 互動膠囊鈕
-            VStack(alignment: .leading, spacing: 7) {
+            // 右側：開放式對話氣泡 + 進度條 + 互動膠囊鈕 (手機字體放大易讀)
+            VStack(alignment: .leading, spacing: 8) {
                 Button(action: onTapCard) {
                     Text(bubbleText)
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(.systemBackground))
                         .cornerRadius(14)
@@ -3865,21 +3856,21 @@ struct PetCompanionBannerCard: View {
                 }
                 .buttonStyle(.plain)
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("Lv.\(levelInfo.level) \(stageTitle)")
-                        .font(.system(size: 11, weight: .heavy))
+                        .font(.system(size: 13, weight: .heavy))
                         .foregroundColor(Color(hex: "#D97706"))
                     ProgressView(value: levelInfo.progress)
                         .tint(Color(hex: "#F59E0B"))
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if petState.pendingFeedDP > 0 {
                         Button(action: onTapFeed) {
                             Text("🪙 餵食 +\(petState.pendingFeedDP)")
-                                .font(.system(size: 11, weight: .heavy))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
+                                .font(.system(size: 13, weight: .heavy))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
                                 .background(
                                     LinearGradient(
                                         colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
@@ -3896,9 +3887,9 @@ struct PetCompanionBannerCard: View {
 
                     Button(action: onTapCard) {
                         Text(petState.hasChosenStarter ? "✨ 3D 互動舞台 ›" : "🎯 三選一領養陪伴 ›")
-                            .font(.system(size: 11, weight: .bold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                            .font(.system(size: 13, weight: .bold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                             .background(Color(hex: "#007AFF").opacity(0.12))
                             .foregroundColor(Color(hex: "#007AFF"))
                             .clipShape(Capsule())
@@ -4391,23 +4382,23 @@ struct PetCompanionSheet: View {
                         .frame(height: 230)
 
                         Text("Lv.\(levelInfo.level) \(stageTitle)（第 \(levelInfo.stage)/20 階）")
-                            .font(.headline.bold())
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
                             .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
 
-                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : "\(petState.species.tagline)（點擊舞台任意處引導移動）"))
-                            .font(.caption)
+                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : "\(petState.species.tagline)（點擊舞台任意處投金幣引導追逐）"))
+                            .font(.system(size: 14, weight: .medium))
                             .multilineTextAlignment(.center)
                             .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
 
-                        // 直接互動按鈕組（以流暢走動/盤旋俯衝動作取代生硬的卡片翻轉）
+                        // 直接互動按鈕組（流暢走動/追逐金幣/盤旋俯衝，字體放大清晰）
                         HStack(spacing: 8) {
                             Button {
                                 triggerInteraction()
                             } label: {
                                 Text("👋 摸摸招財")
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 8)
                                     .background(Color(.systemBackground))
                                     .foregroundColor(.primary)
                                     .clipShape(Capsule())
@@ -4419,9 +4410,9 @@ struct PetCompanionSheet: View {
                                 triggerInteraction(swoop: true)
                             } label: {
                                 Text(petState.species == .bird ? "🪽 盤旋飛翔" : (petState.species == .dog ? "🦴 飛奔巡邏" : "🐾 躍動招手"))
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 8)
                                     .background(Color(.systemBackground))
                                     .foregroundColor(.primary)
                                     .clipShape(Capsule())
@@ -4430,12 +4421,15 @@ struct PetCompanionSheet: View {
                             .buttonStyle(.plain)
 
                             Button {
-                                triggerInteraction(isCoinRain: true)
+                                tapTargetX = CGFloat.random(in: -70...70)
+                                tapTargetY = CGFloat.random(in: -28...18)
+                                tapTargetTime = Date().timeIntervalSinceReferenceDate
+                                triggerInteraction(isCoinRain: true, swoop: true)
                             } label: {
-                                Text("🪙 撒金幣")
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 11)
-                                    .padding(.vertical, 7)
+                                Text("🪙 投金幣追逐")
+                                    .font(.system(size: 13, weight: .heavy))
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 8)
                                     .background(
                                         LinearGradient(
                                             colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
@@ -4464,9 +4458,9 @@ struct PetCompanionSheet: View {
                                     }
                                 } label: {
                                     Text(isDogSitting ? "🐕 站起來" : "🐶 坐下")
-                                        .font(.caption.bold())
-                                        .padding(.horizontal, 11)
-                                        .padding(.vertical, 7)
+                                        .font(.system(size: 13, weight: .bold))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
                                         .background(Color(.systemBackground))
                                         .foregroundColor(Color(hex: "#9A3412"))
                                         .clipShape(Capsule())
@@ -4476,12 +4470,12 @@ struct PetCompanionSheet: View {
                             }
                         }
 
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             ForEach(auras) { aura in
                                 Text("\(aura.icon) \(aura.text)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
                                     .background(petState.activeTheme == .obsidian ? Color.white.opacity(0.14) : Color(hex: aura.colorHex).opacity(0.15))
                                     .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : Color(hex: aura.colorHex))
                                     .clipShape(Capsule())
@@ -4494,10 +4488,10 @@ struct PetCompanionSheet: View {
                     VStack(spacing: 10) {
                         HStack {
                             Text("晉升階位 (第 \(levelInfo.stage)/20 階)")
-                                .font(.caption.bold())
+                                .font(.system(size: 14, weight: .bold))
                             Spacer()
                             Text("\(levelInfo.currentXP) / \(levelInfo.needXP) XP")
-                                .font(.caption.bold())
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(Color(hex: "#007AFF"))
                         }
                         ProgressView(value: levelInfo.progress)
@@ -4507,23 +4501,26 @@ struct PetCompanionSheet: View {
                             let res = PetService.shared.feedAllPending()
                             petState = res.state
                             if res.fedAmount > 0 {
-                                triggerInteraction(isCoinRain: true)
+                                tapTargetX = CGFloat.random(in: -65...65)
+                                tapTargetY = CGFloat.random(in: -24...16)
+                                tapTargetTime = Date().timeIntervalSinceReferenceDate
+                                triggerInteraction(isCoinRain: true, swoop: true)
                             }
                         } label: {
                             HStack {
                                 Text("🪙 餵食全部待領股息點數 (\(petState.pendingFeedDP) DP)")
-                                    .font(.subheadline.bold())
+                                    .font(.system(size: 15, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 11)
+                            .padding(.vertical, 12)
                             .background(petState.pendingFeedDP > 0 ? Color(hex: "#007AFF") : Color(.systemGray4))
                             .foregroundColor(.white)
                             .cornerRadius(12)
                         }
                         .disabled(petState.pendingFeedDP <= 0)
 
-                        Text("可拖曳寵物旋轉 3D 視角；每實領 $100 股息自動得 1 DP，升級不扣代幣。")
-                            .font(.caption2)
+                        Text("點擊舞台任意處可投下金幣吸引寵物追逐；每實領 $100 股息自動得 1 DP。")
+                            .font(.system(size: 12))
                             .foregroundColor(.secondary)
                     }
                     .padding(14)
