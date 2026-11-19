@@ -1,4 +1,5 @@
 import SwiftUI
+import SceneKit
 import UserNotifications
 import UniformTypeIdentifiers
 import PhotosUI
@@ -3625,96 +3626,788 @@ private let petInteractQuotes: [PetSpecies: [String]] = [
     ]
 ]
 
-struct AnimatedPetModelView: View {
+// MARK: - 專業 3D 立體遊戲引擎 (SceneKit 真 3D 立體模型 + 360° 自由視角 + 3D 物理追逐金幣)
+struct Pet3DSceneKitGameView: UIViewRepresentable {
     let species: PetSpecies
-    let isSitting: Bool
-    let size: CGFloat
-    var parallaxX: CGFloat = 0
-    var parallaxY: CGFloat = 0
-    var motionSpeed: Double = 1.0
+    let isDogSitting: Bool
+    let isCompact: Bool
+    let actionTrigger: Int
+    let actionType: String // "pat", "swoop", "coin"
+    var onCatchCoin: (() -> Void)? = nil
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate * motionSpeed
-            let beck = pow(0.5 - 0.5 * cos(t * 3.4), 1.3)
-            let flap = 0.5 - 0.5 * cos(t * 11.5)
-            let wag = sin(t * (isSitting ? 12.0 : 16.0))
-            // 呼吸彈性縮放 (Squash & Stretch) 與自然歪頭韻律，讓寵物更生動靈活
-            let breath = sin(t * 2.8)
-            let headTilt = sin(t * 1.9 + 0.4) * 2.4
-            let pxLimbX = parallaxX * 5.0
-            let pxLimbY = parallaxY * 4.0
-            let pxBodyX = parallaxX * 1.8
-            let pxBodyY = parallaxY * 1.4
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
 
-            ZStack {
-                switch species {
-                case .cat:
-                    Image("pet_cat_body")
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(x: 1.0 - 0.018 * breath, y: 1.0 + 0.022 * breath, anchor: .bottom)
-                        .rotationEffect(.degrees(headTilt), anchor: UnitPoint(x: 0.5, y: 0.72))
-                        .offset(x: pxBodyX, y: pxBodyY)
-                    Image("pet_cat_paw")
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(
-                            x: 1.0 + 0.04 * beck,
-                            y: 1.0 - 0.25 * beck,
-                            anchor: UnitPoint(x: 0.253, y: 0.492)
-                        )
-                        .rotationEffect(
-                            .degrees(5.5 * beck - 2.0 + headTilt * 0.6),
-                            anchor: UnitPoint(x: 0.253, y: 0.492)
-                        )
-                        .rotation3DEffect(
-                            .degrees(-50.0 * beck),
-                            axis: (x: 1, y: 0, z: 0),
-                            anchor: UnitPoint(x: 0.253, y: 0.492),
-                            perspective: 0.62
-                        )
-                        .offset(x: pxLimbX, y: pxLimbY + size * 0.01 * beck)
-                case .bird:
-                    Image("pet_bird_body")
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(x: 1.0 - 0.02 * sin(t * 11.5), y: 1.0 + 0.025 * sin(t * 11.5))
-                        .rotationEffect(.degrees(headTilt * 1.1))
-                        .offset(x: pxBodyX, y: pxBodyY - 3.0 * sin(t * 11.5))
-                    Image("pet_bird_wing")
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(
-                            x: 1.0,
-                            y: 0.74 + 0.32 * flap,
-                            anchor: UnitPoint(x: 0.572, y: 0.459)
-                        )
-                        .rotationEffect(
-                            .degrees(-22.0 + 36.0 * flap),
-                            anchor: UnitPoint(x: 0.572, y: 0.459)
-                        )
-                        .offset(x: pxLimbX, y: pxLimbY - 3.0 * sin(t * 11.5))
-                case .dog:
-                    Image(isSitting ? "pet_dog_sit_tail" : "pet_dog_tail")
-                        .resizable()
-                        .scaledToFit()
-                        .rotationEffect(
-                            .degrees(22.0 * wag),
-                            anchor: isSitting
-                                ? UnitPoint(x: 0.806, y: 0.750)
-                                : UnitPoint(x: 0.850, y: 0.603)
-                        )
-                        .offset(x: pxBodyX * 0.4, y: pxBodyY * 0.4)
-                    Image(isSitting ? "pet_dog_sit_body" : "pet_dog_body")
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(x: 1.0 - 0.018 * breath, y: 1.0 + 0.024 * breath, anchor: .bottom)
-                        .rotationEffect(.degrees(headTilt * 0.8), anchor: .bottom)
-                        .offset(x: pxBodyX, y: pxBodyY)
+    func makeUIView(context: Context) -> SCNView {
+        let scnView = SCNView()
+        scnView.backgroundColor = .clear
+        scnView.antialiasingMode = .multisampling4X
+        scnView.preferredFramesPerSecond = 60
+        scnView.isPlaying = true
+        scnView.loops = true
+        scnView.scene = context.coordinator.scene
+        scnView.pointOfView = context.coordinator.cameraNode
+        scnView.delegate = context.coordinator
+
+        if !isCompact {
+            let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+            scnView.addGestureRecognizer(pan)
+        }
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        scnView.addGestureRecognizer(tap)
+
+        context.coordinator.scnView = scnView
+        context.coordinator.rebuildPet(species: species)
+        return scnView
+    }
+
+    func updateUIView(_ uiView: SCNView, context: Context) {
+        context.coordinator.parent = self
+        if context.coordinator.currentSpecies != species {
+            context.coordinator.rebuildPet(species: species)
+        }
+        context.coordinator.isDogSitting = isDogSitting
+        if context.coordinator.lastActionTrigger != actionTrigger {
+            context.coordinator.lastActionTrigger = actionTrigger
+            context.coordinator.triggerAction(type: actionType)
+        }
+    }
+
+    final class Coordinator: NSObject, SCNSceneRendererDelegate {
+        var parent: Pet3DSceneKitGameView
+        weak var scnView: SCNView?
+        let scene = SCNScene()
+        let cameraOrbitNode = SCNNode()
+        let cameraNode = SCNNode()
+        let worldNode = SCNNode()
+        let petRootNode = SCNNode()
+        let petBodyGroup = SCNNode()
+
+        // 3D 關節節點
+        var headNode = SCNNode()
+        var leftEyeNode = SCNNode()
+        var rightEyeNode = SCNNode()
+        var rightArmPivot = SCNNode()
+        var leftArmPivot = SCNNode()
+        var leftWingPivot = SCNNode()
+        var rightWingPivot = SCNNode()
+        var tailPivot = SCNNode()
+        var legFL = SCNNode()
+        var legFR = SCNNode()
+        var legBL = SCNNode()
+        var legBR = SCNNode()
+
+        var currentSpecies: PetSpecies? = nil
+        var isDogSitting: Bool = false
+        var lastActionTrigger: Int = 0
+
+        // 3D 攝影機軌道角度
+        var cameraYaw: Float = 0.0
+        var cameraPitch: Float = -0.22
+        var panStartYaw: Float = 0.0
+        var panStartPitch: Float = -0.22
+
+        // 3D 空間運動與追逐金幣狀態
+        var posX: Float = 0.0
+        var posY: Float = 0.0
+        var posZ: Float = 0.0
+        var facingYaw: Float = 0.0
+        var targetCoinNode: SCNNode? = nil
+        var targetX: Float = 0.0
+        var targetZ: Float = 0.0
+        var hasTargetCoin: Bool = false
+        var jumpVelocityY: Float = 0.0
+        var jumpOffsetY: Float = 0.0
+        var swoopUntilTime: TimeInterval = 0.0
+
+        init(_ parent: Pet3DSceneKitGameView) {
+            self.parent = parent
+            super.init()
+            setupScene()
+        }
+
+        private func makePBRMaterial(hex: String, roughness: CGFloat = 0.38, metalness: CGFloat = 0.05, emissionHex: String? = nil) -> SCNMaterial {
+            let mat = SCNMaterial()
+            mat.lightingModel = .physicallyBased
+            mat.diffuse.contents = UIColor(Color(hex: hex))
+            mat.roughness.contents = roughness
+            mat.metalness.contents = metalness
+            if let em = emissionHex {
+                mat.emission.contents = UIColor(Color(hex: em)).withAlphaComponent(0.25)
+            }
+            return mat
+        }
+
+        private func setupScene() {
+            scene.rootNode.addChildNode(worldNode)
+            worldNode.addChildNode(petRootNode)
+            petRootNode.addChildNode(petBodyGroup)
+
+            // 1. 3D 透視攝影機
+            let cam = SCNCamera()
+            cam.fieldOfView = parent.isCompact ? 36 : 42
+            cam.zNear = 0.1
+            cam.zFar = 100
+            cameraNode.camera = cam
+            cameraNode.position = SCNVector3(0, parent.isCompact ? 1.55 : 2.15, parent.isCompact ? 4.3 : 5.6)
+            cameraNode.eulerAngles = SCNVector3(cameraPitch, 0, 0)
+            cameraOrbitNode.addChildNode(cameraNode)
+            scene.rootNode.addChildNode(cameraOrbitNode)
+
+            // 2. 專業三點立體打光 (主太陽光 + 暖金補光 + 天空環境光)
+            let ambient = SCNNode()
+            ambient.light = SCNLight()
+            ambient.light?.type = .ambient
+            ambient.light?.intensity = 520
+            ambient.light?.color = UIColor(red: 1.0, green: 0.98, blue: 0.94, alpha: 1.0)
+            scene.rootNode.addChildNode(ambient)
+
+            let dirLight = SCNNode()
+            dirLight.light = SCNLight()
+            dirLight.light?.type = .directional
+            dirLight.light?.intensity = 980
+            dirLight.light?.color = UIColor(red: 1.0, green: 0.97, blue: 0.90, alpha: 1.0)
+            dirLight.light?.castsShadow = true
+            dirLight.light?.shadowRadius = 4
+            dirLight.light?.shadowColor = UIColor.black.withAlphaComponent(0.28)
+            dirLight.position = SCNVector3(4, 7, 5)
+            dirLight.eulerAngles = SCNVector3(-Float.pi / 3.2, Float.pi / 4.5, 0)
+            scene.rootNode.addChildNode(dirLight)
+
+            let rimLight = SCNNode()
+            rimLight.light = SCNLight()
+            rimLight.light?.type = .omni
+            rimLight.light?.intensity = 450
+            rimLight.light?.color = UIColor(Color(hex: "#FDE047"))
+            rimLight.position = SCNVector3(-3.5, 3.0, -3.5)
+            scene.rootNode.addChildNode(rimLight)
+
+            // 3. 3D 遊戲綠茵浮島地形 (非平面舞台卡片)
+            let radius: CGFloat = parent.isCompact ? 1.45 : 2.35
+            let grassTop = SCNCylinder(radius: radius, height: 0.22)
+            grassTop.radialSegmentCount = 48
+            grassTop.materials = [makePBRMaterial(hex: "#4ADE80", roughness: 0.55)]
+            let grassNode = SCNNode(geometry: grassTop)
+            grassNode.position = SCNVector3(0, -0.11, 0)
+            worldNode.addChildNode(grassNode)
+
+            let goldTrim = SCNTorus(ringRadius: radius + 0.02, pipeRadius: 0.055)
+            goldTrim.ringSegmentCount = 48
+            goldTrim.materials = [makePBRMaterial(hex: "#F59E0B", roughness: 0.22, metalness: 0.78)]
+            let trimNode = SCNNode(geometry: goldTrim)
+            trimNode.position = SCNVector3(0, -0.02, 0)
+            worldNode.addChildNode(trimNode)
+
+            let rockBase = SCNCone(topRadius: radius * 0.96, bottomRadius: radius * 0.52, height: 0.55)
+            rockBase.radialSegmentCount = 36
+            rockBase.materials = [makePBRMaterial(hex: "#D97706", roughness: 0.65)]
+            let baseNode = SCNNode(geometry: rockBase)
+            baseNode.position = SCNVector3(0, -0.48, 0)
+            worldNode.addChildNode(baseNode)
+
+            if !parent.isCompact {
+                // 3D 聚寶盆與金元寶擺件在島嶼後方角落
+                let pot = SCNSphere(radius: 0.34)
+                pot.materials = [makePBRMaterial(hex: "#B45309", roughness: 0.25, metalness: 0.72)]
+                let potNode = SCNNode(geometry: pot)
+                potNode.scale = SCNVector3(1.1, 0.75, 1.1)
+                potNode.position = SCNVector3(1.45, 0.18, -1.15)
+                worldNode.addChildNode(potNode)
+
+                for i in 0..<3 {
+                    let coin = SCNCylinder(radius: 0.14, height: 0.05)
+                    coin.materials = [makePBRMaterial(hex: "#FACC15", roughness: 0.18, metalness: 0.88)]
+                    let cn = SCNNode(geometry: coin)
+                    cn.position = SCNVector3(1.38 + Float(i) * 0.07, 0.38 + Float(i) * 0.04, -1.15)
+                    cn.eulerAngles = SCNVector3(0.3, Float(i) * 0.5, 0.2)
+                    worldNode.addChildNode(cn)
                 }
             }
-            .frame(width: size, height: size)
+        }
+
+        func rebuildPet(species: PetSpecies) {
+            currentSpecies = species
+            petBodyGroup.childNodes.forEach { $0.removeFromParentNode() }
+            headNode = SCNNode()
+            leftEyeNode = SCNNode()
+            rightEyeNode = SCNNode()
+            rightArmPivot = SCNNode()
+            leftArmPivot = SCNNode()
+            leftWingPivot = SCNNode()
+            rightWingPivot = SCNNode()
+            tailPivot = SCNNode()
+            legFL = SCNNode()
+            legFR = SCNNode()
+            legBL = SCNNode()
+            legBR = SCNNode()
+
+            switch species {
+            case .cat:
+                build3DLuckyCat()
+            case .bird:
+                build3DMoneyBird()
+            case .dog:
+                build3DFortuneDog()
+            }
+        }
+
+        // MARK: 建立真 3D 立體招財貓模型
+        private func build3DLuckyCat() {
+            let whiteMat = makePBRMaterial(hex: "#FFFBEB", roughness: 0.32)
+            let redMat = makePBRMaterial(hex: "#EF4444", roughness: 0.35)
+            let pinkMat = makePBRMaterial(hex: "#FDA4AF", roughness: 0.4)
+            let goldMat = makePBRMaterial(hex: "#FACC15", roughness: 0.18, metalness: 0.85)
+            let darkMat = makePBRMaterial(hex: "#1E1B18", roughness: 0.12)
+            let orangePatchMat = makePBRMaterial(hex: "#F97316", roughness: 0.4)
+
+            // 圓潤 3D 身體
+            let torsoGeo = SCNSphere(radius: 0.54)
+            torsoGeo.materials = [whiteMat]
+            let torso = SCNNode(geometry: torsoGeo)
+            torso.scale = SCNVector3(0.96, 1.05, 0.88)
+            torso.position = SCNVector3(0, 0.62, 0)
+            petBodyGroup.addChildNode(torso)
+
+            // 紅色項圈與 3D 金鈴鐺
+            let collarGeo = SCNTorus(ringRadius: 0.42, pipeRadius: 0.055)
+            collarGeo.materials = [redMat]
+            let collar = SCNNode(geometry: collarGeo)
+            collar.position = SCNVector3(0, 1.02, 0.02)
+            petBodyGroup.addChildNode(collar)
+
+            let bellGeo = SCNSphere(radius: 0.11)
+            bellGeo.materials = [goldMat]
+            let bell = SCNNode(geometry: bellGeo)
+            bell.position = SCNVector3(0, 0.98, 0.45)
+            petBodyGroup.addChildNode(bell)
+
+            // 3D 頭部
+            headNode.position = SCNVector3(0, 1.42, 0.04)
+            petBodyGroup.addChildNode(headNode)
+
+            let headGeo = SCNSphere(radius: 0.52)
+            headGeo.materials = [whiteMat]
+            let headMesh = SCNNode(geometry: headGeo)
+            headMesh.scale = SCNVector3(1.06, 0.96, 0.95)
+            headNode.addChildNode(headMesh)
+
+            // 三花橘斑與立體貓耳
+            let patchGeo = SCNSphere(radius: 0.22)
+            patchGeo.materials = [orangePatchMat]
+            let patchNode = SCNNode(geometry: patchGeo)
+            patchNode.position = SCNVector3(-0.26, 0.26, 0.18)
+            headNode.addChildNode(patchNode)
+
+            for side: Float in [-1, 1] {
+                let earOuter = SCNCone(topRadius: 0.02, bottomRadius: 0.20, height: 0.34)
+                earOuter.materials = [side < 0 ? orangePatchMat : whiteMat]
+                let earNode = SCNNode(geometry: earOuter)
+                earNode.position = SCNVector3(side * 0.36, 0.46, -0.02)
+                earNode.eulerAngles = SCNVector3(0.08, 0, -side * 0.38)
+                headNode.addChildNode(earNode)
+
+                let earInner = SCNCone(topRadius: 0.01, bottomRadius: 0.11, height: 0.24)
+                earInner.materials = [pinkMat]
+                let innerNode = SCNNode(geometry: earInner)
+                innerNode.position = SCNVector3(0, -0.01, 0.07)
+                earNode.addChildNode(innerNode)
+            }
+
+            // 3D 靈動大眼睛 + 高光 + 粉紅腮紅 + 鼻頭
+            for (side, isLeft) in [(-1.0 as Float, true), (1.0 as Float, false)] {
+                let eyeGeo = SCNSphere(radius: 0.095)
+                eyeGeo.materials = [darkMat]
+                let eye = SCNNode(geometry: eyeGeo)
+                eye.position = SCNVector3(side * 0.21, 0.05, 0.45)
+
+                let shineGeo = SCNSphere(radius: 0.032)
+                shineGeo.materials = [makePBRMaterial(hex: "#FFFFFF", roughness: 0.05)]
+                let shine = SCNNode(geometry: shineGeo)
+                shine.position = SCNVector3(0.03, 0.035, 0.075)
+                eye.addChildNode(shine)
+                headNode.addChildNode(eye)
+                if isLeft { leftEyeNode = eye } else { rightEyeNode = eye }
+
+                let cheekGeo = SCNSphere(radius: 0.08)
+                cheekGeo.materials = [pinkMat]
+                let cheek = SCNNode(geometry: cheekGeo)
+                cheek.scale = SCNVector3(1.2, 0.7, 0.5)
+                cheek.position = SCNVector3(side * 0.33, -0.08, 0.41)
+                headNode.addChildNode(cheek)
+            }
+
+            let noseGeo = SCNSphere(radius: 0.048)
+            noseGeo.materials = [pinkMat]
+            let nose = SCNNode(geometry: noseGeo)
+            nose.scale = SCNVector3(1.2, 0.85, 0.8)
+            nose.position = SCNVector3(0, -0.04, 0.51)
+            headNode.addChildNode(nose)
+
+            // 右手 3D 招財手臂關節 (前後立體揮動)
+            rightArmPivot.position = SCNVector3(-0.46, 0.96, 0.10)
+            petBodyGroup.addChildNode(rightArmPivot)
+
+            let armGeo = SCNCapsule(capRadius: 0.115, height: 0.46)
+            armGeo.materials = [whiteMat]
+            let armNode = SCNNode(geometry: armGeo)
+            armNode.position = SCNVector3(-0.06, 0.18, 0.08)
+            rightArmPivot.addChildNode(armNode)
+
+            let pawGeo = SCNSphere(radius: 0.13)
+            pawGeo.materials = [whiteMat]
+            let pawNode = SCNNode(geometry: pawGeo)
+            pawNode.position = SCNVector3(-0.06, 0.36, 0.12)
+            rightArmPivot.addChildNode(pawNode)
+
+            // 左手抱 3D 立體千萬兩金幣 (Koban)
+            leftArmPivot.position = SCNVector3(0.45, 0.84, 0.18)
+            petBodyGroup.addChildNode(leftArmPivot)
+            let lArmNode = SCNNode(geometry: armGeo)
+            lArmNode.eulerAngles = SCNVector3(0.5, 0, -0.4)
+            leftArmPivot.addChildNode(lArmNode)
+
+            let kobanGeo = SCNBox(width: 0.30, height: 0.44, length: 0.08, chamferRadius: 0.08)
+            kobanGeo.materials = [goldMat]
+            let koban = SCNNode(geometry: kobanGeo)
+            koban.position = SCNVector3(0.32, 0.68, 0.44)
+            koban.eulerAngles = SCNVector3(-0.15, 0.25, -0.12)
+            petBodyGroup.addChildNode(koban)
+
+            // 3D 雙腳與搖擺貓尾
+            let legGeo = SCNCapsule(capRadius: 0.125, height: 0.38)
+            legGeo.materials = [whiteMat]
+            legFL = SCNNode(geometry: legGeo)
+            legFL.position = SCNVector3(-0.23, 0.19, 0.10)
+            petBodyGroup.addChildNode(legFL)
+
+            legFR = SCNNode(geometry: legGeo)
+            legFR.position = SCNVector3(0.23, 0.19, 0.10)
+            petBodyGroup.addChildNode(legFR)
+
+            tailPivot.position = SCNVector3(0, 0.38, -0.44)
+            petBodyGroup.addChildNode(tailPivot)
+            let tailGeo = SCNCapsule(capRadius: 0.075, height: 0.55)
+            tailGeo.materials = [orangePatchMat]
+            let tailMesh = SCNNode(geometry: tailGeo)
+            tailMesh.position = SCNVector3(0, 0.22, -0.10)
+            tailMesh.eulerAngles = SCNVector3(-0.55, 0, 0)
+            tailPivot.addChildNode(tailMesh)
+        }
+
+        // MARK: 建立真 3D 立體貪錢鳥模型
+        private func build3DMoneyBird() {
+            let goldFeatherMat = makePBRMaterial(hex: "#F59E0B", roughness: 0.32, metalness: 0.15)
+            let bellyMat = makePBRMaterial(hex: "#FEF3C7", roughness: 0.38)
+            let wingMat = makePBRMaterial(hex: "#D97706", roughness: 0.35)
+            let beakMat = makePBRMaterial(hex: "#EA580C", roughness: 0.28)
+            let coinMat = makePBRMaterial(hex: "#FACC15", roughness: 0.16, metalness: 0.88)
+            let darkMat = makePBRMaterial(hex: "#1E1B18", roughness: 0.10)
+            let cheekMat = makePBRMaterial(hex: "#FB7185", roughness: 0.4)
+
+            // 圓滾滾 3D 鳥身
+            let bodyGeo = SCNSphere(radius: 0.54)
+            bodyGeo.materials = [goldFeatherMat]
+            let bodyNode = SCNNode(geometry: bodyGeo)
+            bodyNode.scale = SCNVector3(0.95, 0.92, 1.08)
+            bodyNode.position = SCNVector3(0, 0.95, 0)
+            petBodyGroup.addChildNode(bodyNode)
+
+            let bellyGeo = SCNSphere(radius: 0.44)
+            bellyGeo.materials = [bellyMat]
+            let bellyNode = SCNNode(geometry: bellyGeo)
+            bellyNode.position = SCNVector3(0, 0.88, 0.18)
+            petBodyGroup.addChildNode(bellyNode)
+
+            // 頭頂呆毛羽冠
+            headNode.position = SCNVector3(0, 1.38, 0.12)
+            petBodyGroup.addChildNode(headNode)
+            for i in -1...1 {
+                let crestGeo = SCNCapsule(capRadius: 0.045, height: 0.24)
+                crestGeo.materials = [goldFeatherMat]
+                let crest = SCNNode(geometry: crestGeo)
+                crest.position = SCNVector3(Float(i) * 0.06, 0.14, 0)
+                crest.eulerAngles = SCNVector3(-0.2, 0, Float(i) * -0.28)
+                headNode.addChildNode(crest)
+            }
+
+            // 3D 靈動大眼睛與腮紅
+            for (side, isLeft) in [(-1.0 as Float, true), (1.0 as Float, false)] {
+                let eyeGeo = SCNSphere(radius: 0.095)
+                eyeGeo.materials = [darkMat]
+                let eye = SCNNode(geometry: eyeGeo)
+                eye.position = SCNVector3(side * 0.24, 1.06, 0.48)
+                let shine = SCNNode(geometry: SCNSphere(radius: 0.032))
+                shine.geometry?.materials = [makePBRMaterial(hex: "#FFFFFF", roughness: 0.05)]
+                shine.position = SCNVector3(0.03, 0.035, 0.075)
+                eye.addChildNode(shine)
+                petBodyGroup.addChildNode(eye)
+                if isLeft { leftEyeNode = eye } else { rightEyeNode = eye }
+
+                let cheek = SCNNode(geometry: SCNSphere(radius: 0.08))
+                cheek.geometry?.materials = [cheekMat]
+                cheek.position = SCNVector3(side * 0.34, 0.94, 0.44)
+                petBodyGroup.addChildNode(cheek)
+            }
+
+            // 3D 鳥喙咬著立體旋轉金幣
+            let beakGeo = SCNCone(topRadius: 0.01, bottomRadius: 0.12, height: 0.24)
+            beakGeo.materials = [beakMat]
+            let beak = SCNNode(geometry: beakGeo)
+            beak.position = SCNVector3(0, 0.98, 0.62)
+            beak.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
+            petBodyGroup.addChildNode(beak)
+
+            let heldCoinGeo = SCNCylinder(radius: 0.20, height: 0.055)
+            heldCoinGeo.materials = [coinMat]
+            let heldCoin = SCNNode(geometry: heldCoinGeo)
+            heldCoin.position = SCNVector3(0, 0.85, 0.72)
+            heldCoin.eulerAngles = SCNVector3(Float.pi / 2.2, 0, 0)
+            petBodyGroup.addChildNode(heldCoin)
+
+            // 3D 左右立體翅膀關節
+            leftWingPivot.position = SCNVector3(-0.48, 1.02, 0.0)
+            rightWingPivot.position = SCNVector3(0.48, 1.02, 0.0)
+            petBodyGroup.addChildNode(leftWingPivot)
+            petBodyGroup.addChildNode(rightWingPivot)
+
+            let wingGeo = SCNBox(width: 0.56, height: 0.12, length: 0.42, chamferRadius: 0.06)
+            wingGeo.materials = [wingMat]
+            let lWing = SCNNode(geometry: wingGeo)
+            lWing.position = SCNVector3(-0.24, 0, 0)
+            leftWingPivot.addChildNode(lWing)
+
+            let rWing = SCNNode(geometry: wingGeo)
+            rWing.position = SCNVector3(0.24, 0, 0)
+            rightWingPivot.addChildNode(rWing)
+
+            // 3D 尾羽
+            tailPivot.position = SCNVector3(0, 0.82, -0.52)
+            petBodyGroup.addChildNode(tailPivot)
+            let tailGeo = SCNBox(width: 0.28, height: 0.08, length: 0.34, chamferRadius: 0.04)
+            tailGeo.materials = [wingMat]
+            let tailNode = SCNNode(geometry: tailGeo)
+            tailNode.position = SCNVector3(0, 0.04, -0.14)
+            tailNode.eulerAngles = SCNVector3(0.35, 0, 0)
+            tailPivot.addChildNode(tailNode)
+        }
+
+        // MARK: 建立真 3D 立體財氣犬 (柴犬) 模型
+        private func build3DFortuneDog() {
+            let shibaMat = makePBRMaterial(hex: "#EA580C", roughness: 0.38)
+            let creamMat = makePBRMaterial(hex: "#FFFBEB", roughness: 0.35)
+            let redMat = makePBRMaterial(hex: "#DC2626", roughness: 0.35)
+            let goldMat = makePBRMaterial(hex: "#FACC15", roughness: 0.18, metalness: 0.86)
+            let darkMat = makePBRMaterial(hex: "#1E1B18", roughness: 0.12)
+
+            // 3D 柴犬身體
+            let torsoGeo = SCNCapsule(capRadius: 0.40, height: 0.98)
+            torsoGeo.materials = [shibaMat]
+            let torso = SCNNode(geometry: torsoGeo)
+            torso.position = SCNVector3(0, 0.62, 0)
+            torso.eulerAngles = SCNVector3(Float.pi / 2.3, 0, 0)
+            petBodyGroup.addChildNode(torso)
+
+            let chestGeo = SCNSphere(radius: 0.36)
+            chestGeo.materials = [creamMat]
+            let chest = SCNNode(geometry: chestGeo)
+            chest.position = SCNVector3(0, 0.68, 0.24)
+            petBodyGroup.addChildNode(chest)
+
+            // 紅色招財領巾與金牌
+            let collarGeo = SCNTorus(ringRadius: 0.37, pipeRadius: 0.055)
+            collarGeo.materials = [redMat]
+            let collar = SCNNode(geometry: collarGeo)
+            collar.position = SCNVector3(0, 0.96, 0.22)
+            collar.eulerAngles = SCNVector3(0.25, 0, 0)
+            petBodyGroup.addChildNode(collar)
+
+            let medalGeo = SCNCylinder(radius: 0.11, height: 0.04)
+            medalGeo.materials = [goldMat]
+            let medal = SCNNode(geometry: medalGeo)
+            medal.position = SCNVector3(0, 0.86, 0.58)
+            medal.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
+            petBodyGroup.addChildNode(medal)
+
+            // 3D 柴犬頭部、吻部、白眉與立耳
+            headNode.position = SCNVector3(0, 1.32, 0.28)
+            petBodyGroup.addChildNode(headNode)
+
+            let headGeo = SCNSphere(radius: 0.46)
+            headGeo.materials = [shibaMat]
+            let headMesh = SCNNode(geometry: headGeo)
+            headMesh.scale = SCNVector3(1.05, 0.96, 0.98)
+            headNode.addChildNode(headMesh)
+
+            let snoutGeo = SCNSphere(radius: 0.24)
+            snoutGeo.materials = [creamMat]
+            let snout = SCNNode(geometry: snoutGeo)
+            snout.scale = SCNVector3(1.1, 0.82, 1.15)
+            snout.position = SCNVector3(0, -0.10, 0.36)
+            headNode.addChildNode(snout)
+
+            let noseGeo = SCNSphere(radius: 0.065)
+            noseGeo.materials = [darkMat]
+            let nose = SCNNode(geometry: noseGeo)
+            nose.position = SCNVector3(0, -0.02, 0.58)
+            headNode.addChildNode(nose)
+
+            for (side, isLeft) in [(-1.0 as Float, true), (1.0 as Float, false)] {
+                let earGeo = SCNCone(topRadius: 0.02, bottomRadius: 0.18, height: 0.34)
+                earGeo.materials = [shibaMat]
+                let ear = SCNNode(geometry: earGeo)
+                ear.position = SCNVector3(side * 0.32, 0.44, -0.04)
+                ear.eulerAngles = SCNVector3(0.12, 0, -side * 0.30)
+                headNode.addChildNode(ear)
+
+                let eyeGeo = SCNSphere(radius: 0.082)
+                eyeGeo.materials = [darkMat]
+                let eye = SCNNode(geometry: eyeGeo)
+                eye.position = SCNVector3(side * 0.19, 0.06, 0.41)
+                let shine = SCNNode(geometry: SCNSphere(radius: 0.028))
+                shine.geometry?.materials = [makePBRMaterial(hex: "#FFFFFF", roughness: 0.05)]
+                shine.position = SCNVector3(0.025, 0.03, 0.065)
+                eye.addChildNode(shine)
+                headNode.addChildNode(eye)
+                if isLeft { leftEyeNode = eye } else { rightEyeNode = eye }
+
+                // 柴犬招牌白豆眉
+                let browGeo = SCNSphere(radius: 0.045)
+                browGeo.materials = [creamMat]
+                let brow = SCNNode(geometry: browGeo)
+                brow.scale = SCNVector3(1.3, 0.7, 0.7)
+                brow.position = SCNVector3(side * 0.17, 0.19, 0.40)
+                headNode.addChildNode(brow)
+            }
+
+            // 4 條 3D 可動腿 (支援快步小跑與坐下姿勢切換)
+            let legGeo = SCNCapsule(capRadius: 0.105, height: 0.44)
+            legGeo.materials = [shibaMat]
+            legFL = SCNNode(geometry: legGeo)
+            legFL.position = SCNVector3(-0.22, 0.22, 0.28)
+            legFR = SCNNode(geometry: legGeo)
+            legFR.position = SCNVector3(0.22, 0.22, 0.28)
+            legBL = SCNNode(geometry: legGeo)
+            legBL.position = SCNVector3(-0.22, 0.22, -0.26)
+            legBR = SCNNode(geometry: legGeo)
+            legBR.position = SCNVector3(0.22, 0.22, -0.26)
+            petBodyGroup.addChildNode(legFL)
+            petBodyGroup.addChildNode(legFR)
+            petBodyGroup.addChildNode(legBL)
+            petBodyGroup.addChildNode(legBR)
+
+            // 3D 捲曲柴犬尾巴
+            tailPivot.position = SCNVector3(0, 0.76, -0.44)
+            petBodyGroup.addChildNode(tailPivot)
+            let tailGeo = SCNTorus(ringRadius: 0.16, pipeRadius: 0.075)
+            tailGeo.materials = [shibaMat]
+            let tailNode = SCNNode(geometry: tailGeo)
+            tailNode.position = SCNVector3(0, 0.14, -0.06)
+            tailNode.eulerAngles = SCNVector3(0, Float.pi / 2, 0)
+            tailPivot.addChildNode(tailNode)
+        }
+
+        // MARK: 投擲 3D 金幣與互動特效
+        func spawn3DCoin(atX x: Float, z: Float) {
+            targetCoinNode?.removeFromParentNode()
+            let coinGeo = SCNCylinder(radius: 0.22, height: 0.065)
+            coinGeo.materials = [makePBRMaterial(hex: "#FACC15", roughness: 0.15, metalness: 0.90, emissionHex: "#F59E0B")]
+            let coinNode = SCNNode(geometry: coinGeo)
+            coinNode.position = SCNVector3(x, 1.8, z)
+            coinNode.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
+            worldNode.addChildNode(coinNode)
+
+            let drop = SCNAction.move(to: SCNVector3(x, 0.24, z), duration: 0.36)
+            drop.timingMode = .easeIn
+            let bounceUp = SCNAction.moveBy(x: 0, y: 0.25, z: 0, duration: 0.14)
+            let bounceDown = SCNAction.moveBy(x: 0, y: -0.25, z: 0, duration: 0.14)
+            let spin = SCNAction.repeatForever(SCNAction.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 1.0))
+            coinNode.runAction(SCNAction.group([spin, SCNAction.sequence([drop, bounceUp, bounceDown])]))
+
+            targetCoinNode = coinNode
+            targetX = x
+            targetZ = z
+            hasTargetCoin = true
+            if isDogSitting { isDogSitting = false }
+        }
+
+        private func burst3DStars(at pos: SCNVector3) {
+            let goldMat = makePBRMaterial(hex: "#FDE047", roughness: 0.1, metalness: 0.85, emissionHex: "#F59E0B")
+            for i in 0..<8 {
+                let star = SCNNode(geometry: SCNSphere(radius: 0.08))
+                star.geometry?.materials = [goldMat]
+                star.position = SCNVector3(pos.x, pos.y + 0.6, pos.z)
+                worldNode.addChildNode(star)
+                let angle = Float(i) * (Float.pi * 2 / 8.0)
+                let dx = CGFloat(cos(angle) * 0.75)
+                let dz = CGFloat(sin(angle) * 0.75)
+                let move = SCNAction.moveBy(x: dx, y: 0.7, z: dz, duration: 0.55)
+                move.timingMode = .easeOut
+                let fade = SCNAction.fadeOut(duration: 0.55)
+                star.runAction(SCNAction.sequence([SCNAction.group([move, fade]), SCNAction.removeFromParentNode()]))
+            }
+        }
+
+        func triggerAction(type: String) {
+            if type == "coin" {
+                let rx = Float.random(in: -1.15...1.15)
+                let rz = Float.random(in: -0.85...0.95)
+                spawn3DCoin(atX: rx, z: rz)
+            } else if type == "swoop" {
+                swoopUntilTime = CACurrentMediaTime() + 1.4
+                jumpVelocityY = 0.11
+            } else {
+                jumpVelocityY = 0.085
+                burst3DStars(at: petRootNode.position)
+            }
+        }
+
+        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            guard let view = scnView else { return }
+            let trans = gesture.translation(in: view)
+            if gesture.state == .began {
+                panStartYaw = cameraYaw
+                panStartPitch = cameraPitch
+            } else if gesture.state == .changed {
+                cameraYaw = panStartYaw - Float(trans.x) * 0.012
+                cameraPitch = max(-0.68, min(-0.05, panStartPitch - Float(trans.y) * 0.008))
+                cameraOrbitNode.eulerAngles = SCNVector3(0, cameraYaw, 0)
+                cameraNode.eulerAngles = SCNVector3(cameraPitch, 0, 0)
+            }
+        }
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if parent.isCompact {
+                jumpVelocityY = 0.085
+                burst3DStars(at: petRootNode.position)
+                parent.onCatchCoin?()
+                return
+            }
+            guard let view = scnView else { return }
+            let pt = gesture.location(in: view)
+            let hits = view.hitTest(pt, options: nil)
+            if let hit = hits.first {
+                let wx = max(-1.35, min(1.35, hit.worldCoordinates.x))
+                let wz = max(-1.05, min(1.05, hit.worldCoordinates.z))
+                spawn3DCoin(atX: wx, z: wz)
+            } else {
+                spawn3DCoin(atX: Float.random(in: -1.1...1.1), z: Float.random(in: -0.85...0.85))
+            }
+            parent.onCatchCoin?()
+        }
+
+        // MARK: 60fps 3D 骨骼與世界座標更新迴圈
+        func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+            let t = Float(time)
+            let isSwooping = time < swoopUntilTime
+            let maxRadius: Float = parent.isCompact ? 0.35 : 1.25
+
+            // 1. 計算 3D 空間走動 / 飛翔 / 追逐金幣位移 (x, y, z)
+            var desiredX: Float = 0
+            var desiredZ: Float = 0
+            if hasTargetCoin {
+                desiredX = targetX
+                desiredZ = targetZ
+                let dx = desiredX - posX
+                let dz = desiredZ - posZ
+                let dist = hypot(dx, dz)
+                if dist > 0.08 {
+                    let step = min(dist, isSwooping ? 0.075 : 0.048)
+                    posX += (dx / dist) * step
+                    posZ += (dz / dist) * step
+                    let targetAngle = atan2(dx, dz)
+                    facingYaw = facingYaw * 0.82 + targetAngle * 0.18
+                } else {
+                    // 追上並吃到 3D 金幣！起跳慶祝 + 爆發 3D 金星
+                    hasTargetCoin = false
+                    targetCoinNode?.removeFromParentNode()
+                    targetCoinNode = nil
+                    jumpVelocityY = 0.115
+                    burst3DStars(at: SCNVector3(posX, posY, posZ))
+                }
+            } else if parent.isCompact {
+                posX = sin(t * 0.9) * 0.12
+                posZ = 0
+                facingYaw = sin(t * 0.9) * 0.28
+            } else if currentSpecies == .dog && isDogSitting {
+                facingYaw = sin(t * 0.7) * 0.22
+            } else {
+                let speed: Float = isSwooping ? 1.65 : 0.75
+                desiredX = sin(t * speed) * maxRadius
+                desiredZ = sin(t * speed * 2.0) * (maxRadius * 0.52)
+                let dx = desiredX - posX
+                let dz = desiredZ - posZ
+                posX += dx * 0.08
+                posZ += dz * 0.08
+                if hypot(dx, dz) > 0.004 {
+                    let targetAngle = atan2(dx, dz)
+                    let diff = atan2(sin(targetAngle - facingYaw), cos(targetAngle - facingYaw))
+                    facingYaw += diff * 0.12
+                }
+            }
+
+            // 2. 垂直跳躍物理與步態彈跳
+            if jumpVelocityY != 0 || jumpOffsetY > 0 {
+                jumpOffsetY += jumpVelocityY
+                jumpVelocityY -= 0.0075
+                if jumpOffsetY <= 0 {
+                    jumpOffsetY = 0
+                    jumpVelocityY = 0
+                }
+            }
+
+            let walkBounce = (currentSpecies == .dog && isDogSitting) ? 0 : abs(sin(t * (hasTargetCoin || isSwooping ? 11.0 : 6.5))) * 0.11
+            let flightY: Float = (currentSpecies == .bird) ? (0.32 + sin(t * 3.8) * 0.14) : walkBounce
+            posY = flightY + jumpOffsetY
+
+            petRootNode.position = SCNVector3(posX, posY, posZ)
+            petRootNode.eulerAngles = SCNVector3(0, facingYaw, 0)
+
+            // 3. 呼吸彈性 (Squash & Stretch) 與自然眨眼
+            let breath = sin(t * 3.0) * 0.025
+            petBodyGroup.scale = SCNVector3(1.0 - breath * 0.6, 1.0 + breath, 1.0 - breath * 0.6)
+            headNode.eulerAngles = SCNVector3(sin(t * 2.2) * 0.06, sin(t * 1.5) * 0.10, sin(t * 1.8) * 0.07)
+
+            let blinkCycle = fmod(t, 3.6)
+            let eyeScaleY: Float = (blinkCycle > 3.44) ? 0.12 : 1.0
+            leftEyeNode.scale = SCNVector3(1, eyeScaleY, 1)
+            rightEyeNode.scale = SCNVector3(1, eyeScaleY, 1)
+
+            // 4. 各品種專屬 3D 關節動作
+            switch currentSpecies {
+            case .cat:
+                let wave = sin(t * 5.2)
+                rightArmPivot.eulerAngles = SCNVector3(-0.75 + wave * 0.55, 0, 0.15)
+                let stride = sin(t * (hasTargetCoin ? 11.0 : 6.5)) * 0.35
+                legFL.eulerAngles = SCNVector3(stride, 0, 0)
+                legFR.eulerAngles = SCNVector3(-stride, 0, 0)
+                tailPivot.eulerAngles = SCNVector3(0, sin(t * 4.2) * 0.38, sin(t * 4.2) * 0.25)
+            case .bird:
+                let flap = sin(t * (hasTargetCoin || isSwooping ? 18.0 : 12.5)) * 0.68
+                leftWingPivot.eulerAngles = SCNVector3(0, 0, flap)
+                rightWingPivot.eulerAngles = SCNVector3(0, 0, -flap)
+                tailPivot.eulerAngles = SCNVector3(sin(t * 6.0) * 0.18, 0, 0)
+            case .dog:
+                let wag = sin(t * 14.0) * 0.48
+                tailPivot.eulerAngles = SCNVector3(0, wag, wag * 0.5)
+                if isDogSitting {
+                    petBodyGroup.position = SCNVector3(0, -0.10, 0)
+                    legBL.eulerAngles = SCNVector3(-1.15, 0, 0)
+                    legBR.eulerAngles = SCNVector3(-1.15, 0, 0)
+                    legFL.eulerAngles = SCNVector3(0, 0, 0)
+                    legFR.eulerAngles = SCNVector3(0, 0, 0)
+                } else {
+                    petBodyGroup.position = SCNVector3(0, 0, 0)
+                    let trot = sin(t * (hasTargetCoin || isSwooping ? 12.0 : 7.5)) * 0.45
+                    legFL.eulerAngles = SCNVector3(trot, 0, 0)
+                    legBR.eulerAngles = SCNVector3(trot, 0, 0)
+                    legFR.eulerAngles = SCNVector3(-trot, 0, 0)
+                    legBL.eulerAngles = SCNVector3(-trot, 0, 0)
+                }
+            case .none:
+                break
+            }
         }
     }
 }
@@ -3726,11 +4419,8 @@ struct PetCompanionBannerCard: View {
     let onTapCard: () -> Void
     let onTapFeed: () -> Void
 
-    @State private var floatUp = false
-    @State private var bounceScale: CGFloat = 1.0
-    @State private var tiltDeg: Double = 0.0
+    @State private var actionTrigger: Int = 0
     @State private var reactionQuote: String? = nil
-    @State private var particles: [PetParticle] = []
     @State private var isDogSitting = false
 
     private var levelInfo: PetLevelInfo {
@@ -3745,101 +4435,43 @@ struct PetCompanionBannerCard: View {
 
     private var bubbleText: String {
         if !petState.hasChosenStarter {
-            return "🎯 點擊選擇你的專屬財富寵物（三選一出發）"
+            return "🎯 點擊選擇你的專屬 3D 財富寵物（三選一出發）"
         }
         if let quote = reactionQuote { return quote }
         if petState.pendingFeedDP > 0 {
-            return "有 \(petState.pendingFeedDP) DP 股息飼料待餵食"
+            return "有 \(petState.pendingFeedDP) DP 股息金幣待餵食"
         }
         if isDownMarket {
             return petState.species.downMarketLine
         }
         let remain = max(0, levelInfo.needXP - levelInfo.currentXP)
-        return "點我摸摸招財・距第 \(min(20, levelInfo.stage + 1)) 階還差 \(remain) XP"
+        return "點我 3D 互動招財・距第 \(min(20, levelInfo.stage + 1)) 階還差 \(remain) XP"
     }
 
     private func pokePet() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        actionTrigger += 1
         if petState.species == .dog {
             isDogSitting.toggle()
             reactionQuote = isDogSitting ? "乖乖坐下搖尾巴顧「財」盆汪！" : "站起來繼續替你招財巡邏汪！"
         } else if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
             reactionQuote = picked
         }
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.42)) {
-            bounceScale = 1.14
-            tiltDeg = Double.random(in: -14...14)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
-                bounceScale = 1.0
-                tiltDeg = 0
-            }
-        }
-        let emojis = ["❤️", "✨", "🪙", "💰"]
-        for i in 0..<4 {
-            let p = PetParticle(
-                emoji: emojis[i % emojis.count],
-                offsetX: CGFloat.random(in: -26...26),
-                targetY: CGFloat.random(in: -55 ... -30)
-            )
-            particles.append(p)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
-                particles.removeAll { $0.id == p.id }
-            }
-        }
     }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            // 左側：無邊框 3D 公仔＋立體地面陰影底座（點擊直接摸頭互動）
-            ZStack {
-                Ellipse()
-                    .fill(
-                        RadialGradient(
-                            colors: [Color(hex: "#F59E0B").opacity(0.45), Color.black.opacity(0.18), Color.clear],
-                            center: .center,
-                            startRadius: 4,
-                            endRadius: 42
-                        )
-                    )
-                    .frame(width: 72, height: 15)
-                    .scaleEffect(floatUp ? 0.86 : 1.0)
-                    .offset(y: 38)
+        HStack(alignment: .center, spacing: 10) {
+            // 左側：真 3D SceneKit 立體遊戲角色視窗
+            Pet3DSceneKitGameView(
+                species: petState.species,
+                isDogSitting: isDogSitting,
+                isCompact: true,
+                actionTrigger: actionTrigger,
+                actionType: "pat",
+                onCatchCoin: { pokePet() }
+            )
+            .frame(width: 102, height: 102)
 
-                AnimatedPetModelView(
-                    species: petState.species,
-                    isSitting: petState.species == .dog && isDogSitting,
-                    size: 90
-                )
-                .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 8)
-                .offset(y: floatUp ? -5 : 1)
-                .scaleEffect(bounceScale)
-                .rotation3DEffect(.degrees(tiltDeg), axis: (x: 0, y: 1, z: 0))
-
-                if isDownMarket {
-                    Text("🪖")
-                        .font(.system(size: 18))
-                        .offset(x: -30, y: -32)
-                }
-
-                ForEach(particles) { p in
-                    Text(p.emoji)
-                        .font(.system(size: 15))
-                        .offset(x: p.offsetX, y: p.targetY)
-                        .transition(.opacity.combined(with: .scale))
-                }
-            }
-            .frame(width: 94, height: 96)
-            .contentShape(Rectangle())
-            .onTapGesture { pokePet() }
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                    floatUp = true
-                }
-            }
-
-            // 右側：開放式對話氣泡 + 進度條 + 互動膠囊鈕 (手機字體放大易讀)
+            // 右側：開放式對話氣泡 + 進度條 + 互動膠囊鈕
             VStack(alignment: .leading, spacing: 8) {
                 Button(action: onTapCard) {
                     Text(bubbleText)
@@ -3886,7 +4518,7 @@ struct PetCompanionBannerCard: View {
                     }
 
                     Button(action: onTapCard) {
-                        Text(petState.hasChosenStarter ? "✨ 3D 互動舞台 ›" : "🎯 三選一領養陪伴 ›")
+                        Text(petState.hasChosenStarter ? "🎮 進入 3D 遊戲樂園 ›" : "🎯 三選一領養陪伴 ›")
                             .font(.system(size: 13, weight: .bold))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -3903,151 +4535,6 @@ struct PetCompanionBannerCard: View {
     }
 }
 
-private struct PetPlaygroundPose {
-    let x: CGFloat
-    let y: CGFloat
-    let altitude: CGFloat
-    let rollDeg: Double
-    let yawDeg: Double
-    let pitchDeg: Double
-    let squashY: CGFloat
-    let squashX: CGFloat
-    let shadowScale: CGFloat
-    let shadowOpacity: Double
-    let parallaxX: CGFloat
-    let parallaxY: CGFloat
-    let showTargetMarker: Bool
-    let speedMultiplier: Double
-
-    static func compute(
-        species: PetSpecies,
-        isDogSitting: Bool,
-        t: TimeInterval,
-        maxHalfW: CGFloat,
-        swoopTriggerTime: TimeInterval,
-        tapTargetX: CGFloat,
-        tapTargetY: CGFloat,
-        tapTargetTime: TimeInterval,
-        dragTiltX: Double,
-        dragTiltY: Double
-    ) -> PetPlaygroundPose {
-        let boundW = max(48.0, min(115.0, maxHalfW))
-        let swoopElapsed = t - swoopTriggerTime
-        let swoopActive = swoopElapsed >= 0 && swoopElapsed < 1.35
-        let swoopEnv = swoopActive ? sin(.pi * (swoopElapsed / 1.35)) : 0.0
-
-        let tapElapsed = t - tapTargetTime
-        let tapActive = tapElapsed >= 0 && tapElapsed < 2.1
-        let tapBlend: Double = tapActive ? sin(.pi * min(1.0, tapElapsed / 2.1)) : 0.0
-
-        var autoX: CGFloat = 0
-        var autoY: CGFloat = 0
-        var hopY: CGFloat = 0
-        var roll: Double = 0
-        var yaw: Double = 0
-        var pitch: Double = 0
-        var sX: CGFloat = 1.0
-        var sY: CGFloat = 1.0
-        var speedMult: Double = 1.0
-
-        switch species {
-        case .cat:
-            // 招財貓：流暢左右踱步＋小跳步，偶爾停在中央附近向前招手
-            let walkCycle = t * 0.65
-            let rawWave = sin(walkCycle)
-            let paceVel = cos(walkCycle)
-            autoX = CGFloat(rawWave) * boundW * 0.78
-            let stepWave = abs(sin(t * 5.2))
-            let movingWeight = min(1.0, abs(paceVel) * 1.4)
-            hopY = -CGFloat(stepWave) * 7.5 * CGFloat(movingWeight)
-            roll = Double(sin(t * 5.2)) * 4.2 * movingWeight + paceVel * 4.5
-            yaw = paceVel * 14.0
-            pitch = -Double(stepWave) * 4.0 * movingWeight
-            sY = 1.0 - CGFloat(movingWeight * stepWave) * 0.045
-            sX = 1.0 + CGFloat(movingWeight * stepWave) * 0.03
-            if swoopActive {
-                let leap = abs(sin(swoopElapsed * 7.5)) * swoopEnv
-                hopY -= CGFloat(leap * 24.0)
-                yaw += sin(swoopElapsed * 8.0) * 14.0 * swoopEnv
-                speedMult = 1.85
-            }
-        case .bird:
-            // 貪錢鳥：舞台中上層 8 字形盤旋飛翔
-            let flightT = t * 0.92
-            let velX = cos(flightT)
-            autoX = CGFloat(sin(flightT)) * boundW * 0.86
-            autoY = CGFloat(-18.0 + sin(flightT * 2.0 + 0.3) * 20.0 + cos(t * 1.35) * 6.0)
-            roll = velX * 15.0 + sin(t * 3.0) * 3.0
-            yaw = velX * 19.0
-            pitch = cos(flightT * 2.0 + 0.3) * 10.0
-            speedMult = 1.15 + abs(velX) * 0.45
-            if swoopActive {
-                let sPhase = swoopElapsed / 1.35 * .pi * 2.0
-                autoX += CGFloat(sin(sPhase)) * 32.0 * CGFloat(swoopEnv)
-                autoY -= CGFloat(swoopEnv * 26.0)
-                roll += cos(sPhase) * 16.0 * swoopEnv
-                speedMult = 1.9
-            }
-        case .dog:
-            // 財氣犬：站立時快步巡邏搖尾，坐下時乖乖在原地守護
-            if isDogSitting {
-                autoX = CGFloat(sin(t * 0.25)) * 12.0
-                hopY = CGFloat(sin(t * 2.4)) * 1.5
-                roll = sin(t * 1.4) * 1.8
-                yaw = sin(t * 0.8) * 6.0
-                speedMult = 0.95
-            } else {
-                let trotT = t * 0.88 + 0.28 * sin(t * 0.42)
-                let trotVel = cos(trotT)
-                autoX = CGFloat(sin(trotT)) * boundW * 0.82
-                let bounce = abs(sin(t * 7.6))
-                let moveW = min(1.0, abs(trotVel) * 1.5)
-                hopY = -CGFloat(bounce) * 7.0 * CGFloat(moveW)
-                roll = trotVel * 6.0 + sin(t * 7.6) * 3.2 * moveW
-                yaw = trotVel * 17.0
-                sY = 1.0 - CGFloat(moveW * bounce) * 0.04
-                sX = 1.0 + CGFloat(moveW * bounce) * 0.03
-                speedMult = 1.2 + moveW * 0.45
-            }
-            if swoopActive {
-                let dash = abs(sin(swoopElapsed * 9.0)) * swoopEnv
-                hopY -= CGFloat(dash * 26.0)
-                yaw += sin(swoopElapsed * 8.0) * 16.0 * swoopEnv
-                speedMult = 1.95
-            }
-        }
-
-        // 點擊舞台任意位置時平滑朝向目標點靠攏
-        let finalX = autoX * CGFloat(1.0 - tapBlend * 0.85) + tapTargetX * CGFloat(tapBlend * 0.85)
-        let targetYClamped: CGFloat = (species == .bird) ? tapTargetY : min(14.0, max(-16.0, tapTargetY * 0.35))
-        let baseFloorY: CGFloat = 14.0
-        let rawY = (species == .bird ? autoY : baseFloorY) * CGFloat(1.0 - tapBlend * 0.75) + targetYClamped * CGFloat(tapBlend * 0.75) + hopY
-        let clampedYaw = max(-22.0, min(22.0, yaw + dragTiltY + (tapBlend > 0.05 ? Double(tapTargetX - autoX) * 0.14 : 0)))
-        let clampedPitch = max(-16.0, min(16.0, pitch + dragTiltX))
-
-        let altitude = max(0, baseFloorY - rawY)
-        let shScale = max(0.48, min(1.05, 1.0 - Double(altitude) / 95.0))
-        let shOpacity = max(0.32, min(0.95, 0.92 - Double(altitude) / 110.0))
-
-        return PetPlaygroundPose(
-            x: finalX,
-            y: rawY,
-            altitude: altitude,
-            rollDeg: roll,
-            yawDeg: clampedYaw,
-            pitchDeg: clampedPitch,
-            squashY: sY,
-            squashX: sX,
-            shadowScale: CGFloat(shScale),
-            shadowOpacity: shOpacity,
-            parallaxX: CGFloat(clampedYaw / 22.0),
-            parallaxY: CGFloat(-clampedPitch / 16.0),
-            showTargetMarker: tapActive,
-            speedMultiplier: speedMult
-        )
-    }
-}
-
 struct PetCompanionSheet: View {
     @Environment(\.dismiss) var dismiss
     @Binding var petState: DividendPetState
@@ -4055,19 +4542,10 @@ struct PetCompanionSheet: View {
     let summary: PortfolioDividendSourceSummary
     let isDownMarket: Bool
 
-    @State private var floatUp = false
-    @State private var bounceScale: CGFloat = 1.0
-    @State private var dragTiltX: Double = 0.0
-    @State private var dragTiltY: Double = 0.0
-    @State private var swoopTriggerTime: TimeInterval = -10.0
-    @State private var tapTargetX: CGFloat = 0.0
-    @State private var tapTargetY: CGFloat = 0.0
-    @State private var tapTargetTime: TimeInterval = -10.0
+    @State private var actionTrigger: Int = 0
+    @State private var actionType: String = "pat"
     @State private var quoteText: String? = nil
-    @State private var particles: [PetParticle] = []
     @State private var isDogSitting = false
-    @State private var showInsufficientAlert = false
-    @State private var alertMessage = ""
 
     private var levelInfo: PetLevelInfo {
         PetService.shared.levelInfo(for: petState.totalXP)
@@ -4083,81 +4561,21 @@ struct PetCompanionSheet: View {
         PetService.shared.auras(for: holdings, summary: summary)
     }
 
-    @ViewBuilder
-    private var stageAtmosphere: some View {
-        switch petState.activeTheme {
-        case .fortune:
-            RadialGradient(
-                colors: [Color(hex: "#DC2626").opacity(0.20), Color(hex: "#F59E0B").opacity(0.10), Color.clear],
-                center: .center,
-                startRadius: 10,
-                endRadius: 210
-            )
-        case .defaultLight:
-            RadialGradient(
-                colors: [Color(hex: "#FEF3C7").opacity(0.55), Color.clear],
-                center: .center,
-                startRadius: 10,
-                endRadius: 210
-            )
-        case .obsidian:
-            RadialGradient(
-                colors: [Color(hex: "#2C2C2E").opacity(0.92), Color(hex: "#1C1C1E").opacity(0.65), Color.clear],
-                center: .center,
-                startRadius: 15,
-                endRadius: 230
-            )
-        case .sakura:
-            RadialGradient(
-                colors: [Color(hex: "#FBCFE8").opacity(0.55), Color.clear],
-                center: .center,
-                startRadius: 10,
-                endRadius: 210
-            )
-        }
-    }
-
-    private func triggerInteraction(isCoinRain: Bool = false, swoop: Bool = false) {
-        UIImpactFeedbackGenerator(style: isCoinRain ? .medium : .light).impactOccurred()
-        if swoop {
-            if petState.species == .dog && isDogSitting {
-                isDogSitting = false
-            }
-            swoopTriggerTime = Date().timeIntervalSinceReferenceDate
+    private func trigger3DAction(type: String) {
+        UIImpactFeedbackGenerator(style: type == "coin" ? .medium : .light).impactOccurred()
+        actionType = type
+        actionTrigger += 1
+        if type == "swoop" {
+            if petState.species == .dog && isDogSitting { isDogSitting = false }
             switch petState.species {
-            case .cat:
-                quoteText = "喵～全速躍動招財！股息通通吸過來！"
-            case .bird:
-                quoteText = "啾啾～高空盤旋巡視高息除權息！"
-            case .dog:
-                quoteText = "汪汪！活力全開在舞台飛奔守護存摺！"
+            case .cat: quoteText = "喵～3D 全速躍動招財！股息通通吸過來！"
+            case .bird: quoteText = "啾啾～3D 高空盤旋俯衝接金幣！"
+            case .dog: quoteText = "汪汪！活力全開在 3D 綠茵島飛奔！"
             }
+        } else if type == "coin" {
+            quoteText = "🪙 發現 3D 金幣！立刻轉身衝過去跳躍接住！"
         } else if let lines = petInteractQuotes[petState.species], let picked = lines.randomElement() {
             quoteText = picked
-        }
-        withAnimation(.spring(response: 0.24, dampingFraction: 0.45)) {
-            bounceScale = swoop ? 1.16 : 1.12
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.58)) {
-                bounceScale = 1.0
-            }
-        }
-        let pool = isCoinRain ? ["🪙", "🪙", "💰", "🪙"] : ["❤️", "✨", "💰", "🍀"]
-        for i in 0..<(isCoinRain ? 6 : 5) {
-            let p = PetParticle(
-                emoji: pool[i % pool.count],
-                offsetX: CGFloat.random(in: -75...75),
-                targetY: isCoinRain ? CGFloat.random(in: -15...55) : CGFloat.random(in: -105 ... -55)
-            )
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
-                withAnimation(.easeOut(duration: 0.7)) {
-                    particles.append(p)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
-                    particles.removeAll { $0.id == p.id }
-                }
-            }
         }
     }
 
@@ -4168,13 +4586,13 @@ struct PetCompanionSheet: View {
                     // 寵物選擇列（一開始僅可三選一領養陪伴，確認後鎖定專屬夥伴）
                     VStack(spacing: 8) {
                         HStack {
-                            Text(petState.hasChosenStarter ? "🤝 專屬陪伴夥伴（一對一鎖定培育）" : "🎯 請選擇一種寵物陪伴出發（三選一）")
-                                .font(.caption.bold())
+                            Text(petState.hasChosenStarter ? "🤝 專屬 3D 陪伴夥伴（一對一鎖定培育）" : "🎯 請選擇一種 3D 寵物陪伴出發（三選一）")
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(petState.hasChosenStarter ? Color(hex: "#D97706") : .primary)
                             Spacer()
                             if petState.hasChosenStarter {
                                 Text("第 \(levelInfo.stage)/20 階")
-                                    .font(.caption2.bold())
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -4194,34 +4612,31 @@ struct PetCompanionSheet: View {
                                         petState = PetService.shared.selectSpecies(sp)
                                         quoteText = nil
                                     }
-                                    triggerInteraction()
+                                    trigger3DAction(type: "pat")
                                 } label: {
                                     VStack(spacing: 4) {
                                         ZStack(alignment: .topTrailing) {
-                                            Image(sp.avatarImageName)
-                                                .resizable()
-                                                .scaledToFit()
+                                            Text(sp == .cat ? "🐱" : (sp == .bird ? "🐥" : "🐕"))
+                                                .font(.system(size: 34))
                                                 .frame(width: 58, height: 58)
+                                                .background(
+                                                    Circle()
+                                                        .fill(isActive ? Color(hex: "#FEF3C7") : Color(.systemGray6))
+                                                )
                                                 .opacity(isLocked ? 0.36 : 1.0)
-                                                .scaleEffect(isActive ? 1.14 : 0.90)
-                                                .shadow(color: isActive ? Color(hex: "#F59E0B").opacity(0.42) : Color.black.opacity(0.14), radius: isActive ? 8 : 4, x: 0, y: 4)
+                                                .scaleEffect(isActive ? 1.10 : 0.94)
                                             if isLocked {
                                                 Text("🔒")
                                                     .font(.system(size: 13))
                                                     .offset(x: 4, y: -2)
                                             }
                                         }
-                                        Text(isLocked ? "\(sp.displayName)" : (isActive && petState.hasChosenStarter ? "✓ \(sp.displayName)" : sp.displayName))
-                                            .font(.caption2.bold())
+                                        Text(isLocked ? sp.displayName : (isActive && petState.hasChosenStarter ? "✓ \(sp.displayName)" : sp.displayName))
+                                            .font(.system(size: 13, weight: .bold))
                                             .foregroundColor(isActive ? Color(hex: "#D97706") : .secondary)
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 6)
-                                    .background(
-                                        Circle()
-                                            .fill(isActive ? Color(hex: "#FBBF24").opacity(0.20) : Color.clear)
-                                            .blur(radius: 4)
-                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -4233,13 +4648,13 @@ struct PetCompanionSheet: View {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                                     petState = PetService.shared.adoptStarter(petState.species)
                                 }
-                                triggerInteraction(isCoinRain: true, swoop: true)
-                                quoteText = "太棒了！【\(petState.species.displayName)】正式成為你的專屬財富夥伴！"
+                                trigger3DAction(type: "coin")
+                                quoteText = "太棒了！【\(petState.species.displayName)】正式成為你的專屬 3D 財富夥伴！"
                             } label: {
                                 Text("✨ 確認領養【\(petState.species.displayName)】開始陪伴")
-                                    .font(.subheadline.bold())
+                                    .font(.system(size: 15, weight: .bold))
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
+                                    .padding(.vertical, 11)
                                     .background(
                                         LinearGradient(
                                             colors: [Color(hex: "#FDE047"), Color(hex: "#F59E0B")],
@@ -4255,178 +4670,84 @@ struct PetCompanionSheet: View {
                         }
                     }
 
-                    // 完全去卡片化：無外框 60fps 自由走動 / 飛翔 2.5D 立體互動舞台
-                    VStack(spacing: 8) {
+                    // 專業 SceneKit 真 3D 立體遊戲畫面（支援 360° 旋轉視角 + 點擊地面投擲 3D 金幣追逐）
+                    VStack(spacing: 10) {
                         HStack {
-                            Text(petState.species.badgeText)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(petState.activeTheme == .obsidian ? Color.white.opacity(0.14) : Color.black.opacity(0.06))
-                                .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
-                                .clipShape(Capsule())
+                            Text("🎮 360° 拖曳旋轉 3D 視角 · 點地面投擲 3D 金幣")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.secondary)
                             Spacer()
                             Text("🪙 \(petState.spendableDP) DP")
-                                .font(.caption.bold())
+                                .font(.system(size: 14, weight: .heavy))
                                 .foregroundColor(Color(hex: "#D97706"))
                         }
 
-                        GeometryReader { geo in
-                            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-                                let t = timeline.date.timeIntervalSinceReferenceDate
-                                let pose = PetPlaygroundPose.compute(
-                                    species: petState.species,
-                                    isDogSitting: isDogSitting,
-                                    t: t,
-                                    maxHalfW: (geo.size.width - 135) * 0.5,
-                                    swoopTriggerTime: swoopTriggerTime,
-                                    tapTargetX: tapTargetX,
-                                    tapTargetY: tapTargetY,
-                                    tapTargetTime: tapTargetTime,
-                                    dragTiltX: dragTiltX,
-                                    dragTiltY: dragTiltY
-                                )
-
-                                ZStack {
-                                    // 無框環境光暈（漸層自然淡出無卡片邊界）
-                                    stageAtmosphere
-                                        .clipShape(Ellipse())
-                                        .blur(radius: 18)
-                                        .opacity(0.9)
-
-                                    // 點擊引導目標金幣標記
-                                    if pose.showTargetMarker {
-                                        Text("🪙")
-                                            .font(.title3)
-                                            .shadow(color: Color(hex: "#F59E0B").opacity(0.6), radius: 6)
-                                            .offset(x: tapTargetX, y: tapTargetY + 46)
-                                    }
-
-                                    // 動態追蹤地面立體陰影（隨高度與左右移動縮放濃淡）
-                                    Ellipse()
-                                        .fill(
-                                            RadialGradient(
-                                                colors: [Color(hex: "#F59E0B").opacity(0.45 * pose.shadowOpacity), Color.black.opacity(0.24 * pose.shadowOpacity), Color.clear],
-                                                center: .center,
-                                                startRadius: 6,
-                                                endRadius: 72
-                                            )
-                                        )
-                                        .frame(width: 126, height: 22)
-                                        .scaleEffect(pose.shadowScale)
-                                        .offset(x: pose.x, y: 82)
-
-                                    // 2.5D 多層視差動態公仔（會在舞台內左右走動或上下盤旋飛行）
-                                    AnimatedPetModelView(
-                                        species: petState.species,
-                                        isSitting: petState.species == .dog && isDogSitting,
-                                        size: 146,
-                                        parallaxX: pose.parallaxX,
-                                        parallaxY: pose.parallaxY,
-                                        motionSpeed: pose.speedMultiplier
+                        ZStack(alignment: .bottom) {
+                            RoundedRectangle(cornerRadius: 22)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#E0F2FE"), Color(hex: "#FEF9C3").opacity(0.65), Color(hex: "#DCFCE7").opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
                                     )
-                                    .shadow(color: Color.black.opacity(0.24), radius: 12, x: -pose.parallaxX * 6, y: 10 + pose.altitude * 0.15)
-                                    .scaleEffect(x: bounceScale * pose.squashX, y: bounceScale * pose.squashY)
-                                    .rotationEffect(.degrees(pose.rollDeg))
-                                    .rotation3DEffect(.degrees(pose.pitchDeg), axis: (x: 1, y: 0, z: 0), perspective: 0.55)
-                                    .rotation3DEffect(.degrees(pose.yawDeg), axis: (x: 0, y: 1, z: 0), perspective: 0.55)
-                                    .offset(x: pose.x, y: pose.y)
-
-                                    if isDownMarket {
-                                        Text("🪖")
-                                            .font(.title2)
-                                            .offset(x: pose.x - 42, y: pose.y - 52)
-                                    }
-
-                                    ForEach(particles) { p in
-                                        Text(p.emoji)
-                                            .font(.title3)
-                                            .offset(x: pose.x + p.offsetX, y: pose.y + p.targetY)
-                                    }
-                                }
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .contentShape(Rectangle())
-                                .gesture(
-                                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                                        .onChanged { val in
-                                            let dist = hypot(val.translation.width, val.translation.height)
-                                            if dist > 6 {
-                                                let ry = max(-22.0, min(22.0, Double(val.translation.width) / 4.2))
-                                                let rx = max(-16.0, min(16.0, -Double(val.translation.height) / 5.2))
-                                                dragTiltY = ry
-                                                dragTiltX = rx
-                                            }
-                                        }
-                                        .onEnded { val in
-                                            let dist = hypot(val.translation.width, val.translation.height)
-                                            if dist <= 8 {
-                                                // 點擊舞台任意處：寵物會走/飛到點擊位置！
-                                                let halfW = max(50.0, (geo.size.width - 130) * 0.5)
-                                                tapTargetX = max(-halfW, min(halfW, val.location.x - geo.size.width * 0.5))
-                                                tapTargetY = max(-48.0, min(26.0, val.location.y - geo.size.height * 0.5))
-                                                tapTargetTime = Date().timeIntervalSinceReferenceDate
-                                                if petState.species == .dog && isDogSitting {
-                                                    isDogSitting = false
-                                                }
-                                                triggerInteraction()
-                                            } else {
-                                                withAnimation(.spring(response: 0.45, dampingFraction: 0.55)) {
-                                                    dragTiltX = 0
-                                                    dragTiltY = 0
-                                                }
-                                            }
-                                        }
                                 )
-                            }
+
+                            Pet3DSceneKitGameView(
+                                species: petState.species,
+                                isDogSitting: isDogSitting,
+                                isCompact: false,
+                                actionTrigger: actionTrigger,
+                                actionType: actionType,
+                                onCatchCoin: {
+                                    quoteText = "🪙 追上 3D 金幣了！開心地跳起來招財！"
+                                }
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
                         }
-                        .frame(height: 230)
+                        .frame(height: 295)
+                        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
 
                         Text("Lv.\(levelInfo.level) \(stageTitle)（第 \(levelInfo.stage)/20 階）")
                             .font(.system(size: 18, weight: .heavy, design: .rounded))
-                            .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : .primary)
+                            .foregroundColor(.primary)
 
-                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : "\(petState.species.tagline)（點擊舞台任意處投金幣引導追逐）"))
+                        Text(quoteText ?? (isDownMarket ? petState.species.downMarketLine : "\(petState.species.tagline)（點擊 3D 島嶼地面投金幣引導追逐）"))
                             .font(.system(size: 14, weight: .medium))
                             .multilineTextAlignment(.center)
-                            .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7").opacity(0.85) : .secondary)
+                            .foregroundColor(.secondary)
 
-                        // 直接互動按鈕組（流暢走動/追逐金幣/盤旋俯衝，字體放大清晰）
+                        // 3D 互動按鈕組
                         HStack(spacing: 8) {
                             Button {
-                                triggerInteraction()
+                                trigger3DAction(type: "pat")
                             } label: {
-                                Text("👋 摸摸招財")
+                                Text("👋 摸摸跳躍")
                                     .font(.system(size: 13, weight: .bold))
                                     .padding(.horizontal, 13)
                                     .padding(.vertical, 8)
-                                    .background(Color(.systemBackground))
+                                    .background(Color(.secondarySystemBackground))
                                     .foregroundColor(.primary)
                                     .clipShape(Capsule())
-                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
                             }
                             .buttonStyle(.plain)
 
                             Button {
-                                triggerInteraction(swoop: true)
+                                trigger3DAction(type: "swoop")
                             } label: {
-                                Text(petState.species == .bird ? "🪽 盤旋飛翔" : (petState.species == .dog ? "🦴 飛奔巡邏" : "🐾 躍動招手"))
+                                Text(petState.species == .bird ? "🪽 3D 衝刺飛翔" : (petState.species == .dog ? "🦴 3D 飛奔巡邏" : "🐾 3D 躍動招手"))
                                     .font(.system(size: 13, weight: .bold))
                                     .padding(.horizontal, 13)
                                     .padding(.vertical, 8)
-                                    .background(Color(.systemBackground))
+                                    .background(Color(.secondarySystemBackground))
                                     .foregroundColor(.primary)
                                     .clipShape(Capsule())
-                                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
                             }
                             .buttonStyle(.plain)
 
                             Button {
-                                tapTargetX = CGFloat.random(in: -70...70)
-                                tapTargetY = CGFloat.random(in: -28...18)
-                                tapTargetTime = Date().timeIntervalSinceReferenceDate
-                                triggerInteraction(isCoinRain: true, swoop: true)
+                                trigger3DAction(type: "coin")
                             } label: {
-                                Text("🪙 投金幣追逐")
+                                Text("🪙 投 3D 金幣")
                                     .font(.system(size: 13, weight: .heavy))
                                     .padding(.horizontal, 13)
                                     .padding(.vertical, 8)
@@ -4446,25 +4767,16 @@ struct PetCompanionSheet: View {
                             if petState.species == .dog {
                                 Button {
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.52)) {
-                                        isDogSitting.toggle()
-                                        bounceScale = 1.12
-                                    }
-                                    quoteText = isDogSitting ? "乖乖坐下顧聚寶盆，尾巴繼續搖汪！" : "精力充沛站起來在舞台走動汪！"
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
-                                            bounceScale = 1.0
-                                        }
-                                    }
+                                    isDogSitting.toggle()
+                                    quoteText = isDogSitting ? "乖乖坐下顧聚寶盆，3D 尾巴繼續搖汪！" : "精力充沛站起來在 3D 綠茵島奔跑汪！"
                                 } label: {
                                     Text(isDogSitting ? "🐕 站起來" : "🐶 坐下")
                                         .font(.system(size: 13, weight: .bold))
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
-                                        .background(Color(.systemBackground))
+                                        .background(Color(.secondarySystemBackground))
                                         .foregroundColor(Color(hex: "#9A3412"))
                                         .clipShape(Capsule())
-                                        .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -4476,13 +4788,12 @@ struct PetCompanionSheet: View {
                                     .font(.system(size: 12, weight: .bold))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
-                                    .background(petState.activeTheme == .obsidian ? Color.white.opacity(0.14) : Color(hex: aura.colorHex).opacity(0.15))
-                                    .foregroundColor(petState.activeTheme == .obsidian ? Color(hex: "#FEF3C7") : Color(hex: aura.colorHex))
+                                    .background(Color(hex: aura.colorHex).opacity(0.15))
+                                    .foregroundColor(Color(hex: aura.colorHex))
                                     .clipShape(Capsule())
                             }
                         }
                     }
-                    .padding(.vertical, 6)
 
                     // 成長進度與餵食
                     VStack(spacing: 10) {
@@ -4501,10 +4812,7 @@ struct PetCompanionSheet: View {
                             let res = PetService.shared.feedAllPending()
                             petState = res.state
                             if res.fedAmount > 0 {
-                                tapTargetX = CGFloat.random(in: -65...65)
-                                tapTargetY = CGFloat.random(in: -24...16)
-                                tapTargetTime = Date().timeIntervalSinceReferenceDate
-                                triggerInteraction(isCoinRain: true, swoop: true)
+                                trigger3DAction(type: "coin")
                             }
                         } label: {
                             HStack {
@@ -4519,56 +4827,22 @@ struct PetCompanionSheet: View {
                         }
                         .disabled(petState.pendingFeedDP <= 0)
 
-                        Text("點擊舞台任意處可投下金幣吸引寵物追逐；每實領 $100 股息自動得 1 DP。")
+                        Text("手指左右拖曳可 360° 旋轉 3D 視角；點擊地面可投擲 3D 金幣吸引寵物追逐。")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                     }
                     .padding(14)
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(14)
-
-                    // 舞台氛圍
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("✨ 舞台氛圍（用可用 DP 解鎖，不扣等級）")
-                            .font(.caption.bold())
-
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                            ForEach(PetCardTheme.allCases) { theme in
-                                let unlocked = theme.costDP == 0 || petState.unlockedThemes.contains(theme.rawValue)
-                                let isActive = petState.activeTheme == theme
-                                Button {
-                                    let res = PetService.shared.buyOrApplyTheme(theme)
-                                    petState = res.state
-                                    if res.insufficient {
-                                        alertMessage = "需要 \(theme.costDP) DP 才能解鎖【\(theme.title)】，目前可用 \(petState.spendableDP) DP。"
-                                        showInsufficientAlert = true
-                                    }
-                                } label: {
-                                    Text("\(isActive ? "✓ " : "")\(theme.title)\(unlocked ? "" : " (\(theme.costDP)DP)")")
-                                        .font(.caption.bold())
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(isActive ? Color(hex: "#1C1C1E") : Color(.secondarySystemBackground))
-                                        .foregroundColor(isActive ? Color(hex: "#FDE047") : .primary)
-                                        .cornerRadius(10)
-                                }
-                            }
-                        }
-                    }
                 }
                 .padding()
             }
-            .navigationTitle("3D 財富寵物互動舞台")
+            .navigationTitle("3D 財富寵物樂園")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
                 }
-            }
-            .alert("可用代幣不足", isPresented: $showInsufficientAlert) {
-                Button("確定", role: .cancel) {}
-            } message: {
-                Text(alertMessage)
             }
         }
     }

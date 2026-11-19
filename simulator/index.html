@@ -1004,47 +1004,71 @@
 
   let petRoamRAF = null;
   const petRoam = {
-    x: 0,
-    y: 0,
-    dragYaw: 0,
-    dragPitch: 0,
-    targetX: 0,
-    targetY: 0,
-    tapUntil: 0,
+    posX: 0,
+    posY: 0,
+    posZ: 0,
+    facingYaw: 0,
+    camYaw: 0.15,
+    camPitch: -0.28,
+    hasCoin: false,
+    coinX: 0,
+    coinY: 0,
+    coinZ: 0,
+    coinVelY: 0,
+    jumpY: 0,
+    jumpVelY: 0,
     swoopUntil: 0,
-    swoopStart: 0
+    stars: []
   };
 
+  function spawn3DGameCoinSim(tx, tz) {
+    petRoam.hasCoin = true;
+    petRoam.coinX = Math.max(-1.25, Math.min(1.25, tx));
+    petRoam.coinZ = Math.max(-1.05, Math.min(1.05, tz));
+    petRoam.coinY = 1.65;
+    petRoam.coinVelY = -0.04;
+    if (petState.species === 'dog' && isDogSitting) {
+      isDogSitting = false;
+      const btn = document.getElementById('dogSitBtn');
+      if (btn) btn.innerText = '🐶 坐下';
+    }
+  }
+
+  function burst3DGameStarsSim(x, y, z) {
+    for (let i = 0; i < 10; i++) {
+      const ang = (i / 10) * Math.PI * 2;
+      petRoam.stars.push({
+        x, y: y + 0.55, z,
+        vx: Math.cos(ang) * 0.045,
+        vy: 0.055 + Math.random() * 0.03,
+        vz: Math.sin(ang) * 0.045,
+        life: 1.0
+      });
+    }
+  }
+
   function interactModalPet(mode) {
-    const stg = document.getElementById('petModalStage');
-    const img = document.getElementById('petModalImg');
     const quote = document.getElementById('petModalQuote');
-    if (mode === 'swoop') {
+    if (mode === 'coin') {
+      spawn3DGameCoinSim((Math.random() - 0.5) * 2.1, (Math.random() - 0.5) * 1.7);
+      if (quote) quote.innerText = '🪙 發現 3D 金幣！立刻轉身衝過去跳躍接住！';
+    } else if (mode === 'swoop') {
       if (petState.species === 'dog' && isDogSitting) {
         isDogSitting = false;
-        applyDogPoseToRig(img, false);
         const btn = document.getElementById('dogSitBtn');
         if (btn) btn.innerText = '🐶 坐下';
       }
-      const now = performance.now();
-      petRoam.swoopStart = now;
-      petRoam.swoopUntil = now + 1350;
-    } else if (img) {
-      img.classList.remove('pet-bounce');
-      void img.offsetWidth;
-      img.classList.add('pet-bounce');
-    }
-    if (mode === 'coin') {
-      spawnPetParticles(stg, ['🪙'], true);
-    } else {
-      spawnPetParticles(stg, ['❤️', '✨', '💰', '🍀'], false);
-    }
-    if (quote) {
-      if (mode === 'swoop') {
+      petRoam.swoopUntil = performance.now() + 1450;
+      petRoam.jumpVelY = 0.095;
+      if (quote) {
         quote.innerText = petState.species === 'bird'
-          ? '啾啾～高空盤旋巡視高息除權息！'
-          : (petState.species === 'dog' ? '汪汪！活力全開在舞台飛奔守護存摺！' : '喵～全速躍動招財！股息通通吸過來！');
-      } else {
+          ? '啾啾～3D 高空盤旋俯衝接金幣！'
+          : (petState.species === 'dog' ? '汪汪！活力全開在 3D 綠茵島飛奔！' : '喵～3D 全速躍動招財！股息通通吸過來！');
+      }
+    } else {
+      petRoam.jumpVelY = 0.085;
+      burst3DGameStarsSim(petRoam.posX, petRoam.posY, petRoam.posZ);
+      if (quote) {
         const lines = PET_INTERACT_LINES[petState.species] || PET_INTERACT_LINES.cat;
         quote.innerText = lines[Math.floor(Math.random() * lines.length)];
       }
@@ -1054,176 +1078,296 @@
   function startPetStageLoop() {
     if (petRoamRAF) cancelAnimationFrame(petRoamRAF);
     const tick = (now) => {
-      const stageEl = document.getElementById('petPlayground');
-      const actorEl = document.getElementById('petPlaygroundActor');
-      const rigEl = document.getElementById('petModalImg');
-      const shadowEl = document.getElementById('petPlaygroundShadow');
-      const lureEl = document.getElementById('petLureCoin');
-      if (!stageEl || !stageEl.isConnected || !actorEl || !rigEl) {
+      const canvas = document.getElementById('pet3DGameCanvas');
+      if (!canvas || !canvas.isConnected) {
         petRoamRAF = null;
         return;
       }
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const cw = canvas.clientWidth || 320;
+      const ch = canvas.clientHeight || 250;
+      if (canvas.width !== cw * dpr || canvas.height !== ch * dpr) {
+        canvas.width = cw * dpr;
+        canvas.height = ch * dpr;
+      }
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, cw, ch);
 
       const t = now * 0.001;
-      const w = stageEl.clientWidth || 300;
-      const maxX = Math.max(46, Math.min(108, (w - 135) * 0.5));
-      const swoopActive = now < petRoam.swoopUntil;
-      const swoopU = swoopActive ? Math.max(0, Math.min(1, (now - petRoam.swoopStart) / 1350)) : 0;
-      const swoopEnv = swoopActive ? Math.sin(Math.PI * swoopU) : 0;
-
-      const tapActive = now < petRoam.tapUntil;
-      const tapRem = tapActive ? (petRoam.tapUntil - now) / 2100 : 0;
-      const tapBlend = tapActive ? Math.sin(Math.PI * (1 - tapRem)) : 0;
-      if (lureEl) {
-        lureEl.style.display = tapActive ? 'block' : 'none';
-        if (tapActive) {
-          lureEl.style.left = `calc(50% + ${petRoam.targetX.toFixed(1)}px)`;
-          lureEl.style.top = `calc(54% + ${petRoam.targetY.toFixed(1)}px)`;
-        }
-      }
-
-      let autoX = 0, autoY = 0, hopY = 0, roll = 0, yaw = 0, pitch = 0, sX = 1, sY = 1;
-      const breath = Math.sin(t * 2.8);
       const sp = petState.species || 'cat';
-      if (sp === 'cat') {
-        const wc = t * 0.65;
-        const vel = Math.cos(wc);
-        autoX = Math.sin(wc) * maxX * 0.78;
-        const stepWave = Math.abs(Math.sin(t * 5.2));
-        const mw = Math.min(1, Math.abs(vel) * 1.4);
-        hopY = -stepWave * 8.5 * mw;
-        roll = Math.sin(t * 5.2) * 4.5 * mw + vel * 4.5 + Math.sin(t * 1.9) * 1.8;
-        yaw = vel * 15;
-        pitch = -stepWave * 4.2 * mw;
-        sY = 1 - mw * stepWave * 0.05 + breath * 0.018;
-        sX = 1 + mw * stepWave * 0.035 - breath * 0.014;
-        if (swoopActive) {
-          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3)) * 24 * swoopEnv;
-          yaw += Math.sin(swoopU * Math.PI * 4) * 15 * swoopEnv;
+      const isSwooping = now < petRoam.swoopUntil;
+
+      // 1. 更新 3D 空間運動 (posX, posY, posZ) 與朝向角 (facingYaw)
+      if (petRoam.hasCoin) {
+        petRoam.coinY += petRoam.coinVelY;
+        petRoam.coinVelY -= 0.006;
+        if (petRoam.coinY < 0.22) {
+          petRoam.coinY = 0.22;
+          petRoam.coinVelY = Math.abs(petRoam.coinVelY) * 0.45;
         }
-      } else if (sp === 'bird') {
-        const ft = t * 0.92;
-        const velX = Math.cos(ft);
-        autoX = Math.sin(ft) * maxX * 0.86;
-        autoY = -18 + Math.sin(ft * 2 + 0.3) * 20 + Math.cos(t * 1.35) * 6;
-        roll = velX * 16 + Math.sin(t * 3) * 3.5;
-        yaw = velX * 20;
-        pitch = Math.cos(ft * 2 + 0.3) * 10;
-        sY = 1 + Math.sin(t * 11.5) * 0.025;
-        sX = 1 - Math.sin(t * 11.5) * 0.02;
-        if (swoopActive) {
-          autoX += Math.sin(swoopU * Math.PI * 2) * 32 * swoopEnv;
-          autoY -= swoopEnv * 26;
-          roll += Math.cos(swoopU * Math.PI * 2) * 16 * swoopEnv;
+        const dx = petRoam.coinX - petRoam.posX;
+        const dz = petRoam.coinZ - petRoam.posZ;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.09) {
+          const step = Math.min(dist, 0.052);
+          petRoam.posX += (dx / dist) * step;
+          petRoam.posZ += (dz / dist) * step;
+          const targetYaw = Math.atan2(dx, dz);
+          const diff = Math.atan2(Math.sin(targetYaw - petRoam.facingYaw), Math.cos(targetYaw - petRoam.facingYaw));
+          petRoam.facingYaw += diff * 0.22;
+        } else {
+          petRoam.hasCoin = false;
+          petRoam.jumpVelY = 0.105;
+          burst3DGameStarsSim(petRoam.posX, petRoam.posY, petRoam.posZ);
+          const quote = document.getElementById('petModalQuote');
+          if (quote) quote.innerText = '🪙 追上 3D 金幣了！開心地跳起來招財！';
         }
+      } else if (sp === 'dog' && isDogSitting) {
+        petRoam.facingYaw = Math.sin(t * 0.7) * 0.25;
       } else {
-        if (isDogSitting) {
-          autoX = Math.sin(t * 0.25) * 10;
-          hopY = Math.sin(t * 2.4) * 1.8;
-          roll = Math.sin(t * 1.4) * 2.2;
-          yaw = Math.sin(t * 0.8) * 6.5;
-          sY = 1 + breath * 0.022;
-          sX = 1 - breath * 0.016;
-        } else {
-          const tt = t * 0.88 + 0.28 * Math.sin(t * 0.42);
-          const tv = Math.cos(tt);
-          autoX = Math.sin(tt) * maxX * 0.82;
-          const bnc = Math.abs(Math.sin(t * 7.6));
-          const mw = Math.min(1, Math.abs(tv) * 1.5);
-          hopY = -bnc * 8 * mw;
-          roll = tv * 6 + Math.sin(t * 7.6) * 3.5 * mw;
-          yaw = tv * 17;
-          sY = 1 - mw * bnc * 0.045 + breath * 0.018;
-          sX = 1 + mw * bnc * 0.032 - breath * 0.014;
-        }
-        if (swoopActive) {
-          hopY -= Math.abs(Math.sin(swoopU * Math.PI * 3.5)) * 25 * swoopEnv;
-          yaw += Math.sin(swoopU * Math.PI * 4) * 16 * swoopEnv;
+        const spd = isSwooping ? 1.65 : 0.75;
+        const tx = Math.sin(t * spd) * 1.15;
+        const tz = Math.sin(t * spd * 2.0) * 0.62;
+        const dx = tx - petRoam.posX;
+        const dz = tz - petRoam.posZ;
+        petRoam.posX += dx * 0.08;
+        petRoam.posZ += dz * 0.08;
+        if (Math.hypot(dx, dz) > 0.003) {
+          const targetYaw = Math.atan2(dx, dz);
+          const diff = Math.atan2(Math.sin(targetYaw - petRoam.facingYaw), Math.cos(targetYaw - petRoam.facingYaw));
+          petRoam.facingYaw += diff * 0.14;
         }
       }
 
-      const targetX = petRoam.targetX;
-      const targetYClamped = sp === 'bird' ? petRoam.targetY : Math.min(14, Math.max(-16, petRoam.targetY * 0.35));
-      const baseFloorY = 10;
-      const finalX = autoX * (1 - tapBlend * 0.85) + targetX * (tapBlend * 0.85);
-      const rawY = (sp === 'bird' ? autoY : baseFloorY) * (1 - tapBlend * 0.75) + targetYClamped * (tapBlend * 0.75) + hopY;
-
-      const clampedYaw = Math.max(-22, Math.min(22, yaw + petRoam.dragYaw + (tapBlend > 0.05 ? (targetX - autoX) * 0.14 : 0)));
-      const clampedPitch = Math.max(-16, Math.min(16, pitch + petRoam.dragPitch));
-      const px = clampedYaw / 22;
-      const py = -clampedPitch / 16;
-
-      actorEl.style.transform = `translate3d(${finalX.toFixed(1)}px, ${rawY.toFixed(1)}px, 0)`;
-      rigEl.style.transform = `perspective(520px) rotateX(${clampedPitch.toFixed(1)}deg) rotateY(${clampedYaw.toFixed(1)}deg) rotateZ(${roll.toFixed(1)}deg) scale(${sX.toFixed(3)}, ${sY.toFixed(3)})`;
-
-      // 2.5D 分層視差（肢體層與本體層以不同深度偏移，消除平面感）
-      const layers = rigEl.querySelectorAll('.pet-layer');
-      if (layers.length === 2) {
-        if (sp === 'dog') {
-          layers[0].style.translate = `${(px * 1.5).toFixed(1)}px ${(py * 1.2).toFixed(1)}px`;
-          layers[1].style.translate = `${(px * 3.5).toFixed(1)}px ${(py * 2.5).toFixed(1)}px`;
-        } else {
-          layers[0].style.translate = `${(px * 2.0).toFixed(1)}px ${(py * 1.5).toFixed(1)}px`;
-          layers[1].style.translate = `${(px * 5.2).toFixed(1)}px ${(py * 3.8).toFixed(1)}px`;
+      if (petRoam.jumpVelY !== 0 || petRoam.jumpY > 0) {
+        petRoam.jumpY += petRoam.jumpVelY;
+        petRoam.jumpVelY -= 0.007;
+        if (petRoam.jumpY <= 0) {
+          petRoam.jumpY = 0;
+          petRoam.jumpVelY = 0;
         }
       }
+      const walkBounce = (sp === 'dog' && isDogSitting) ? 0 : Math.abs(Math.sin(t * (petRoam.hasCoin || isSwooping ? 11.0 : 6.5))) * 0.11;
+      const baseFlight = sp === 'bird' ? (0.34 + Math.sin(t * 3.8) * 0.14) : walkBounce;
+      petRoam.posY = baseFlight + petRoam.jumpY;
 
-      const alt = Math.max(0, baseFloorY - rawY);
-      const shScale = Math.max(0.48, Math.min(1.05, 1 - alt / 95));
-      const shOp = Math.max(0.32, Math.min(0.95, 0.92 - alt / 110));
-      if (shadowEl) {
-        shadowEl.style.transform = `translate3d(${finalX.toFixed(1)}px, 0, 0) scale(${shScale.toFixed(3)})`;
-        shadowEl.style.opacity = shOp.toFixed(2);
+      // 2. 3D 透視投影矩陣 (Camera Orbit 360°)
+      const cosY = Math.cos(petRoam.camYaw), sinY = Math.sin(petRoam.camYaw);
+      const cosP = Math.cos(petRoam.camPitch), sinP = Math.sin(petRoam.camPitch);
+      const fov = 315;
+      const camDist = 4.8;
+      const centerY = ch * 0.60;
+
+      const project = (wx, wy, wz) => {
+        const rx = wx * cosY - wz * sinY;
+        const rz1 = wx * sinY + wz * cosY;
+        const ry = (wy - 0.55) * cosP - rz1 * sinP;
+        const rz = (wy - 0.55) * sinP + rz1 * cosP + camDist;
+        const scale = fov / Math.max(0.5, rz);
+        return { sx: cw * 0.5 + rx * scale, sy: centerY - ry * scale, z: rz, scale };
+      };
+
+      // 3. 繪製 3D 綠茵浮島地形與金色邊環
+      const drawDisk = (yLevel, rad, fillTop, fillRim, thickness) => {
+        const ptsTop = [];
+        const ptsBot = [];
+        for (let i = 0; i <= 40; i++) {
+          const a = (i / 40) * Math.PI * 2;
+          ptsTop.push(project(Math.cos(a) * rad, yLevel, Math.sin(a) * rad));
+          ptsBot.push(project(Math.cos(a) * rad, yLevel - thickness, Math.sin(a) * rad));
+        }
+        ctx.fillStyle = fillRim;
+        ctx.beginPath();
+        ptsTop.forEach((p, i) => i === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+        for (let i = ptsBot.length - 1; i >= 0; i--) ctx.lineTo(ptsBot[i].sx, ptsBot[i].sy);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = fillTop;
+        ctx.beginPath();
+        ptsTop.forEach((p, i) => i === 0 ? ctx.moveTo(p.sx, p.sy) : ctx.lineTo(p.sx, p.sy));
+        ctx.closePath();
+        ctx.fill();
+      };
+
+      drawDisk(-0.18, 1.85, '#B45309', '#92400E', 0.34);
+      drawDisk(-0.02, 2.15, '#F59E0B', '#D97706', 0.14);
+      drawDisk(0.0, 2.05, '#4ADE80', '#22C55E', 0.08);
+
+      // 寵物腳下即時 3D 投影陰影
+      const shCenter = project(petRoam.posX, 0.01, petRoam.posZ);
+      const shRad = Math.max(10, (0.48 - petRoam.posY * 0.22) * shCenter.scale);
+      ctx.fillStyle = 'rgba(20, 83, 45, 0.28)';
+      ctx.beginPath();
+      ctx.ellipse(shCenter.sx, shCenter.sy, shRad, shRad * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. 建立 3D 體積球體渲染佇列 (Z-buffer 深度排序 + PBR 立體高光漸層)
+      const spheres = [];
+      const addPart = (lx, ly, lz, rx, ry, rz, colorMain, colorDark, spec = true) => {
+        // 依寵物朝向旋轉局部座標 (lx, ly, lz) -> 世界座標
+        const cf = Math.cos(petRoam.facingYaw), sf = Math.sin(petRoam.facingYaw);
+        const wx = petRoam.posX + (lx * cf + lz * sf);
+        const wy = petRoam.posY + ly;
+        const wz = petRoam.posZ + (-lx * sf + lz * cf);
+        const p = project(wx, wy, wz);
+        spheres.push({ p, rx: rx * p.scale, ry: ry * p.scale, colorMain, colorDark, spec });
+      };
+
+      const breath = Math.sin(t * 3.0) * 0.025;
+      const blink = (t % 3.5) > 3.35 ? 0.15 : 1.0;
+
+      if (sp === 'cat') {
+        // 真 3D 招財貓體積建模
+        const stride = Math.sin(t * (petRoam.hasCoin ? 11.0 : 6.5)) * 0.14;
+        const wave = Math.sin(t * 5.4) * 0.22;
+        addPart(-0.22, 0.18 + Math.max(0, stride), stride, 0.14, 0.18, 0.14, '#FFFBEB', '#E5E7EB');
+        addPart(0.22, 0.18 + Math.max(0, -stride), -stride, 0.14, 0.18, 0.14, '#FFFBEB', '#E5E7EB');
+        addPart(0, 0.42, -0.44, 0.09, 0.24, 0.09, '#F97316', '#C2410C'); // 3D 貓尾
+        addPart(0, 0.56, 0, 0.46 - breath, 0.50 + breath, 0.42, '#FFFBEB', '#D6D3D1'); // 3D 圓潤身軀
+        addPart(0, 0.90, 0.05, 0.36, 0.08, 0.36, '#EF4444', '#B91C1C'); // 紅項圈
+        addPart(0, 0.88, 0.42, 0.11, 0.11, 0.11, '#FACC15', '#B45309'); // 3D 金鈴鐺
+        // 左手與千萬兩金幣
+        addPart(0.38, 0.72, 0.18, 0.13, 0.20, 0.13, '#FFFBEB', '#E5E7EB');
+        addPart(0.28, 0.66, 0.38, 0.16, 0.24, 0.08, '#FACC15', '#CA8A04');
+        // 右手 3D 前後招財手
+        addPart(-0.42, 0.88 + wave * 0.3, 0.16 + wave, 0.13, 0.22, 0.13, '#FFFBEB', '#E5E7EB');
+        addPart(-0.42, 1.08 + wave * 0.4, 0.24 + wave * 1.2, 0.14, 0.14, 0.14, '#FDA4AF', '#FFFBEB');
+        // 3D 頭部、雙耳、五官
+        addPart(0, 1.28, 0.04, 0.48, 0.44, 0.45, '#FFFBEB', '#E7E5E4');
+        addPart(-0.24, 1.48, 0.14, 0.18, 0.15, 0.16, '#F97316', '#C2410C');
+        addPart(-0.34, 1.66, -0.02, 0.15, 0.20, 0.12, '#F97316', '#C2410C');
+        addPart(0.34, 1.66, -0.02, 0.15, 0.20, 0.12, '#FFFBEB', '#D6D3D1');
+        addPart(-0.33, 1.64, 0.05, 0.08, 0.12, 0.06, '#FDA4AF', '#F43F5E', false);
+        addPart(0.33, 1.64, 0.05, 0.08, 0.12, 0.06, '#FDA4AF', '#F43F5E', false);
+        addPart(-0.19, 1.32, 0.43, 0.085, 0.085 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(0.19, 1.32, 0.43, 0.085, 0.085 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(-0.31, 1.21, 0.40, 0.08, 0.05, 0.05, '#FDA4AF', '#FB7185', false);
+        addPart(0.31, 1.21, 0.40, 0.08, 0.05, 0.05, '#FDA4AF', '#FB7185', false);
+        addPart(0, 1.24, 0.48, 0.05, 0.04, 0.04, '#FB7185', '#E11D48', false);
+      } else if (sp === 'bird') {
+        // 真 3D 貪錢鳥體積建模
+        const flap = Math.sin(t * (petRoam.hasCoin || isSwooping ? 18.0 : 12.5)) * 0.26;
+        addPart(0, 0.72, -0.48, 0.16, 0.08, 0.18, '#D97706', '#92400E'); // 尾羽
+        addPart(0, 0.86, 0, 0.48 - breath, 0.46 + breath, 0.52, '#F59E0B', '#B45309'); // 3D 圓鳥身
+        addPart(0, 0.80, 0.16, 0.38, 0.36, 0.38, '#FEF3C7', '#FDE68A'); // 肚皮
+        addPart(-0.52, 0.92 + flap, 0, 0.24, 0.12, 0.28, '#D97706', '#92400E'); // 左3D翅
+        addPart(0.52, 0.92 + flap, 0, 0.24, 0.12, 0.28, '#D97706', '#92400E');  // 右3D翅
+        addPart(0, 1.36, 0.08, 0.08, 0.16, 0.08, '#F59E0B', '#B45309'); // 呆毛羽冠
+        addPart(-0.21, 0.98, 0.44, 0.085, 0.085 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(0.21, 0.98, 0.44, 0.085, 0.085 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(-0.32, 0.88, 0.40, 0.075, 0.05, 0.05, '#FB7185', '#E11D48', false);
+        addPart(0.32, 0.88, 0.40, 0.075, 0.05, 0.05, '#FB7185', '#E11D48', false);
+        addPart(0, 0.90, 0.54, 0.10, 0.08, 0.14, '#EA580C', '#9A3412'); // 3D 鳥喙
+        addPart(0, 0.78, 0.64, 0.16, 0.16, 0.05, '#FACC15', '#CA8A04'); // 嘴咬 3D 金幣
+      } else {
+        // 真 3D 財氣犬 (柴犬) 體積建模
+        const trot = isDogSitting ? 0 : Math.sin(t * (petRoam.hasCoin || isSwooping ? 12.0 : 7.5)) * 0.16;
+        const sitDrop = isDogSitting ? -0.14 : 0;
+        const wag = Math.sin(t * 14.0) * 0.22;
+        addPart(-0.20, 0.20, 0.24 + trot, 0.11, 0.20, 0.11, '#EA580C', '#9A3412');
+        addPart(0.20, 0.20, 0.24 - trot, 0.11, 0.20, 0.11, '#EA580C', '#9A3412');
+        addPart(-0.20, 0.20 + sitDrop * 0.5, -0.24 - trot, 0.12, 0.18, 0.12, '#EA580C', '#9A3412');
+        addPart(0.20, 0.20 + sitDrop * 0.5, -0.24 + trot, 0.12, 0.18, 0.12, '#EA580C', '#9A3412');
+        addPart(wag, 0.78 + sitDrop, -0.46, 0.14, 0.16, 0.14, '#EA580C', '#C2410C'); // 3D 捲曲柴尾
+        addPart(0, 0.58 + sitDrop * 0.6, 0, 0.42 - breath, 0.40 + breath, 0.52, '#EA580C', '#C2410C');
+        addPart(0, 0.64 + sitDrop * 0.4, 0.24, 0.34, 0.32, 0.30, '#FFFBEB', '#E7E5E4');
+        addPart(0, 0.88 + sitDrop * 0.2, 0.22, 0.34, 0.08, 0.34, '#DC2626', '#991B1B'); // 紅領巾
+        addPart(0, 0.80 + sitDrop * 0.2, 0.52, 0.11, 0.11, 0.05, '#FACC15', '#B45309'); // 金牌
+        addPart(0, 1.22 + sitDrop * 0.15, 0.24, 0.44, 0.41, 0.42, '#EA580C', '#C2410C');
+        addPart(0, 1.13 + sitDrop * 0.15, 0.54, 0.22, 0.17, 0.22, '#FFFBEB', '#D6D3D1'); // 3D 吻部
+        addPart(0, 1.19 + sitDrop * 0.15, 0.72, 0.065, 0.055, 0.065, '#1E1B18', '#000000'); // 黑鼻頭
+        addPart(-0.30, 1.60 + sitDrop * 0.15, 0.18, 0.14, 0.21, 0.12, '#EA580C', '#9A3412');
+        addPart(0.30, 1.60 + sitDrop * 0.15, 0.18, 0.14, 0.21, 0.12, '#EA580C', '#9A3412');
+        addPart(-0.18, 1.28 + sitDrop * 0.15, 0.58, 0.078, 0.078 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(0.18, 1.28 + sitDrop * 0.15, 0.58, 0.078, 0.078 * blink, 0.06, '#1E1B18', '#000000');
+        addPart(-0.16, 1.40 + sitDrop * 0.15, 0.56, 0.055, 0.035, 0.04, '#FFFBEB', '#E5E7EB', false); // 柴犬白豆眉
+        addPart(0.16, 1.40 + sitDrop * 0.15, 0.56, 0.055, 0.035, 0.04, '#FFFBEB', '#E5E7EB', false);
       }
+
+      // 場上掉落的 3D 旋轉金幣
+      if (petRoam.hasCoin) {
+        const cp = project(petRoam.coinX, petRoam.coinY, petRoam.coinZ);
+        const spinW = Math.max(0.06, Math.abs(Math.cos(t * 7.0)) * 0.20);
+        spheres.push({ p: cp, rx: spinW * cp.scale, ry: 0.20 * cp.scale, colorMain: '#FDE047', colorDark: '#D97706', spec: true });
+      }
+
+      // 3D 金星爆炸粒子
+      for (let i = petRoam.stars.length - 1; i >= 0; i--) {
+        const st = petRoam.stars[i];
+        st.x += st.vx;
+        st.y += st.vy;
+        st.z += st.vz;
+        st.vy -= 0.003;
+        st.life -= 0.035;
+        if (st.life <= 0) {
+          petRoam.stars.splice(i, 1);
+          continue;
+        }
+        const spP = project(st.x, st.y, st.z);
+        spheres.push({ p: spP, rx: 0.08 * st.life * spP.scale, ry: 0.08 * st.life * spP.scale, colorMain: '#FDE047', colorDark: '#F59E0B', spec: false });
+      }
+
+      // 依攝影機深度由遠到近排序繪製 (Z-buffer Painter's Algorithm)
+      spheres.sort((a, b) => b.p.z - a.p.z);
+      spheres.forEach(s => {
+        const { sx, sy } = s.p;
+        const rx = Math.max(1.5, s.rx);
+        const ry = Math.max(1.5, s.ry);
+        const grad = ctx.createRadialGradient(sx - rx * 0.32, sy - ry * 0.35, rx * 0.08, sx, sy, Math.max(rx, ry));
+        grad.addColorStop(0, s.spec ? '#FFFFFF' : s.colorMain);
+        grad.addColorStop(s.spec ? 0.22 : 0.0, s.colorMain);
+        grad.addColorStop(1, s.colorDark);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.restore();
       petRoamRAF = requestAnimationFrame(tick);
     };
     petRoamRAF = requestAnimationFrame(tick);
   }
 
   function bindPet3DTilt(stageEl) {
-    if (!stageEl || stageEl.dataset.tiltBound) return;
-    stageEl.dataset.tiltBound = '1';
+    const canvas = document.getElementById('pet3DGameCanvas');
+    if (!canvas || canvas.dataset.bound3d) {
+      startPetStageLoop();
+      return;
+    }
+    canvas.dataset.bound3d = '1';
     let dragging = false;
-    let downX = 0, downY = 0;
-    const updateTilt = (clientX, clientY) => {
-      const rect = stageEl.getBoundingClientRect();
-      const nx = ((clientX - rect.left) / rect.width - 0.5) * 2;
-      const ny = ((clientY - rect.top) / rect.height - 0.5) * 2;
-      petRoam.dragYaw = Math.max(-20, Math.min(20, nx * 20));
-      petRoam.dragPitch = Math.max(-14, Math.min(14, -ny * 14));
-    };
-    stageEl.addEventListener('pointerdown', e => {
+    let downX = 0, downY = 0, startYaw = 0, startPitch = 0;
+
+    canvas.addEventListener('pointerdown', e => {
       dragging = true;
       downX = e.clientX;
       downY = e.clientY;
-      updateTilt(e.clientX, e.clientY);
+      startYaw = petRoam.camYaw;
+      startPitch = petRoam.camPitch;
     });
-    stageEl.addEventListener('pointermove', e => {
-      if (dragging || e.pointerType === 'mouse') updateTilt(e.clientX, e.clientY);
+    canvas.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      petRoam.camYaw = startYaw - (e.clientX - downX) * 0.014;
+      petRoam.camPitch = Math.max(-0.72, Math.min(-0.08, startPitch - (e.clientY - downY) * 0.010));
     });
-    stageEl.addEventListener('pointerup', e => {
+    canvas.addEventListener('pointerup', e => {
       const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
       dragging = false;
-      petRoam.dragYaw = 0;
-      petRoam.dragPitch = 0;
       if (dist <= 8) {
-        const rect = stageEl.getBoundingClientRect();
-        const maxX = Math.max(46, Math.min(108, (rect.width - 135) * 0.5));
-        petRoam.targetX = Math.max(-maxX, Math.min(maxX, e.clientX - rect.left - rect.width * 0.5));
-        petRoam.targetY = Math.max(-46, Math.min(24, e.clientY - rect.top - rect.height * 0.54));
-        petRoam.tapUntil = performance.now() + 2100;
-        if (petState.species === 'dog' && isDogSitting) {
-          isDogSitting = false;
-          applyDogPoseToRig(document.getElementById('petModalImg'), false);
-          const btn = document.getElementById('dogSitBtn');
-          if (btn) btn.innerText = '🐶 坐下';
-        }
-        interactModalPet('pat');
+        const rect = canvas.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 2.2;
+        const nz = ((e.clientY - rect.top) / rect.height - 0.58) * 2.0;
+        const cosY = Math.cos(-petRoam.camYaw), sinY = Math.sin(-petRoam.camYaw);
+        const wx = nx * cosY - nz * sinY;
+        const wz = nx * sinY + nz * cosY;
+        spawn3DGameCoinSim(wx, wz);
       }
     });
-    const resetDrag = () => { dragging = false; petRoam.dragYaw = 0; petRoam.dragPitch = 0; };
-    stageEl.addEventListener('pointerleave', resetDrag);
-    stageEl.addEventListener('pointercancel', resetDrag);
+    canvas.addEventListener('pointerleave', () => { dragging = false; });
     startPetStageLoop();
   }
 
@@ -1236,89 +1380,71 @@
     const isDownMarket = holdings.length > 0 && (totalMarketValue - totalCost) < 0;
     const divSummary = analyzePortfolioDividendSources(holdings);
     const auras = getPetAuras(holdings, divSummary);
-    const activeTheme = petState.activeTheme || 'fortune';
-    const bgCls = `pet-stage-bg-${activeTheme}`;
-    const isDark = activeTheme === 'obsidian';
     const stageTitle = meta.stageNames[lvInfo.stage - 1] || petMetaSafe(meta);
-
-    const themes = [
-      { id: 'fortune', name: '財運紅金', cost: 0 },
-      { id: 'default', name: '極簡純白', cost: 0 },
-      { id: 'obsidian', name: '曜石黑金', cost: 80 },
-      { id: 'sakura', name: '晨曦櫻花', cost: 150 }
-    ];
-
-    const swoopLabel = petState.species === 'bird' ? '🪽 盤旋飛翔' : (petState.species === 'dog' ? '🦴 飛奔巡邏' : '🐾 躍動招手');
+    const swoopLabel = petState.species === 'bird' ? '🪽 3D 衝刺飛翔' : (petState.species === 'dog' ? '🦴 3D 飛奔巡邏' : '🐾 3D 躍動招手');
 
     openSheet(`
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div>
-          <h3 style="font-size: 16px; font-weight: 800;">✨ 2.5D 財富寵物互動舞台</h3>
-          <div style="font-size: 11px; color: #8E8E93;">點擊舞台引導移動 · 拖曳調整立體視角</div>
+          <h3 style="font-size: 17px; font-weight: 800;">🎮 3D 財富寵物樂園</h3>
+          <div style="font-size: 12px; color: #8E8E93;">360° 拖曳旋轉 3D 視角 · 點擊島嶼地面投擲 3D 金幣</div>
         </div>
         <button class="nav-btn" onclick="closeSheet()">關閉</button>
       </div>
 
       <!-- 寵物選擇列（一開始僅可三選一領養陪伴，確認後鎖定專屬夥伴） -->
-      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; margin-bottom: 4px; color: ${petState.hasChosenStarter ? '#D97706' : '#1C1C1E'};">
-        <span>${petState.hasChosenStarter ? '🤝 專屬陪伴夥伴（一對一鎖定培育）' : '🎯 請選擇一種寵物陪伴出發（三選一）'}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: ${petState.hasChosenStarter ? '#D97706' : '#1C1C1E'};">
+        <span>${petState.hasChosenStarter ? '🤝 專屬 3D 陪伴夥伴（一對一鎖定培育）' : '🎯 請選擇一種 3D 寵物陪伴出發（三選一）'}</span>
         ${petState.hasChosenStarter ? `<span style="color: #8E8E93;">第 ${lvInfo.stage}/20 階</span>` : ''}
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
         ${['cat', 'bird', 'dog'].map(sp => {
           const m = PET_SPECIES_META[sp];
           const active = petState.species === sp;
           const locked = petState.hasChosenStarter && !active;
+          const emoji = sp === 'cat' ? '🐱' : (sp === 'bird' ? '🐥' : '🐕');
           return `
-            <div onclick="selectPetSpecies('${sp}')" style="position: relative; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 16px; background: ${active ? 'radial-gradient(circle, rgba(251,191,36,0.28) 0%, transparent 72%)' : 'transparent'}; opacity: ${locked ? 0.36 : 1}; transition: all 0.2s;">
-              <img src="pet_${sp}.png" alt="${m.label}" style="width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.22)); transform: scale(${active ? 1.14 : 0.90}); transition: transform 0.2s;">
-              ${locked ? '<span style="position: absolute; top: 4px; right: 16%; font-size: 12px;">🔒</span>' : ''}
-              <span style="font-size: 11px; font-weight: 800; margin-top: 2px; color: ${active ? '#D97706' : '#8E8E93'};">${active && petState.hasChosenStarter ? '✓ ' : ''}${m.label}</span>
+            <div onclick="selectPetSpecies('${sp}')" style="position: relative; cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: 16px; background: ${active ? '#FEF3C7' : '#F2F2F7'}; opacity: ${locked ? 0.36 : 1}; transition: all 0.2s;">
+              <div style="font-size: 28px; line-height: 1.1;">${emoji}</div>
+              ${locked ? '<span style="position: absolute; top: 4px; right: 12%; font-size: 12px;">🔒</span>' : ''}
+              <span style="font-size: 13px; font-weight: 800; margin-top: 4px; color: ${active ? '#D97706' : '#666'};">${active && petState.hasChosenStarter ? '✓ ' : ''}${m.label}</span>
             </div>
           `;
         }).join('')}
       </div>
       ${!petState.hasChosenStarter ? `
-        <button class="sim-btn" style="width: 100%; justify-content: center; padding: 9px 12px; font-size: 13px; font-weight: 800; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 4px 10px rgba(245,158,11,0.3); margin-bottom: 10px;" onclick="adoptStarterPet()">
+        <button class="sim-btn" style="width: 100%; justify-content: center; padding: 10px 12px; font-size: 14px; font-weight: 800; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 4px 10px rgba(245,158,11,0.3); margin-bottom: 10px;" onclick="adoptStarterPet()">
           ✨ 確認領養【${meta.label}】開始陪伴
         </button>
       ` : ''}
 
-      <!-- 無外框 2.5D 自由走動／飛翔舞台 -->
-      <div id="petModalStage" class="${bgCls}" style="padding: 6px 6px 10px 6px; text-align: center; position: relative; margin-bottom: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 2px;">
-          <span style="padding: 3px 9px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.06)'}; font-weight: 700;">
-            ${meta.badge}
-          </span>
-          <span style="font-weight: 800; color: #D97706;">🪙 ${petState.spendableDP || 0} DP</span>
-        </div>
-
-        <div id="petPlayground" class="pet-3d-stage" style="position: relative; width: 100%; height: 215px; display: flex; align-items: center; justify-content: center; overflow: visible; cursor: pointer;">
-          <span id="petLureCoin" class="pet-lure-coin" style="display: none;">🪙</span>
-          <div id="petPlaygroundActor" style="position: relative; width: 146px; height: 146px; pointer-events: none;">
-            ${renderPetRigHTML(petState.species, justBounced ? 'pet-bounce' : '', petState.species === 'dog' && isDogSitting, 'petModalImg')}
-            ${isDownMarket ? '<span style="position: absolute; top: 4px; left: 10px; font-size: 22px; z-index: 5; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🪖</span>' : ''}
+      <!-- 真 3D 立體綠茵浮島遊戲畫面 (無 2.5D 卡片感、移除舞台氛圍) -->
+      <div id="petModalStage" style="text-align: center; position: relative; margin-bottom: 12px;">
+        <div style="position: relative; width: 100%; height: 265px; border-radius: 20px; overflow: hidden; background: linear-gradient(180deg, #E0F2FE 0%, #FEF9C3 58%, #DCFCE7 100%); box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);">
+          <canvas id="pet3DGameCanvas" style="width: 100%; height: 100%; display: block; cursor: grab;"></canvas>
+          <div style="position: absolute; top: 10px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; font-size: 12px; font-weight: 800;">
+            <span style="background: rgba(255,255,255,0.82); padding: 3px 10px; border-radius: 99px; color: #1C1C1E;">${meta.badge}</span>
+            <span style="background: rgba(255,255,255,0.82); padding: 3px 10px; border-radius: 99px; color: #D97706;">🪙 ${petState.spendableDP || 0} DP</span>
           </div>
-          <div id="petPlaygroundShadow" class="pet-pedestal" style="position: absolute; bottom: 10px; width: 120px; height: 20px; margin: 0;"></div>
         </div>
 
-        <div style="font-size: 15px; font-weight: 900; margin-top: 2px;">Lv.${lvInfo.level} ${stageTitle}（第 ${lvInfo.stage}/20 階）</div>
-        <div id="petModalQuote" style="font-size: 12px; opacity: 0.85; margin: 4px 0 10px 0; min-height: 16px;">
-          ${isDownMarket ? meta.downLine : `${meta.tagline}（點舞台引導移動）`}
+        <div style="font-size: 17px; font-weight: 900; margin-top: 10px;">Lv.${lvInfo.level} ${stageTitle}（第 ${lvInfo.stage}/20 階）</div>
+        <div id="petModalQuote" style="font-size: 13.5px; color: #555; font-weight: 600; margin: 4px 0 10px 0; min-height: 18px;">
+          ${isDownMarket ? meta.downLine : `${meta.tagline}（點擊 3D 綠茵島地面投金幣引導追逐）`}
         </div>
 
-        <!-- 直接互動按鈕組 -->
-        <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
-          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸招財</button>
-          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #1C1C1E; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); interactModalPet('swoop');">${swoopLabel}</button>
-          <button class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); interactModalPet('coin');">🪙 撒金幣</button>
-          ${petState.species === 'dog' ? `<button id="dogSitBtn" class="sim-btn" style="padding: 6px 12px; font-size: 11px; border-radius: 99px; background: rgba(255,255,255,0.92); color: #9A3412; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="event.stopPropagation(); toggleDogSit(false);">${isDogSitting ? '🐕 站起來' : '🐶 坐下'}</button>` : ''}
+        <!-- 3D 互動按鈕組 -->
+        <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+          <button class="sim-btn" style="padding: 8px 14px; font-size: 13px; font-weight: 700; border-radius: 99px; background: #F2F2F7; color: #1C1C1E;" onclick="event.stopPropagation(); interactModalPet('pat');">👋 摸摸跳躍</button>
+          <button class="sim-btn" style="padding: 8px 14px; font-size: 13px; font-weight: 700; border-radius: 99px; background: #F2F2F7; color: #1C1C1E;" onclick="event.stopPropagation(); interactModalPet('swoop');">${swoopLabel}</button>
+          <button class="sim-btn" style="padding: 8px 14px; font-size: 13px; font-weight: 800; border-radius: 99px; background: linear-gradient(135deg, #FDE047, #F59E0B); color: #451A03; box-shadow: 0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation(); interactModalPet('coin');">🪙 投 3D 金幣</button>
+          ${petState.species === 'dog' ? `<button id="dogSitBtn" class="sim-btn" style="padding: 8px 14px; font-size: 13px; border-radius: 99px; background: #F2F2F7; color: #9A3412; font-weight: 800;" onclick="event.stopPropagation(); toggleDogSit(false);">${isDogSitting ? '🐕 站起來' : '🐶 坐下'}</button>` : ''}
         </div>
 
         <!-- 投組體質光環 -->
         <div style="display: flex; justify-content: center; gap: 6px; flex-wrap: wrap;">
           ${auras.map(a => `
-            <span style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: ${isDark ? 'rgba(255,255,255,0.14)' : a.color + '20'}; color: ${isDark ? '#FEF3C7' : a.color};">
+            <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: ${a.color}20; color: ${a.color};">
               ${a.icon} ${a.text}
             </span>
           `).join('')}
@@ -1326,37 +1452,23 @@
       </div>
 
       <!-- 經驗條與餵食按鈕 -->
-      <div style="background: #F2F2F7; border-radius: 14px; padding: 12px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px;">
+      <div style="background: #F2F2F7; border-radius: 14px; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 6px;">
           <span>晉升階位 (第 ${lvInfo.stage}/20 階)</span>
           <span style="color: #007AFF;">${lvInfo.currentXP} / ${lvInfo.needXP} XP</span>
         </div>
-        <div class="goal-bar-bg" style="margin: 4px 0 10px 0;"><div class="goal-bar-fill" style="width: ${lvInfo.pct}%;"></div></div>
+        <div class="goal-bar-bg" style="margin: 4px 0 12px 0;"><div class="goal-bar-fill" style="width: ${lvInfo.pct}%;"></div></div>
         <div style="display: flex; gap: 8px;">
-          <button class="sim-btn primary" style="flex: 1.3; justify-content: center; padding: 10px; font-size: 12px; font-weight: 700;" onclick="feedPetPending(true)">
+          <button class="sim-btn primary" style="flex: 1.3; justify-content: center; padding: 11px; font-size: 14px; font-weight: 700;" onclick="feedPetPending(true)">
             🪙 餵食全部 (${petState.pendingFeedDP || 0} DP)
           </button>
-          <button class="sim-btn" style="flex: 1; justify-content: center; padding: 10px; font-size: 12px; background: #E5E5EA; color: #1C1C1E; font-weight: 700;" onclick="simulatePetDividendDP()">
+          <button class="sim-btn" style="flex: 1; justify-content: center; padding: 11px; font-size: 14px; background: #E5E5EA; color: #1C1C1E; font-weight: 700;" onclick="simulatePetDividendDP()">
             🧪 模擬領息 +50
           </button>
         </div>
       </div>
-
-      <!-- 氛圍光線切換 -->
-      <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #1C1C1E;">✨ 舞台氛圍（不遮寵物，用 DP 解鎖）</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-        ${themes.map(t => {
-          const unlocked = t.cost === 0 || (petState.unlockedThemes || []).includes(t.id);
-          const active = activeTheme === t.id;
-          return `
-            <button class="sim-btn" style="justify-content: center; padding: 8px 6px; font-size: 11px; font-weight: 700; background: ${active ? '#1C1C1E' : '#F2F2F7'}; color: ${active ? '#FDE047' : '#1C1C1E'};" onclick="buyOrApplyPetTheme('${t.id}', ${t.cost})">
-              ${active ? '✓ ' : ''}${t.name}${unlocked ? '' : ` (${t.cost}DP)`}
-            </button>
-          `;
-        }).join('')}
-      </div>
     `);
-    setTimeout(() => bindPet3DTilt(document.getElementById('petPlayground')), 30);
+    setTimeout(() => bindPet3DTilt(document.getElementById('pet3DGameCanvas')), 30);
   }
 
   function petMetaSafe(meta) {
